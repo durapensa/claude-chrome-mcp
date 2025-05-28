@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Claude Chrome MCP",
+  "version": "1.0.0",
+  "description": "Enable Claude Desktop to interact with claude.ai through MCP",
+  "permissions": [
+    "debugger",
+    "tabs",
+    "activeTab",
+    "storage",
+    "webNavigation"
+  ],
+  "host_permissions": [
+    "https://claude.ai/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [{
+    "matches": ["https://claude.ai/*"],
+    "js": ["content.js"],
+    "run_at": "document_end"
+  }],
+  "web_accessible_resources": [{
+    "resources": ["*.js"],
+    "matches": ["https://claude.ai/*"]
+  }]
+}
