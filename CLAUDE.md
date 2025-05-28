@@ -137,14 +137,7 @@ Both clients can control Claude.ai tabs simultaneously without conflicts.
 
 To integrate Claude Chrome MCP with Claude Code:
 
-1. **Start the WebSocket Server** (required for Claude Code):
-   ```bash
-   cd mcp-server
-   node standalone-websocket-54322.js
-   ```
-   Keep this running in the background.
-
-2. **Add to Claude Code MCP Configuration**:
+1. **Add to Claude Code MCP Configuration**:
    Add this to your Claude Code MCP settings:
    ```json
    {
@@ -158,9 +151,11 @@ To integrate Claude Chrome MCP with Claude Code:
    ```
    Replace `/path/to/claude-chrome-mcp` with your actual project path.
 
-3. **Restart Claude Code** to load the MCP server.
+2. **Restart Claude Code** to load the MCP server.
 
-4. **Verify Integration**:
+   **Note**: The WebSocket server now auto-starts! No manual setup required.
+
+3. **Verify Integration**:
    - Claude Code should now have access to all 8 Chrome tools
    - Test with: "spawn a new Claude tab" or "get Claude sessions"
    - Both Claude Desktop and Claude Code can control Chrome simultaneously

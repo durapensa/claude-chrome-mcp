@@ -212,8 +212,10 @@ const ClaudePageUtils = {
   // Check if page is ready for interaction
   isPageReady() {
     const input = this.getMessageInput();
-    const hasContent = document.querySelector('main, .conversation, .chat');
-    return !!(input && hasContent);
+    // Check for any content that indicates Claude is loaded
+    const hasContent = document.querySelector('main, .conversation, .chat, [data-testid*="message"], .font-user-message, .font-claude-message, div[role="presentation"]');
+    const hasClaudeUI = document.querySelector('h1, h2, nav, header') || document.title.includes('Claude');
+    return !!(input && (hasContent || hasClaudeUI));
   }
 };
 

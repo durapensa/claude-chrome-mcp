@@ -5,6 +5,8 @@ const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio
 const { CallToolRequestSchema, ListToolsRequestSchema } = require('@modelcontextprotocol/sdk/types.js');
 const WebSocket = require('ws');
 const EventEmitter = require('events');
+const { spawn } = require('child_process');
+const path = require('path');
 
 class WebSocketClient extends EventEmitter {
   constructor(url = 'ws://localhost:54322') {
@@ -168,7 +170,29 @@ class ClaudeCodeMCPServer {
     );
 
     this.wsClient = new WebSocketClient();
+    this.websocketServerProcess = null;
     this.setupToolHandlers();
+  }
+
+  async startWebSocketServer() {
+    console.error('Claude Code MCP: Starting WebSocket server...');
+    const serverPath = path.join(__dirname, '..', 'standalone-websocket-54322.js');
+    
+    this.websocketServerProcess = spawn('node', [serverPath], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      detached: false
+    });
+
+    this.websocketServerProcess.stdout.on('data', (data) => {
+      console.error('WebSocket Server:', data.toString().trim());
+    });
+
+    this.websocketServerProcess.stderr.on('data', (data) => {
+      console.error('WebSocket Server Error:', data.toString().trim());
+    });
+
+    // Wait a moment for server to start
+    await new Promise(resolve => setTimeout(resolve, 1000));
   }
 
   setupToolHandlers() {
@@ -689,11 +713,28 @@ class ClaudeCodeMCPServer {
     }
   }
 
+  async start() {
+    // Start WebSocket server first
+    await this.startWebSocketServer();
+    
+    // Then connect WebSocket client and start MCP server
+    await this.wsClient.connect();
+    
+    const transport = new StdioServerTransport();
+    await this.server.connect(transport);
+    
+    console.error('Claude Code MCP: Server started successfully');
+  }
+
   async stop() {
     console.error('Claude Code MCP: Shutting down server...');
     
     if (this.wsClient) {
       this.wsClient.disconnect();
+    }
+    
+    if (this.websocketServerProcess && !this.websocketServerProcess.killed) {
+      this.websocketServerProcess.kill('SIGTERM');
     }
     
     if (this.server) {
@@ -711,6 +752,11 @@ const server = new ClaudeCodeMCPServer();
 const gracefulShutdown = async (signal) => {
   console.error(`Claude Code MCP: Received ${signal}, shutting down gracefully...`);
   try {
+    // Kill WebSocket server process if it exists
+    if (server.websocketServerProcess && !server.websocketServerProcess.killed) {
+      console.error('Claude Code MCP: Stopping WebSocket server...');
+      server.websocketServerProcess.kill('SIGTERM');
+    }
     await server.stop();
     process.exit(0);
   } catch (error) {
