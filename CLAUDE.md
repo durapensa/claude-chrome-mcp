@@ -133,27 +133,33 @@ Both clients can control Claude.ai tabs simultaneously without conflicts.
 - **Claude Code**: Uses dedicated MCP server on port 54322 ✅ READY
 - **CLI Tool**: Connects to Claude Code server by default (port 54322) ✅
 
-### **Claude Code Setup Instructions** 🆕
+### **Setup Instructions** 🆕
 
-To integrate Claude Chrome MCP with Claude Code:
+**Zero Configuration Required!** The system auto-detects your MCP client type.
 
-1. **Add to Claude Code MCP Configuration**:
-   Add this to your Claude Code MCP settings:
+1. **Add to Any MCP Client Configuration**:
    ```json
    {
      "mcpServers": {
        "claude-chrome-mcp": {
          "command": "node",
-         "args": ["/path/to/claude-chrome-mcp/mcp-server/bin/ccm-server-claude-code"]
+         "args": ["/path/to/claude-chrome-mcp/mcp-server/src/server.js"]
        }
      }
    }
    ```
    Replace `/path/to/claude-chrome-mcp` with your actual project path.
 
-2. **Restart Claude Code** to load the MCP server.
+2. **Restart your MCP client** to load the server.
 
-   **Note**: The WebSocket server now auto-starts! No manual setup required.
+   **Note**: Hub auto-starts and client auto-identifies! No manual setup required.
+   
+3. **Auto-Detection Features**:
+   - ✅ **Claude Desktop** → Detected automatically
+   - ✅ **Claude Code** → Detected automatically  
+   - ✅ **VS Code** → Detected automatically
+   - ✅ **Cursor** → Detected automatically
+   - ✅ **Custom Clients** → Generic fallback with process name
 
 3. **Verify Integration**:
    - Claude Code should now have access to all 8 Chrome tools
@@ -176,32 +182,6 @@ Once configured, Claude Code will have access to these tools:
 2. **Redundancy**: If one server fails, the other continues working  
 3. **Scalability**: Easy to add more client types in the future
 4. **No Conflicts**: Each client maintains separate request queues
-
-## Implementation Best Practices
-
-### 1. **Session Management**
-- Use descriptive naming for different project aspects
-- Maintain session inventory with `get_claude_sessions`
-- Clean up unused sessions periodically
-- Coordinate between Claude Desktop and Claude Code workflows
-
-### 2. **Message Optimization**
-- Send focused, specific queries to web Claude
-- Use web Claude for exploratory questions
-- Reserve API for final, polished interactions
-- Leverage both clients for parallel workflows
-
-### 3. **Content Extraction**
-- Use `get_claude_response` for clean content retrieval
-- Post-process extracted content as needed
-- Combine multiple responses for comprehensive outputs
-- Share results between Claude Desktop and Claude Code workflows
-
-### 4. **Error Handling**
-- Always check page readiness with `debug_claude_page`
-- Implement retry logic for network issues
-- Validate responses before processing
-- Monitor connection status for both servers
 
 ## Integration with Claude Code Workflows
 

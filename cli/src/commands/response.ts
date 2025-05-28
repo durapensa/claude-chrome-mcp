@@ -24,8 +24,8 @@ export function responseCommand(program: Command): void {
       try {
         const response = await client.getLatestResponse(tabIdNum);
 
-        if (response.error) {
-          console.error(chalk.red('Error getting response:'), response.error);
+        if (response.error || (response.success === false)) {
+          console.error(chalk.red('Error getting response:'), response.error || response.reason);
           process.exit(1);
         }
 

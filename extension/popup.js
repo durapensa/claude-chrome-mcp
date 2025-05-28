@@ -9,7 +9,6 @@ class CCMPopup {
     await this.connectToBackground();
     this.setupEventListeners();
     this.startStatusUpdates();
-    this.refreshData();
   }
 
   async connectToBackground() {
@@ -19,21 +18,13 @@ class CCMPopup {
 
   async getBackgroundStatus() {
     return new Promise((resolve) => {
-      chrome.runtime.sendMessage({ type: 'getStatus' }, (response) => {
+      chrome.runtime.sendMessage({ type: 'getHubStatus' }, (response) => {
         resolve(response || {});
       });
     });
   }
 
   setupEventListeners() {
-    document.getElementById('refresh-btn').addEventListener('click', () => {
-      this.refreshData();
-    });
-
-    document.getElementById('new-tab-btn').addEventListener('click', () => {
-      this.createNewClaudeTab();
-    });
-
     // Add click handler for server status to retry connection
     document.getElementById('server-status').addEventListener('click', () => {
       this.retryConnection();
@@ -48,6 +39,75 @@ class CCMPopup {
   }
 
   async updateServerStatus() {
+    const status = await this.getBackgroundStatus();
+    this.updateHubDisplay(status);
+  }
+
+  updateHubDisplay(status) {
+    const serverDot = document.getElementById('server-dot');
+    const serverDetail = document.getElementById('server-detail');
+    const clientsList = document.getElementById('clients-list');
+    
+    // Update hub connection status
+    if (status.hubConnected) {
+      serverDot.className = 'status-dot connected';
+      serverDetail.textContent = `Hub Connected (Port ${status.serverPort})`;
+    } else {
+      serverDot.className = 'status-dot disconnected';
+      serverDetail.textContent = 'Hub Disconnected';
+    }
+    
+    // Update clients list
+    this.updateClientsList(status.connectedClients || [], clientsList);
+    
+    // Also update Claude sessions
+    this.updateClaudeSessions();
+  }
+  
+  updateClientsList(clients, container) {
+    container.innerHTML = '';
+    
+    // Only show clients that are actually connected and have meaningful names
+    const validClients = (clients || []).filter(client => 
+      client && 
+      client.name && 
+      client.name !== 'Unknown Client' && 
+      client.connected !== false &&
+      client.websocketState === 1 // WebSocket.OPEN
+    );
+    
+    if (validClients.length === 0) {
+      container.innerHTML = '<div class="no-clients">No MCP clients connected</div>';
+      return;
+    }
+    
+    validClients.forEach(client => {
+      const clientDiv = document.createElement('div');
+      clientDiv.className = 'client-item';
+      
+      const timeSinceConnect = Math.floor((Date.now() - client.connectedAt) / 1000);
+      const lastActivity = Math.floor((Date.now() - client.lastActivity) / 1000);
+      
+      clientDiv.innerHTML = `
+        <div class="client-header">
+          <span class="client-name">${this.escapeHtml(client.name)}</span>
+          <span class="client-type">${this.escapeHtml(client.type)}</span>
+        </div>
+        <div class="client-details">
+          <span class="client-id">ID: ${this.escapeHtml(client.id)}</span>
+          <span class="client-requests">Requests: ${client.requestCount || 0}</span>
+        </div>
+        <div class="client-timing">
+          <span>Connected: ${timeSinceConnect}s ago</span>
+          <span>Last active: ${lastActivity}s ago</span>
+        </div>
+      `;
+      
+      container.appendChild(clientDiv);
+    });
+  }
+
+  async oldUpdateServerStatus() {
     try {
       const status = await this.getBackgroundStatus();
       
@@ -167,9 +227,6 @@ class CCMPopup {
     });
   }
 
-  async refreshData() {
-    await this.updateClaudeSessions();
-  }
 
   async updateClaudeSessions() {
     try {
@@ -221,15 +278,6 @@ class CCMPopup {
     `).join('');
   }
 
-  async createNewClaudeTab() {
-    try {
-      chrome.tabs.create({ url: 'https://claude.ai' });
-      // Refresh after a short delay to show the new tab
-      setTimeout(() => this.refreshData(), 1000);
-    } catch (error) {
-      console.error('Failed to create new Claude tab:', error);
-    }
-  }
 
   escapeHtml(unsafe) {
     return unsafe

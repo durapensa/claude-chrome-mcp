@@ -46,25 +46,29 @@ export function scriptCommand(program: Command): void {
         }
 
         if (options.raw) {
-          console.log(result.value);
+          const scriptResult = result.result || result;
+          console.log(scriptResult.value);
           return;
         }
 
         console.log(chalk.green('✓ Script executed successfully'));
         
-        if (result.value !== undefined) {
+        // Handle the nested result structure
+        const scriptResult = result.result || result;
+        
+        if (scriptResult.value !== undefined) {
           console.log(chalk.gray('Result:'));
           
           // Pretty print the result
-          if (typeof result.value === 'object') {
-            console.log(JSON.stringify(result.value, null, 2));
+          if (typeof scriptResult.value === 'object') {
+            console.log(JSON.stringify(scriptResult.value, null, 2));
           } else {
-            console.log(result.value);
+            console.log(scriptResult.value);
           }
         }
 
-        if (result.type) {
-          console.log(chalk.gray(`Type: ${result.type}`));
+        if (scriptResult.type) {
+          console.log(chalk.gray(`Type: ${scriptResult.type}`));
         }
       } catch (error) {
         console.error(chalk.red('Script execution failed:'), (error as Error).message);
