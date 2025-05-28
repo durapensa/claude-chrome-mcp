@@ -8,13 +8,18 @@
     "tabs",
     "activeTab",
     "storage",
-    "webNavigation"
+    "webNavigation",
+    "notifications"
   ],
   "host_permissions": [
     "https://claude.ai/*"
   ],
   "background": {
     "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Claude Chrome MCP"
   },
   "content_scripts": [{
     "matches": ["https://claude.ai/*"],
