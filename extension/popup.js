@@ -51,46 +51,86 @@ class CCMPopup {
     try {
       const status = await this.getBackgroundStatus();
       
-      if (!status.connectionState) {
+      if (!status.globalConnectionState) {
         this.setServerStatus('disconnected', 'Background script not available');
         this.showHelp(true);
         return;
       }
 
-      const connectionState = status.connectionState;
-      const websocketState = status.websocketState;
-      const attempts = status.reconnectAttempts || 0;
-      const maxAttempts = status.maxReconnectAttempts || 10;
-      const lastError = status.lastError;
-
-      if (connectionState === 'connecting') {
-        this.setServerStatus('connecting', 'Connecting to MCP server...');
-        this.showHelp(false);
-      } else if (connectionState === 'connected') {
-        this.setServerStatus('connected', 'Connected to MCP server');
-        this.showHelp(false);
-      } else {
-        // Disconnected state
-        if (attempts >= maxAttempts) {
-          const errorMsg = lastError === 'MCP server not running' ? 
-            'MCP server not running' : 'Connection failed (max retries exceeded)';
-          this.setServerStatus('disconnected', errorMsg);
-          this.showHelp(true);
-        } else if (attempts > 0) {
-          this.setServerStatus('connecting', `Reconnecting... (${attempts}/${maxAttempts})`);
-          this.showHelp(false);
-        } else {
-          const errorMsg = lastError === 'MCP server not running' ? 
-            'MCP server not running' : 'Disconnected from MCP server';
-          this.setServerStatus('disconnected', errorMsg);
-          this.showHelp(lastError === 'MCP server not running');
-        }
-      }
+      this.renderMultiServerStatus(status);
     } catch (error) {
       console.error('Failed to get background status:', error);
       this.setServerStatus('disconnected', 'Failed to get status');
       this.showHelp(true);
     }
+  }
+
+  renderMultiServerStatus(status) {
+    const { globalConnectionState, servers } = status;
+    const serverStatusElement = document.getElementById('server-status');
+
+    // Clear existing content and create multi-server display
+    const serverDetail = document.getElementById('server-detail');
+    
+    if (!servers || servers.length === 0) {
+      this.setServerStatus('disconnected', 'No servers configured');
+      this.showHelp(true);
+      return;
+    }
+
+    // Update main status based on global state
+    const connectedServers = servers.filter(s => s.state === 'connected');
+    const connectingServers = servers.filter(s => s.state === 'connecting');
+    
+    if (connectedServers.length > 0) {
+      const connectedNames = connectedServers.map(s => s.name).join(', ');
+      this.setServerStatus('connected', `Connected: ${connectedNames}`);
+      this.showHelp(false);
+    } else if (connectingServers.length > 0) {
+      const connectingNames = connectingServers.map(s => s.name).join(', ');
+      this.setServerStatus('connecting', `Connecting: ${connectingNames}`);
+      this.showHelp(false);
+    } else {
+      this.setServerStatus('disconnected', 'All servers disconnected');
+      this.showHelp(true);
+    }
+
+    // Add detailed server info below main status
+    this.renderDetailedServerStatus(servers);
+  }
+
+  renderDetailedServerStatus(servers) {
+    const container = document.getElementById('servers-detail');
+    if (!container) {
+      // Create container if it doesn't exist
+      const newContainer = document.createElement('div');
+      newContainer.id = 'servers-detail';
+      newContainer.className = 'servers-detail';
+      document.getElementById('server-status').appendChild(newContainer);
+    }
+
+    const detailContainer = document.getElementById('servers-detail');
+    detailContainer.innerHTML = servers.map(server => {
+      const statusIcon = {
+        connected: '●',
+        connecting: '◐',
+        disconnected: '○',
+        failed: '×'
+      }[server.state] || '○';
+
+      const statusClass = server.state;
+      const errorText = server.lastError ? ` (${server.lastError})` : '';
+      
+      return `
+        <div class="server-item ${statusClass}">
+          <span class="server-icon">${statusIcon}</span>
+          <span class="server-name">${server.name}</span>
+          <span class="server-port">:${server.port}</span>
+          ${server.reconnectAttempts > 0 ? `<span class="retry-count">(${server.reconnectAttempts})</span>` : ''}
+          ${errorText ? `<span class="error-text">${errorText}</span>` : ''}
+        </div>
+      `;
+    }).join('');
   }
 
   showHelp(show) {

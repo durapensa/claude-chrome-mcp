@@ -8,9 +8,13 @@ const ChromeBridge = require('./chrome-bridge.js');
 
 class CCMMCPServer {
   constructor() {
+    const serverId = process.env.CCM_SERVER_ID || 'claude-desktop';
+    const serverName = process.env.CCM_SERVER_NAME || 'Claude Chrome MCP';
+    const websocketPort = parseInt(process.env.CCM_WEBSOCKET_PORT || '54321', 10);
+
     this.server = new Server(
       {
-        name: 'claude-chrome-mcp',
+        name: `claude-chrome-mcp-${serverId}`,
         version: '1.0.0',
       },
       {
@@ -20,8 +24,10 @@ class CCMMCPServer {
       }
     );
 
-    this.websocketServer = new WebSocketServer(54321);
+    this.websocketServer = new WebSocketServer(websocketPort);
     this.chromeBridge = new ChromeBridge(this.websocketServer);
+    this.serverId = serverId;
+    this.serverName = serverName;
     this.setupToolHandlers();
   }
 
@@ -221,12 +227,12 @@ class CCMMCPServer {
   async start() {
     // Start WebSocket server for extension communication
     await this.websocketServer.start();
-    console.error('CCM WebSocket server started on port 54321');
+    console.error(`${this.serverName} WebSocket server started on port ${this.websocketServer.port}`);
 
-    // Start MCP server for Claude Desktop communication
+    // Start MCP server for client communication
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    console.error('CCM MCP server started');
+    console.error(`${this.serverName} MCP server started`);
   }
 
   async stop() {

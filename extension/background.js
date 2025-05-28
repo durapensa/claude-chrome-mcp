@@ -1,127 +1,178 @@
 // Chrome Extension Background Service Worker
-// Handles WebSocket connection to MCP server and debugger management
+// Handles WebSocket connections to multiple MCP servers and debugger management
 
-const WEBSOCKET_PORT = 54321;
-const MCP_SERVER_URL = `ws://localhost:${WEBSOCKET_PORT}`;
 const KEEPALIVE_INTERVAL = 20000;
+
+// Multiple server configuration
+const MCP_SERVERS = [
+  { id: 'claude-desktop', port: 54321, name: 'Claude Desktop', priority: 1 },
+  { id: 'claude-code', port: 54322, name: 'Claude Code', priority: 2 }
+];
 
 class CCMExtension {
   constructor() {
-    this.websocket = null;
+    this.connections = new Map(); // serverId -> connection info
     this.connectedTabs = new Map();
     this.debuggerSessions = new Map();
-    this.reconnectAttempts = 0;
-    this.maxReconnectAttempts = 10;
-    this.reconnectTimer = null;
-    this.connectionState = 'disconnected'; // disconnected, connecting, connected
-    this.lastError = null;
+    this.globalConnectionState = 'disconnected'; // overall state
     this.hasShownNotification = false;
     
     this.init();
   }
 
   init() {
-    this.connectToMCPServer();
+    this.connectToAllServers();
     this.setupEventListeners();
     this.startKeepalive();
   }
 
-  connectToMCPServer() {
-    if (this.connectionState === 'connecting') {
+  connectToAllServers() {
+    console.log('CCM: Connecting to all MCP servers...');
+    MCP_SERVERS.forEach(server => {
+      this.connectToServer(server);
+    });
+  }
+
+  connectToServer(serverConfig) {
+    const serverId = serverConfig.id;
+    const existing = this.connections.get(serverId);
+    
+    if (existing && existing.state === 'connecting') {
       return; // Already trying to connect
     }
 
-    this.connectionState = 'connecting';
-    console.log('CCM: Attempting to connect to MCP server...');
+    // Initialize or update connection info
+    const connectionInfo = {
+      config: serverConfig,
+      websocket: null,
+      state: 'connecting',
+      reconnectAttempts: existing?.reconnectAttempts || 0,
+      reconnectTimer: null,
+      lastError: null
+    };
+    
+    this.connections.set(serverId, connectionInfo);
+    
+    console.log(`CCM: Attempting to connect to ${serverConfig.name} (${serverConfig.port})...`);
 
     try {
       // Close existing connection if any
-      if (this.websocket) {
-        this.websocket.close();
+      if (existing?.websocket) {
+        existing.websocket.close();
       }
 
-      this.websocket = new WebSocket(MCP_SERVER_URL);
+      const serverUrl = `ws://localhost:${serverConfig.port}`;
+      connectionInfo.websocket = new WebSocket(serverUrl);
       
-      this.websocket.onopen = () => {
-        console.log('CCM: Connected to MCP server');
-        this.connectionState = 'connected';
-        this.reconnectAttempts = 0;
+      connectionInfo.websocket.onopen = () => {
+        console.log(`CCM: Connected to ${serverConfig.name}`);
+        connectionInfo.state = 'connected';
+        connectionInfo.reconnectAttempts = 0;
         
         // Clear any pending reconnect timer
-        if (this.reconnectTimer) {
-          clearTimeout(this.reconnectTimer);
-          this.reconnectTimer = null;
+        if (connectionInfo.reconnectTimer) {
+          clearTimeout(connectionInfo.reconnectTimer);
+          connectionInfo.reconnectTimer = null;
         }
         
-        this.sendMessage({ type: 'extension_ready', timestamp: Date.now() });
-        this.updateBadge('connected');
+        this.sendMessageToServer(serverId, { 
+          type: 'extension_ready', 
+          extensionId: chrome.runtime.id,
+          timestamp: Date.now() 
+        });
+        this.updateGlobalState();
       };
 
-      this.websocket.onmessage = (event) => {
+      connectionInfo.websocket.onmessage = (event) => {
         try {
-          this.handleMCPMessage(JSON.parse(event.data));
+          const message = JSON.parse(event.data);
+          this.handleServerMessage(serverId, message);
         } catch (error) {
-          console.error('CCM: Error parsing message:', error);
+          console.error(`CCM: Error parsing message from ${serverConfig.name}:`, error);
         }
       };
 
-      this.websocket.onclose = (event) => {
-        console.log('CCM: Disconnected from MCP server', event.code, event.reason);
-        this.connectionState = 'disconnected';
-        this.updateBadge('disconnected');
+      connectionInfo.websocket.onclose = (event) => {
+        console.log(`CCM: Disconnected from ${serverConfig.name}`, event.code, event.reason);
+        connectionInfo.state = 'disconnected';
+        this.updateGlobalState();
         
         // Only attempt reconnect if it wasn't a clean close
         if (event.code !== 1000) {
-          this.scheduleReconnect();
+          this.scheduleServerReconnect(serverId);
         }
       };
 
-      this.websocket.onerror = (error) => {
-        console.error('CCM: WebSocket error:', error);
-        this.connectionState = 'disconnected';
-        this.lastError = 'Connection failed';
-        this.updateBadge('error');
+      connectionInfo.websocket.onerror = (error) => {
+        console.error(`CCM: WebSocket error for ${serverConfig.name}:`, error);
+        connectionInfo.state = 'disconnected';
+        connectionInfo.lastError = 'Connection failed';
+        this.updateGlobalState();
       };
 
       // Set a connection timeout
       setTimeout(() => {
-        if (this.connectionState === 'connecting' && this.websocket.readyState !== WebSocket.OPEN) {
-          console.log('CCM: Connection timeout - MCP server likely not running');
-          this.lastError = 'MCP server not running';
-          this.websocket.close();
-          this.scheduleReconnect();
+        if (connectionInfo.state === 'connecting' && connectionInfo.websocket.readyState !== WebSocket.OPEN) {
+          console.log(`CCM: Connection timeout for ${serverConfig.name} - server likely not running`);
+          connectionInfo.lastError = 'Server not running';
+          connectionInfo.websocket.close();
+          this.scheduleServerReconnect(serverId);
         }
       }, 5000);
 
     } catch (error) {
-      console.error('CCM: Failed to create WebSocket:', error);
-      this.connectionState = 'disconnected';
-      this.lastError = 'Connection failed';
-      this.scheduleReconnect();
+      console.error(`CCM: Failed to create WebSocket for ${serverConfig.name}:`, error);
+      connectionInfo.state = 'disconnected';
+      connectionInfo.lastError = 'Connection failed';
+      this.scheduleServerReconnect(serverId);
     }
   }
 
-  scheduleReconnect() {
+  scheduleServerReconnect(serverId) {
+    const connectionInfo = this.connections.get(serverId);
+    if (!connectionInfo) return;
+
+    const maxReconnectAttempts = 10;
+    
     // Clear any existing timer
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
+    if (connectionInfo.reconnectTimer) {
+      clearTimeout(connectionInfo.reconnectTimer);
     }
 
-    if (this.reconnectAttempts < this.maxReconnectAttempts) {
-      this.reconnectAttempts++;
-      const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+    if (connectionInfo.reconnectAttempts < maxReconnectAttempts) {
+      connectionInfo.reconnectAttempts++;
+      const delay = Math.min(1000 * Math.pow(2, connectionInfo.reconnectAttempts), 30000);
       
-      console.log(`CCM: Scheduling reconnect attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`);
+      console.log(`CCM: Scheduling reconnect attempt for ${connectionInfo.config.name} ${connectionInfo.reconnectAttempts}/${maxReconnectAttempts} in ${delay}ms`);
       
-      this.reconnectTimer = setTimeout(() => {
-        this.connectToMCPServer();
+      connectionInfo.reconnectTimer = setTimeout(() => {
+        this.connectToServer(connectionInfo.config);
       }, delay);
       
-      this.updateBadge('reconnecting');
+      this.updateGlobalState();
     } else {
-      console.log('CCM: Max reconnect attempts exceeded');
-      this.updateBadge('failed');
+      console.log(`CCM: Max reconnect attempts exceeded for ${connectionInfo.config.name}`);
+      connectionInfo.state = 'failed';
+      this.updateGlobalState();
       this.showServerNotRunningNotification();
+    }
+  }
+
+  updateGlobalState() {
+    const states = Array.from(this.connections.values()).map(conn => conn.state);
+    
+    if (states.includes('connected')) {
+      this.globalConnectionState = 'connected';
+      this.updateBadge('connected');
+    } else if (states.includes('connecting')) {
+      this.globalConnectionState = 'connecting';
+      this.updateBadge('reconnecting');
+    } else if (states.every(state => state === 'failed')) {
+      this.globalConnectionState = 'failed';
+      this.updateBadge('failed');
+    } else {
+      this.globalConnectionState = 'disconnected';
+      this.updateBadge('disconnected');
     }
   }
 
@@ -140,15 +191,26 @@ class CCMExtension {
     chrome.action.setBadgeBackgroundColor({ color: config.color });
   }
 
-  sendMessage(message) {
-    if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
-      this.websocket.send(JSON.stringify(message));
+  sendMessageToServer(serverId, message) {
+    const connectionInfo = this.connections.get(serverId);
+    if (connectionInfo?.websocket && connectionInfo.websocket.readyState === WebSocket.OPEN) {
+      connectionInfo.websocket.send(JSON.stringify(message));
       return true;
     }
     return false;
   }
 
-  async handleMCPMessage(message) {
+  broadcastToAllServers(message) {
+    let sentCount = 0;
+    this.connections.forEach((connectionInfo, serverId) => {
+      if (this.sendMessageToServer(serverId, message)) {
+        sentCount++;
+      }
+    });
+    return sentCount;
+  }
+
+  async handleServerMessage(serverId, message) {
     const { type, tabId, command, params, requestId } = message;
 
     try {
@@ -174,14 +236,14 @@ class CCMExtension {
           throw new Error(`Unknown message type: ${type}`);
       }
 
-      this.sendMessage({
+      this.sendMessageToServer(serverId, {
         type: 'response',
         requestId,
         result,
         timestamp: Date.now()
       });
     } catch (error) {
-      this.sendMessage({
+      this.sendMessageToServer(serverId, {
         type: 'error',
         requestId,
         error: error.message,
@@ -328,13 +390,20 @@ class CCMExtension {
     // Handle messages from popup
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       if (request.type === 'getStatus') {
+        const serverStatus = Array.from(this.connections.entries()).map(([serverId, connectionInfo]) => ({
+          id: serverId,
+          name: connectionInfo.config.name,
+          port: connectionInfo.config.port,
+          state: connectionInfo.state,
+          reconnectAttempts: connectionInfo.reconnectAttempts,
+          lastError: connectionInfo.lastError,
+          hasWebSocket: !!connectionInfo.websocket,
+          websocketState: connectionInfo.websocket ? connectionInfo.websocket.readyState : null
+        }));
+
         sendResponse({
-          connectionState: this.connectionState,
-          lastError: this.lastError,
-          reconnectAttempts: this.reconnectAttempts,
-          maxReconnectAttempts: this.maxReconnectAttempts,
-          hasWebSocket: !!this.websocket,
-          websocketState: this.websocket ? this.websocket.readyState : null,
+          globalConnectionState: this.globalConnectionState,
+          servers: serverStatus,
           debuggerSessions: Array.from(this.debuggerSessions.keys())
         });
       } else if (request.type === 'retryConnection') {
@@ -346,7 +415,7 @@ class CCMExtension {
   }
 
   notifyTabUpdate(tab) {
-    this.sendMessage({
+    this.broadcastToAllServers({
       type: 'tab_update',
       tab: {
         id: tab.id,
@@ -360,26 +429,28 @@ class CCMExtension {
 
   startKeepalive() {
     setInterval(() => {
-      if (this.connectionState === 'connected') {
-        const sent = this.sendMessage({ type: 'keepalive', timestamp: Date.now() });
-        if (!sent) {
-          console.log('CCM: Keepalive failed, connection may be dead');
-          this.connectionState = 'disconnected';
-          this.scheduleReconnect();
+      if (this.globalConnectionState === 'connected') {
+        const sentCount = this.broadcastToAllServers({ type: 'keepalive', timestamp: Date.now() });
+        if (sentCount === 0) {
+          console.log('CCM: All keepalives failed, connections may be dead');
+          this.connectToAllServers();
         }
       }
     }, KEEPALIVE_INTERVAL);
   }
 
-  // Method to manually retry connection (can be called from popup)
+  // Method to manually retry connections (can be called from popup)
   retryConnection() {
-    console.log('CCM: Manual retry connection requested');
-    this.reconnectAttempts = 0; // Reset attempts
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
-    this.connectToMCPServer();
+    console.log('CCM: Manual retry connections requested');
+    // Reset all connection attempts
+    this.connections.forEach((connectionInfo) => {
+      connectionInfo.reconnectAttempts = 0;
+      if (connectionInfo.reconnectTimer) {
+        clearTimeout(connectionInfo.reconnectTimer);
+        connectionInfo.reconnectTimer = null;
+      }
+    });
+    this.connectToAllServers();
   }
 
   showServerNotRunningNotification() {

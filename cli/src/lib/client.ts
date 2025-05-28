@@ -21,7 +21,7 @@ export class CCMClient {
   private pendingRequests = new Map<string, { resolve: Function; reject: Function; timeout: NodeJS.Timeout }>();
 
   constructor(
-    private serverUrl: string = 'ws://localhost:54321',
+    private serverUrl: string = 'ws://localhost:54322',
     private verbose: boolean = false
   ) {}
 

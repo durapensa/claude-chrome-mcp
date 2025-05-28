@@ -17,7 +17,7 @@ program
   .name('ccm')
   .description('Claude Chrome MCP CLI - Control Claude.ai from the command line')
   .version('1.0.0')
-  .option('-s, --server <url>', 'WebSocket server URL', 'ws://localhost:54321')
+  .option('-s, --server <url>', 'WebSocket server URL', 'ws://localhost:54322')
   .option('-v, --verbose', 'Enable verbose logging')
   .option('--no-color', 'Disable colored output');
 
