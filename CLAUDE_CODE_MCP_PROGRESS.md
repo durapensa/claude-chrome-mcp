@@ -160,10 +160,11 @@ If Claude Code session restarts:
 
 ## 🎉 CLAUDE CHROME MCP + CLAUDE CODE INTEGRATION COMPLETE! 
 
-**FULLY OPERATIONAL SYSTEM (SIMPLIFIED ARCHITECTURE):**
+**FULLY OPERATIONAL SYSTEM (UNIFIED ARCHITECTURE):**
 - ✅ Multi-client Chrome extension (ports 54321 & 54322)
-- ✅ Claude Desktop MCP server (port 54321) 
-- ✅ Claude Code MCP server (auto-starts WebSocket on port 54322) - **SIMPLIFIED**
+- ✅ Single MCP server with environment-based configuration
+- ✅ Claude Desktop: `CCM_WEBSOCKET_PORT=54321` (default)
+- ✅ Claude Code: `CCM_WEBSOCKET_PORT=54322` via wrapper executable
 - ✅ CLI tool (uses port 54322) - **VERIFIED**
 
 **VERIFIED FUNCTIONALITY:**

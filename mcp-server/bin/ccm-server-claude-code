@@ -1,16 +1,12 @@
 #!/usr/bin/env node
 
 // Claude Chrome MCP Server for Claude Code
-// This server connects to the standalone WebSocket server on port 54322
-// and provides MCP tools for Claude Code integration
-
-const path = require('path');
-const serverPath = path.join(__dirname, '..', 'src', 'claude-code-server.js');
+// This executable configures the main MCP server for Claude Code usage
 
 // Set environment variables for Claude Code configuration
 process.env.CCM_SERVER_ID = 'claude-code';
 process.env.CCM_SERVER_NAME = 'Claude Chrome MCP (Claude Code)';
-process.env.CCM_WEBSOCKET_URL = 'ws://localhost:54322';
+process.env.CCM_WEBSOCKET_PORT = '54322';
 
-// Start the server
-require(serverPath);
+// Start the main server with Claude Code configuration
+require('../src/server.js');
