@@ -356,7 +356,15 @@ class CCMExtensionHub {
       const conversationsScript = `
         (async function() {
           try {
-            const response = await fetch('/api/organizations/' + window.organizationId + '/chat_conversations?offset=0&limit=30', {
+            // Extract organization ID from cookies
+            const cookies = document.cookie;
+            const orgMatch = cookies.match(/lastActiveOrg=([^;]+)/);
+            if (!orgMatch) {
+              throw new Error('Organization ID not found in cookies');
+            }
+            const orgId = orgMatch[1];
+            
+            const response = await fetch('/api/organizations/' + orgId + '/chat_conversations?offset=0&limit=30', {
               method: 'GET',
               headers: {
                 'Accept': 'application/json',
@@ -388,12 +396,12 @@ class CCMExtensionHub {
         throw new Error('API Error: ' + apiData.error);
       }
 
-      if (!apiData || !apiData.conversations) {
+      if (!apiData || !Array.isArray(apiData)) {
         throw new Error('Invalid API response format');
       }
 
       // Transform the conversations to include tab IDs
-      const conversations = apiData.conversations.map(conv => ({
+      const conversations = apiData.map(conv => ({
         id: conv.uuid,
         title: conv.name || 'Untitled Conversation',
         created_at: conv.created_at,
