@@ -1,20 +1,12 @@
 # Claude Chrome MCP (CCM)
 
-Developer tool suite enabling Claude Desktop to interact with claude.ai in Chrome browsers through the Model Context Protocol (MCP).
+Developer tool suite enabling Claude Desktop, Claude Code, and other MCP hosts like Cursor, to interact with claude.ai in Chrome browsers.
 
 ## Components
 
 - **Chrome Extension** - Provides chrome.debugger access via WebSocket (claude.ai only)
-- **MCP Server** - Node.js server exposing Chrome capabilities to Claude Desktop  
+- **MCP Server** - Node.js server exposing Chrome capabilities to MCP clients
 - **CLI Tool** - Command-line interface for direct browser control
-
-## Current Status
-
-- ✅ **Chrome Extension**: Multi-server connection manager operational
-- ✅ **MCP Server for Claude Desktop**: Fully functional on port 54321  
-- ✅ **CLI Tool**: Working with port 54322 default
-- ✅ **Standalone WebSocket Server**: Running on port 54322 for Claude Code
-- ❌ **Claude Code MCP Server**: Missing - needs MCP wrapper for Claude Code integration
 
 ## Quick Start
 
@@ -52,24 +44,15 @@ Replace `/path/to/claude-chrome-mcp` with your actual project path.
 
 Claude Desktop will start the MCP server on launch.
 
-### 3. Start Claude Code WebSocket Server (Optional)
+Refer to MCP server installation instructions for Claude Code, Cursor, and other MCP clients.
 
-```bash
-cd mcp-server
-node standalone-websocket-54322.js
-```
-
-This starts a WebSocket server on port 54322 for Claude Code CLI usage.
-
-### 4. Install CLI Tool
+### 3. Install CLI Tool
 
 ```bash
 cd cli
 npm install
 npm run build
 npm link  # Makes 'ccm' command globally available
-
-# CLI connects to port 54322 by default for Claude Code compatibility
 ```
 
 ## Testing
@@ -80,20 +63,10 @@ npm link  # Makes 'ccm' command globally available
 4. **Test CLI Tool**: Run `ccm sessions` to verify CLI connection to port 54322
 5. **Multi-Client Test**: Use both Claude Desktop and CLI simultaneously
 
-Available MCP tools:
-- `spawn_claude_tab` - Create new Claude.ai tab
-- `get_claude_sessions` - List active Claude tabs
-- `send_message_to_claude` - Send messages to Claude sessions
-- `get_claude_response` - Get latest responses
-- `debug_attach` - Attach Chrome debugger
-- `execute_script` - Run JavaScript in tabs
-- `get_dom_elements` - Query DOM elements
-
 ## Usage
 
-### MCP Tools in Claude Desktop
+### MCP Tools
 
-With all components running, Claude Desktop has access to these tools:
 - `spawn_claude_tab` - Create new Claude.ai tab
 - `get_claude_sessions` - List active Claude tabs
 - `send_message_to_claude` - Send messages to Claude sessions
@@ -160,9 +133,6 @@ ccm attach 123456789 --detach
 # Use Claude Desktop server (port 54321)
 ccm --server ws://localhost:54321 sessions
 
-# Use Claude Code server (default port 54322) 
-ccm sessions
-
 # Enable verbose logging
 ccm --verbose send 123456789 "Hello"
 
@@ -178,21 +148,10 @@ To get tab IDs for use with other commands:
 # List sessions with IDs
 ccm sessions
 
-# Get just the tab IDs
-ccm sessions --quiet
-
 # Use in scripts
 TAB_ID=$(ccm sessions --quiet | head -1)
 ccm send $TAB_ID "Hello from script!"
 ```
-
-## Development Status
-
-- ✅ Chrome Extension (Multi-server WebSocket bridge, session detection, popup UI)
-- ✅ MCP Server for Claude Desktop (8 tools, port 54321)
-- ✅ Standalone WebSocket Server for Claude Code (port 54322)
-- ✅ CLI Tool (7 commands, connects to port 54322)
-- ❌ Claude Code MCP Server (missing MCP wrapper for full integration)
 
 ## Multi-Client Architecture
 
@@ -215,17 +174,3 @@ ccm send $TAB_ID "Hello from script!"
                                                 │  (Port 54322)   │
                                                 └─────────────────┘
 ```
-
-**Component Responsibilities:**
-- **Chrome Extension**: Multi-server WebSocket bridge, session detection, UI
-- **Claude Desktop MCP Server**: Protocol translation, 8 tools for Claude Desktop (port 54321)
-- **Claude Code WebSocket Server**: Standalone server for CLI/Claude Code (port 54322)  
-- **CLI Tool**: Direct command-line control, connects to port 54322
-- **Missing**: Claude Code MCP Server wrapper for full Claude Code integration
-
-## Multi-Client Benefits
-
-- **Simultaneous Usage**: Claude Desktop and CLI can control Chrome tabs concurrently
-- **Independent Workflows**: Different tools for different use cases
-- **Redundancy**: If one server fails, the other continues working
-- **Scalability**: Easy to add more client types in the future

@@ -10,6 +10,7 @@ import { responseCommand } from './commands/response';
 import { spawnCommand } from './commands/spawn';
 import { scriptCommand } from './commands/script';
 import { elementsCommand } from './commands/elements';
+import { deleteCommand } from './commands/delete';
 
 const program = new Command();
 
@@ -61,6 +62,7 @@ responseCommand(program);
 spawnCommand(program);
 scriptCommand(program);
 elementsCommand(program);
+deleteCommand(program);
 
 // Handle unknown commands
 program.on('command:*', () => {

@@ -22,7 +22,7 @@ export class CCMClient {
   private pendingRequests = new Map<string, { resolve: Function; reject: Function; timeout: NodeJS.Timeout }>();
 
   constructor(
-    private serverUrl: string = 'ws://localhost:54322', // This parameter is now ignored but kept for compatibility
+    private serverUrl: string = 'ws://localhost:54321', // Updated to use unified server port
     private verbose: boolean = false
   ) {}
 
@@ -196,7 +196,24 @@ export class CCMClient {
   // Public API methods using MCP tools
   
   async getClaudeSessions(): Promise<ClaudeTab[]> {
-    return await this.sendMCPToolCall('get_claude_sessions');
+    const result = await this.sendMCPToolCall('get_claude_sessions');
+    
+    // Handle error responses
+    if (result.text && result.text.includes('Error:')) {
+      throw new Error(result.text);
+    }
+    
+    // Handle array response
+    if (Array.isArray(result)) {
+      return result;
+    }
+    
+    // Handle wrapped response
+    if (result.sessions && Array.isArray(result.sessions)) {
+      return result.sessions;
+    }
+    
+    throw new Error('Invalid response format');
   }
 
   async spawnClaudeTab(url: string = 'https://claude.ai'): Promise<{ id: number; url: string; title: string }> {
@@ -226,5 +243,9 @@ export class CCMClient {
 
   async getDOMElements(tabId: number, selector: string): Promise<any[]> {
     return await this.sendMCPToolCall('get_dom_elements', { tabId, selector });
+  }
+
+  async deleteConversation(tabId: number): Promise<any> {
+    return await this.sendMCPToolCall('delete_claude_conversation', { tabId });
   }
 }

@@ -6,6 +6,280 @@ const { CallToolRequestSchema, ListToolsRequestSchema } = require('@modelcontext
 const WebSocket = require('ws');
 const EventEmitter = require('events');
 
+// Enhanced error handling and debugging utilities
+class ErrorTracker {
+  constructor(maxErrors = 100) {
+    this.errors = [];
+    this.maxErrors = maxErrors;
+    this.errorCounts = new Map();
+  }
+
+  logError(error, context = {}) {
+    const errorEntry = {
+      timestamp: Date.now(),
+      message: error.message || error,
+      stack: error.stack,
+      context,
+      id: this.generateErrorId()
+    };
+
+    this.errors.push(errorEntry);
+    
+    if (this.errors.length > this.maxErrors) {
+      this.errors.shift();
+    }
+
+    const errorKey = error.message || error.toString();
+    this.errorCounts.set(errorKey, (this.errorCounts.get(errorKey) || 0) + 1);
+
+    console.error(`[${errorEntry.id}] Error:`, error.message, context);
+    
+    return errorEntry.id;
+  }
+
+  generateErrorId() {
+    return Math.random().toString(36).substr(2, 9);
+  }
+
+  getRecentErrors(count = 10) {
+    return this.errors.slice(-count);
+  }
+
+  getErrorStats() {
+    return {
+      totalErrors: this.errors.length,
+      uniqueErrors: this.errorCounts.size,
+      mostFrequentErrors: Array.from(this.errorCounts.entries())
+        .sort(([,a], [,b]) => b - a)
+        .slice(0, 5)
+    };
+  }
+}
+
+class DebugMode {
+  constructor() {
+    this.enabled = process.env.CCM_DEBUG === '1' || process.env.NODE_ENV === 'development';
+    this.verboseEnabled = process.env.CCM_VERBOSE === '1';
+    this.loggers = new Map();
+  }
+
+  createLogger(component) {
+    const logger = {
+      debug: (message, data = {}) => {
+        if (this.enabled) {
+          console.error(`[${component}] DEBUG:`, message, data);
+        }
+      },
+      
+      verbose: (message, data = {}) => {
+        if (this.verboseEnabled) {
+          console.error(`[${component}] VERBOSE:`, message, data);
+        }
+      },
+      
+      info: (message, data = {}) => {
+        console.error(`[${component}] INFO:`, message, data);
+      },
+      
+      warn: (message, data = {}) => {
+        console.error(`[${component}] WARN:`, message, data);
+      },
+      
+      error: (message, error = null, data = {}) => {
+        console.error(`[${component}] ERROR:`, message, error?.message || error, data);
+      }
+    };
+
+    this.loggers.set(component, logger);
+    return logger;
+  }
+
+  getLogger(component) {
+    return this.loggers.get(component) || this.createLogger(component);
+  }
+}
+
+// Enhanced process lifecycle management
+class ProcessLifecycleManager {
+  constructor() {
+    this.isShuttingDown = false;
+    this.shutdownPromise = null;
+    this.shutdownTimeoutMs = 5000;
+    this.parentPid = process.ppid;
+    this.parentCheckInterval = null;
+    this.cleanupTasks = [];
+    this.lastParentCheck = Date.now();
+    this.lastActivityTime = Date.now();
+    
+    this.setupSignalHandlers();
+    this.setupParentMonitoring();
+    this.setupOrphanDetection();
+  }
+
+  addCleanupTask(name, cleanupFn) {
+    this.cleanupTasks.push({ name, cleanupFn });
+  }
+
+  setupSignalHandlers() {
+    const signals = ['SIGINT', 'SIGTERM', 'SIGQUIT', 'SIGPIPE'];
+    
+    signals.forEach(signal => {
+      process.on(signal, () => {
+        console.error(`CCM: Received ${signal}, initiating graceful shutdown`);
+        this.gracefulShutdown(`signal:${signal}`);
+      });
+    });
+
+    process.on('disconnect', () => {
+      console.error('CCM: Parent process disconnected');
+      this.gracefulShutdown('parent_disconnect');
+    });
+
+    process.on('uncaughtException', (error) => {
+      console.error('CCM: Uncaught exception:', error);
+      this.emergencyShutdown('uncaught_exception');
+    });
+
+    process.on('unhandledRejection', (reason, promise) => {
+      console.error('CCM: Unhandled rejection:', reason);
+      this.emergencyShutdown('unhandled_rejection');
+    });
+  }
+
+  setupParentMonitoring() {
+    if (this.parentPid && this.parentPid !== 1) {
+      this.parentCheckInterval = setInterval(() => {
+        this.checkParentProcess();
+      }, 2000);
+    }
+
+    if (process.env.CCM_PARENT_PID) {
+      const envParentPid = parseInt(process.env.CCM_PARENT_PID);
+      if (envParentPid && envParentPid !== this.parentPid) {
+        console.warn(`CCM: ENV parent PID (${envParentPid}) differs from process parent PID (${this.parentPid})`);
+        this.parentPid = envParentPid;
+      }
+    }
+
+    if (process.stdin.isTTY === false && !process.env.CCM_NO_STDIN_MONITOR) {
+      process.stdin.on('end', () => {
+        console.error('CCM: stdin closed, parent likely disconnected');
+        this.gracefulShutdown('stdin_closed');
+      });
+
+      process.stdin.on('error', (error) => {
+        console.error('CCM: stdin error:', error);
+        this.gracefulShutdown('stdin_error');
+      });
+    }
+  }
+
+  setupOrphanDetection() {
+    const checkOrphanStatus = () => {
+      if (process.ppid === 1 && this.parentPid !== 1) {
+        console.error('CCM: Process orphaned (parent PID is now 1)');
+        this.gracefulShutdown('orphaned');
+        return;
+      }
+
+      const maxIdleTime = parseInt(process.env.CCM_MAX_IDLE_TIME || '300000');
+      if (maxIdleTime > 0) {
+        const timeSinceLastActivity = Date.now() - this.lastActivityTime;
+        if (timeSinceLastActivity > maxIdleTime) {
+          console.error(`CCM: No activity for ${timeSinceLastActivity}ms, shutting down`);
+          this.gracefulShutdown('max_idle_time');
+        }
+      }
+    };
+
+    setInterval(checkOrphanStatus, 10000);
+  }
+
+  checkParentProcess() {
+    try {
+      if (this.parentPid && this.parentPid !== 1) {
+        process.kill(this.parentPid, 0);
+        this.lastParentCheck = Date.now();
+      }
+    } catch (error) {
+      if (error.code === 'ESRCH') {
+        console.error(`CCM: Parent process ${this.parentPid} no longer exists`);
+        this.gracefulShutdown('parent_dead');
+      } else if (error.code === 'EPERM') {
+        console.warn(`CCM: Cannot signal parent process ${this.parentPid} (permission denied)`);
+      } else {
+        console.error('CCM: Error checking parent process:', error);
+      }
+    }
+  }
+
+  updateActivity() {
+    this.lastActivityTime = Date.now();
+  }
+
+  async gracefulShutdown(reason = 'unknown') {
+    if (this.isShuttingDown) {
+      return this.shutdownPromise;
+    }
+
+    console.error(`CCM: Graceful shutdown initiated (reason: ${reason})`);
+    this.isShuttingDown = true;
+
+    this.shutdownPromise = this.performShutdown(reason);
+    return this.shutdownPromise;
+  }
+
+  async performShutdown(reason) {
+    const shutdownStart = Date.now();
+    
+    try {
+      if (this.parentCheckInterval) {
+        clearInterval(this.parentCheckInterval);
+        this.parentCheckInterval = null;
+      }
+
+      const cleanupPromises = this.cleanupTasks.map(async ({ name, cleanupFn }) => {
+        try {
+          console.error(`CCM: Running cleanup task: ${name}`);
+          await cleanupFn();
+          console.error(`CCM: Cleanup task completed: ${name}`);
+        } catch (error) {
+          console.error(`CCM: Cleanup task failed: ${name}`, error);
+        }
+      });
+
+      await Promise.race([
+        Promise.all(cleanupPromises),
+        new Promise(resolve => setTimeout(resolve, this.shutdownTimeoutMs))
+      ]);
+
+      const shutdownDuration = Date.now() - shutdownStart;
+      console.error(`CCM: Graceful shutdown completed in ${shutdownDuration}ms (reason: ${reason})`);
+      
+      process.exit(0);
+      
+    } catch (error) {
+      console.error('CCM: Error during graceful shutdown:', error);
+      this.emergencyShutdown('shutdown_error');
+    }
+  }
+
+  emergencyShutdown(reason = 'unknown') {
+    console.error(`CCM: Emergency shutdown initiated (reason: ${reason})`);
+    
+    setTimeout(() => {
+      console.error('CCM: Force exit');
+      process.exit(1);
+    }, 1000);
+  }
+
+  startHeartbeat(intervalMs = 30000) {
+    setInterval(() => {
+      this.updateActivity();
+    }, intervalMs);
+  }
+}
+
 const HUB_PORT = 54321;
 
 // ============================================================================
@@ -56,47 +330,132 @@ class WebSocketHub extends EventEmitter {
     this.server = null;
     this.chromeExtensionConnection = null;
     this.requestCounter = 0;
+    this.isShuttingDown = false;
+    this.startTime = Date.now();
+    this.messageCounter = 0;
+    this.clientCounter = 0;
+    
+    // Health monitoring
+    this.healthCheckInterval = null;
+    this.keepaliveInterval = null;
+    
+    // Enhanced debugging
+    this.errorTracker = new ErrorTracker();
+    this.debug = new DebugMode().createLogger('WebSocketHub');
+    
+    this.setupSignalHandlers();
   }
 
   async start() {
-    this.server = new WebSocket.Server({ 
-      port: HUB_PORT,
-      clientTracking: true 
-    });
+    if (this.server) {
+      throw new Error('Hub already started');
+    }
 
-    console.error(`WebSocket Hub: Server listening on port ${HUB_PORT}`);
+    try {
+      await this.startServer();
+      this.startHealthMonitoring();
+      console.error(`WebSocket Hub: Started on port ${HUB_PORT}`);
+    } catch (error) {
+      console.error(`WebSocket Hub: Failed to start:`, error);
+      throw error;
+    }
+  }
 
-    this.server.on('connection', (ws, req) => {
-      console.error('WebSocket Hub: New connection from', req.socket.remoteAddress);
-      
-      ws.on('message', (data) => {
-        try {
-          const message = JSON.parse(data.toString());
-          this.handleWebSocketMessage(ws, message);
-        } catch (error) {
-          console.error('WebSocket Hub: Invalid JSON from client:', error);
-          ws.close(1003, 'Invalid JSON');
+  async startServer() {
+    return new Promise((resolve, reject) => {
+      this.server = new WebSocket.Server({ 
+        port: HUB_PORT,
+        clientTracking: true
+      });
+
+      this.server.on('listening', () => {
+        console.error(`WebSocket Hub: Listening on port ${HUB_PORT}`);
+        resolve();
+      });
+
+      this.server.on('error', (error) => {
+        if (error.code === 'EADDRINUSE') {
+          console.error(`WebSocket Hub: Port ${HUB_PORT} already in use`);
+          reject(new Error(`Port ${HUB_PORT} already in use`));
+        } else {
+          console.error('WebSocket Hub: Server error:', error);
+          reject(error);
         }
       });
 
-      ws.on('close', (code, reason) => {
-        this.handleWebSocketClose(ws, code, reason);
-      });
-
-      ws.on('error', (error) => {
-        console.error('WebSocket Hub: Client error:', error);
+      this.server.on('connection', (ws, req) => {
+        this.handleNewConnection(ws, req);
       });
     });
-
-    this.server.on('error', (error) => {
-      console.error('WebSocket Hub: Server error:', error);
-    });
-
-    this.setupSignalHandlers();
-    console.error('WebSocket Hub: Initialized for Extension-as-Hub architecture');
   }
 
-  handleWebSocketMessage(ws, message) {
+  handleNewConnection(ws, req) {
+    const clientId = `client-${++this.clientCounter}-${Date.now()}`;
+    const remoteAddress = req.socket.remoteAddress;
+    
+    console.error(`WebSocket Hub: New connection ${clientId} from ${remoteAddress}`);
+
+    // Set up basic connection state
+    ws.clientId = clientId;
+    ws.connectionTime = Date.now();
+    ws.lastActivity = Date.now();
+    ws.messageCount = 0;
+    ws.isAlive = true;
+
+    // Set up message handling
+    ws.on('message', (data) => {
+      this.handleMessage(ws, data);
+    });
+
+    ws.on('close', (code, reason) => {
+      this.handleDisconnection(ws, code, reason);
+    });
+
+    ws.on('error', (error) => {
+      this.errorTracker.logError(error, { clientId, action: 'client_error' });
+      console.error(`WebSocket Hub: Client ${clientId} error:`, error);
+    });
+
+    // Set up ping/pong for connection health
+    ws.on('pong', () => {
+      ws.isAlive = true;
+      ws.lastActivity = Date.now();
+    });
+
+    // Send welcome message
+    this.sendToClient(ws, {
+      type: 'welcome',
+      clientId: clientId,
+      serverInfo: {
+        name: 'Claude Chrome MCP Hub',
+        version: '2.1.0',
+        port: HUB_PORT,
+        startTime: this.startTime
+      }
+    });
+  }
+
+  handleMessage(ws, data) {
+    try {
+      const message = JSON.parse(data.toString());
+      ws.lastActivity = Date.now();
+      ws.messageCount++;
+      this.messageCounter++;
+
+      this.routeMessage(ws, message);
+      
+    } catch (error) {
+      this.errorTracker.logError(error, { clientId: ws.clientId, action: 'parse_message' });
+      console.error(`WebSocket Hub: Invalid JSON from client ${ws.clientId}:`, error);
+      this.sendToClient(ws, {
+        type: 'error',
+        error: 'Invalid JSON message',
+        timestamp: Date.now()
+      });
+    }
+  }
+
+  routeMessage(ws, message) {
     const { type } = message;
 
     switch (type) {
@@ -108,199 +467,368 @@ class WebSocketHub extends EventEmitter {
         this.registerMCPClient(ws, message);
         break;
         
-      case 'chrome_request':
-        this.forwardToChromeExtension(message);
+      case 'keepalive':
+        this.handleKeepalive(ws, message);
         break;
         
-      case 'mcp_request':
-        this.forwardToMCPClient(message);
+      case 'request':
+        this.forwardRequest(ws, message);
+        break;
+        
+      case 'response':
+      case 'error':
+        this.forwardResponse(ws, message);
         break;
         
       default:
-        if (ws === this.chromeExtensionConnection) {
-          this.handleChromeExtensionMessage(message);
-        } else {
-          this.handleMCPClientMessage(ws, message);
-        }
+        console.warn(`WebSocket Hub: Unknown message type '${type}' from ${ws.clientId}`);
+        this.sendToClient(ws, {
+          type: 'error',
+          error: `Unknown message type: ${type}`,
+          timestamp: Date.now()
+        });
     }
+  }
+
+  handleKeepalive(ws, message) {
+    this.sendToClient(ws, {
+      type: 'keepalive_response',
+      timestamp: Date.now()
+    });
   }
 
   registerChromeExtension(ws, message) {
-    console.error('WebSocket Hub: Chrome extension connected');
+    if (this.chromeExtensionConnection && this.chromeExtensionConnection !== ws) {
+      console.warn('WebSocket Hub: Replacing existing extension connection');
+      this.chromeExtensionConnection.close(1000, 'New extension connected');
+    }
+
     this.chromeExtensionConnection = ws;
+    ws.clientType = 'chrome_extension';
+    ws.clientInfo = {
+      id: 'chrome-extension',
+      name: 'Chrome Extension',
+      type: 'chrome_extension',
+      extensionId: message.extensionId
+    };
+
+    console.error('WebSocket Hub: Chrome extension registered');
     
-    ws.send(JSON.stringify({
+    this.sendToClient(ws, {
       type: 'registration_confirmed',
       role: 'chrome_extension',
-      hubInfo: {
-        name: 'Claude Chrome MCP Hub',
-        version: '2.0.0',
-        port: HUB_PORT
-      }
-    }));
+      hubInfo: this.getHubInfo()
+    });
 
-    this.sendClientListToExtension();
+    this.broadcastClientListUpdate();
   }
 
   registerMCPClient(ws, message) {
-    const clientInfo = message.clientInfo || {};
-    const client = new MCPClientConnection(ws, clientInfo);
-    
-    this.clients.set(client.id, client);
-    console.error(`WebSocket Hub: Registered MCP client ${client.name} (${client.id}) - Type: ${client.type}`);
-    console.error(`WebSocket Hub: Client info:`, JSON.stringify(clientInfo, null, 2));
-    
-    ws.send(JSON.stringify({
-      type: 'registration_confirmed',
-      clientId: client.id,
-      role: 'mcp_client',
-      hubInfo: {
-        name: 'Claude Chrome MCP Hub',
-        version: '2.0.0'
-      }
-    }));
+    const clientInfo = {
+      id: message.clientInfo?.id || `mcp-${ws.clientId}`,
+      name: message.clientInfo?.name || 'MCP Client',
+      type: message.clientInfo?.type || 'mcp',
+      capabilities: message.clientInfo?.capabilities || [],
+      ...message.clientInfo
+    };
 
-    ws.clientId = client.id;
-    this.notifyExtensionClientChange();
+    ws.clientType = 'mcp_client';
+    ws.clientInfo = clientInfo;
+    
+    this.clients.set(clientInfo.id, {
+      ws,
+      info: clientInfo,
+      registeredAt: Date.now(),
+      requestCount: 0
+    });
+
+    console.error(`WebSocket Hub: MCP client registered: ${clientInfo.name} (${clientInfo.id})`);
+    
+    this.sendToClient(ws, {
+      type: 'registration_confirmed',
+      clientId: clientInfo.id,
+      role: 'mcp_client',
+      hubInfo: this.getHubInfo()
+    });
+
+    this.broadcastClientListUpdate();
   }
 
-  handleWebSocketClose(ws, code, reason) {
+  handleDisconnection(ws, code, reason) {
+    const clientId = ws.clientId;
+    const clientInfo = ws.clientInfo;
+    
+    console.error(`WebSocket Hub: Client ${clientId} disconnected (code: ${code}, reason: ${reason})`);
+
     if (ws === this.chromeExtensionConnection) {
       console.error('WebSocket Hub: Chrome extension disconnected');
       this.chromeExtensionConnection = null;
-    } else if (ws.clientId) {
-      const client = this.clients.get(ws.clientId);
-      if (client) {
-        console.error(`WebSocket Hub: MCP client ${client.name} disconnected (code: ${code})`);
-        this.clients.delete(ws.clientId);
-        this.notifyExtensionClientChange();
-        
-        // If no MCP clients remain, shut down the hub
-        if (this.clients.size === 0) {
-          console.error('WebSocket Hub: No MCP clients remaining, shutting down...');
-          // Immediate shutdown to prevent stale processes
-          setImmediate(() => {
-            this.shutdown();
-          });
+      
+      // Notify all MCP clients about extension disconnect
+      for (const [id, client] of this.clients) {
+        this.sendToClient(client.ws, {
+          type: 'extension_disconnected',
+          timestamp: Date.now()
+        });
+      }
+    } else if (ws.clientType === 'mcp_client' && clientInfo) {
+      this.clients.delete(clientInfo.id);
+      console.error(`WebSocket Hub: MCP client ${clientInfo.name} removed`);
+    }
+
+    this.broadcastClientListUpdate();
+
+    // Check if we should shut down
+    this.checkShutdownConditions();
+  }
+
+  checkShutdownConditions() {
+    // Shut down if no MCP clients remain and we're not the extension
+    if (this.clients.size === 0 && !this.chromeExtensionConnection) {
+      console.error('WebSocket Hub: No clients remaining, scheduling shutdown...');
+      setTimeout(() => {
+        if (this.clients.size === 0 && !this.chromeExtensionConnection) {
+          this.shutdown('no_clients');
         }
+      }, 5000); // 5 second grace period
+    }
+  }
+
+  sendToClient(ws, message) {
+    if (ws.readyState === WebSocket.OPEN) {
+      try {
+        ws.send(JSON.stringify(message));
+        return true;
+      } catch (error) {
+        this.errorTracker.logError(error, { action: 'send_message' });
+        console.error('WebSocket Hub: Error sending message:', error);
+        return false;
       }
     }
+    return false;
   }
 
-  handleChromeExtensionMessage(message) {
-    const { targetClientId } = message;
-    const client = this.clients.get(targetClientId);
-    
-    if (client) {
-      client.send(message);
-    } else {
-      console.error('WebSocket Hub: Target client not found:', targetClientId);
-    }
-  }
-
-  handleMCPClientMessage(ws, message) {
-    const client = this.clients.get(ws.clientId);
-    if (!client) {
-      console.error('WebSocket Hub: Message from unregistered client');
+  forwardRequest(ws, message) {
+    if (ws.clientType !== 'mcp_client') {
+      this.sendToClient(ws, {
+        type: 'error',
+        requestId: message.requestId,
+        error: 'Only MCP clients can send requests',
+        timestamp: Date.now()
+      });
       return;
     }
 
-    client.requestCount++;
-    client.lastActivity = Date.now();
-
-    if (this.chromeExtensionConnection) {
-      const forwardedMessage = {
-        ...message,
-        sourceClientId: client.id,
-        sourceClientName: client.name,
-        hubRequestId: ++this.requestCounter
-      };
-      
-      this.chromeExtensionConnection.send(JSON.stringify(forwardedMessage));
-    } else {
-      ws.send(JSON.stringify({
+    if (!this.chromeExtensionConnection || this.chromeExtensionConnection.readyState !== WebSocket.OPEN) {
+      this.sendToClient(ws, {
         type: 'error',
         requestId: message.requestId,
         error: 'Chrome extension not connected',
         timestamp: Date.now()
-      }));
+      });
+      return;
+    }
+
+    // Add source information and forward
+    const forwardedMessage = {
+      ...message,
+      sourceClientId: ws.clientInfo.id,
+      sourceClientName: ws.clientInfo.name,
+      hubMessageId: ++this.messageCounter
+    };
+
+    this.sendToClient(this.chromeExtensionConnection, forwardedMessage);
+
+    // Update client stats
+    const client = this.clients.get(ws.clientInfo.id);
+    if (client) {
+      client.requestCount++;
     }
   }
 
-  sendClientListToExtension() {
+  forwardResponse(ws, message) {
+    if (ws !== this.chromeExtensionConnection) {
+      console.warn('WebSocket Hub: Received response from non-extension client');
+      return;
+    }
+
+    const { targetClientId } = message;
+    if (!targetClientId) {
+      console.warn('WebSocket Hub: Response missing targetClientId');
+      return;
+    }
+
+    const client = this.clients.get(targetClientId);
+    if (!client || client.ws.readyState !== WebSocket.OPEN) {
+      console.warn(`WebSocket Hub: Target client ${targetClientId} not available`);
+      return;
+    }
+
+    this.sendToClient(client.ws, message);
+  }
+
+  broadcastClientListUpdate() {
+    if (!this.chromeExtensionConnection || this.chromeExtensionConnection.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    const clientList = Array.from(this.clients.values()).map(client => ({
+      id: client.info.id,
+      name: client.info.name,
+      type: client.info.type,
+      capabilities: client.info.capabilities,
+      connected: client.ws.readyState === WebSocket.OPEN,
+      registeredAt: client.registeredAt,
+      requestCount: client.requestCount,
+      lastActivity: client.ws.lastActivity
+    }));
+
+    this.sendToClient(this.chromeExtensionConnection, {
+      type: 'client_list_update',
+      clients: clientList,
+      timestamp: Date.now()
+    });
+  }
+
+  getHubInfo() {
+    return {
+      name: 'Claude Chrome MCP Hub',
+      version: '2.1.0',
+      port: HUB_PORT,
+      startTime: this.startTime,
+      clientCount: this.clients.size,
+      extensionConnected: !!this.chromeExtensionConnection
+    };
+  }
+
+  startHealthMonitoring() {
+    // Ping all clients periodically
+    this.keepaliveInterval = setInterval(() => {
+      this.pingAllClients();
+    }, 30000); // Every 30 seconds
+
+    // Check for dead connections
+    this.healthCheckInterval = setInterval(() => {
+      this.checkClientHealth();
+    }, 60000); // Every minute
+  }
+
+  pingAllClients() {
+    const allConnections = [];
+    
     if (this.chromeExtensionConnection) {
-      const clientList = Array.from(this.clients.values()).map(client => client.getStatus());
-      
-      console.error(`WebSocket Hub: Sending client list to extension: ${clientList.length} clients`);
-      console.error(`WebSocket Hub: Client list:`, JSON.stringify(clientList, null, 2));
-      
-      this.chromeExtensionConnection.send(JSON.stringify({
-        type: 'client_list_update',
-        clients: clientList,
-        timestamp: Date.now()
-      }));
+      allConnections.push(this.chromeExtensionConnection);
     }
+    
+    for (const client of this.clients.values()) {
+      allConnections.push(client.ws);
+    }
+
+    allConnections.forEach(ws => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.isAlive = false;
+        ws.ping();
+      }
+    });
   }
 
-  notifyExtensionClientChange() {
-    this.sendClientListToExtension();
+  checkClientHealth() {
+    const now = Date.now();
+    const deadConnections = [];
+
+    // Check extension connection
+    if (this.chromeExtensionConnection && !this.chromeExtensionConnection.isAlive) {
+      const timeSinceActivity = now - this.chromeExtensionConnection.lastActivity;
+      if (timeSinceActivity > 120000) { // 2 minutes
+        console.warn('WebSocket Hub: Extension connection appears dead');
+        deadConnections.push(this.chromeExtensionConnection);
+      }
+    }
+
+    // Check MCP client connections
+    for (const [clientId, client] of this.clients) {
+      if (!client.ws.isAlive) {
+        const timeSinceActivity = now - client.ws.lastActivity;
+        if (timeSinceActivity > 120000) { // 2 minutes
+          console.warn(`WebSocket Hub: MCP client ${clientId} appears dead`);
+          deadConnections.push(client.ws);
+        }
+      }
+    }
+
+    // Close dead connections
+    deadConnections.forEach(ws => {
+      console.error(`WebSocket Hub: Closing dead connection ${ws.clientId}`);
+      ws.terminate();
+    });
   }
 
   setupSignalHandlers() {
-    const cleanup = () => {
-      console.error('WebSocket Hub: Shutting down...');
-      
-      this.clients.forEach(client => {
-        client.send({
-          type: 'hub_shutdown',
-          timestamp: Date.now()
-        });
-      });
-
-      if (this.chromeExtensionConnection) {
-        this.chromeExtensionConnection.send(JSON.stringify({
-          type: 'hub_shutdown',
-          timestamp: Date.now()
-        }));
-      }
-
-      if (this.server) {
-        this.server.close(() => {
-          console.error('WebSocket Hub: Server closed');
-        });
-      }
-    };
-
-    process.on('SIGINT', cleanup);
-    process.on('SIGTERM', cleanup);
-  }
-
-  shutdown() {
-    console.error('WebSocket Hub: Graceful shutdown initiated');
+    const signals = ['SIGINT', 'SIGTERM', 'SIGQUIT'];
     
-    // Notify all clients about shutdown
-    this.clients.forEach(client => {
-      client.send({
-        type: 'hub_shutdown',
-        timestamp: Date.now()
+    signals.forEach(signal => {
+      process.on(signal, () => {
+        console.error(`WebSocket Hub: Received ${signal}, shutting down`);
+        this.shutdown(`signal:${signal}`);
       });
     });
+  }
+
+  async shutdown(reason = 'unknown') {
+    if (this.isShuttingDown) {
+      return;
+    }
+
+    this.isShuttingDown = true;
+    console.error(`WebSocket Hub: Shutting down (reason: ${reason})`);
+
+    // Clear intervals
+    if (this.keepaliveInterval) {
+      clearInterval(this.keepaliveInterval);
+    }
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+    }
+
+    // Notify all clients
+    const shutdownMessage = {
+      type: 'hub_shutdown',
+      reason,
+      timestamp: Date.now()
+    };
 
     if (this.chromeExtensionConnection) {
-      this.chromeExtensionConnection.send(JSON.stringify({
-        type: 'hub_shutdown',
-        timestamp: Date.now()
-      }));
+      this.sendToClient(this.chromeExtensionConnection, shutdownMessage);
     }
 
-    if (this.server) {
-      this.server.close(() => {
-        console.error('WebSocket Hub: Server closed');
-        process.exit(0);
-      });
-    } else {
-      process.exit(0);
+    for (const client of this.clients.values()) {
+      this.sendToClient(client.ws, shutdownMessage);
     }
+
+    // Close server
+    if (this.server) {
+      await new Promise(resolve => {
+        this.server.close(() => {
+          console.error('WebSocket Hub: Server closed');
+          resolve();
+        });
+      });
+    }
+
+    console.error('WebSocket Hub: Shutdown complete');
+    process.exit(0);
+  }
+
+  getStats() {
+    return {
+      port: HUB_PORT,
+      startTime: this.startTime,
+      uptime: Date.now() - this.startTime,
+      clientCount: this.clients.size,
+      extensionConnected: !!this.chromeExtensionConnection,
+      messageCount: this.messageCounter,
+      isShuttingDown: this.isShuttingDown
+    };
   }
 
   stop() {
@@ -319,10 +847,55 @@ class AutoHubClient {
     this.connected = false;
     this.requestCounter = 0;
     this.pendingRequests = new Map();
+    
+    // Improved reconnection parameters
     this.reconnectAttempts = 0;
-    this.maxReconnectAttempts = 10;
+    this.maxReconnectAttempts = -1; // Infinite attempts
+    this.baseReconnectDelay = 1000;
+    this.maxReconnectDelay = 30000;
+    this.connectionHealthInterval = null;
+    
     this.ownedHub = null;
     this.isHubOwner = false;
+    this.lastSuccessfulConnection = null;
+    
+    // Connection state tracking
+    this.connectionState = 'disconnected'; // disconnected, connecting, connected, reconnecting
+    this.connectionHistory = [];
+    this.lastActivityTime = Date.now();
+    
+    // Enhanced debugging and error tracking
+    this.errorTracker = new ErrorTracker();
+    this.debug = new DebugMode().createLogger('AutoHubClient');
+    
+    this.setupProcessMonitoring();
+  }
+
+  setupProcessMonitoring() {
+    // Enhanced parent process monitoring
+    if (process.ppid) {
+      this.parentCheckInterval = setInterval(() => {
+        try {
+          process.kill(process.ppid, 0);
+        } catch (e) {
+          console.error('CCM: Parent process no longer exists, shutting down');
+          this.gracefulShutdown();
+        }
+      }, 2000);
+    }
+
+    // Monitor for orphaned processes
+    if (process.env.CCM_PARENT_PID) {
+      const parentPid = parseInt(process.env.CCM_PARENT_PID);
+      this.parentMonitor = setInterval(() => {
+        try {
+          process.kill(parentPid, 0);
+        } catch (e) {
+          console.error('CCM: Specified parent process no longer exists');
+          this.gracefulShutdown();
+        }
+      }, 3000);
+    }
   }
 
   mergeClientInfo(clientInfo) {
@@ -457,43 +1030,98 @@ class AutoHubClient {
   }
 
   async connect() {
-    // Try to connect to existing hub first
+    if (this.connectionState === 'connecting') {
+      this.debug.info('Connection already in progress');
+      return;
+    }
+
+    this.connectionState = 'connecting';
+    
     try {
-      await this.connectToExistingHub();
+      // Try existing hub first with shorter timeout
+      await this.connectToExistingHub(5000);
+      this.onConnectionSuccess();
       console.error(`CCM: Connected to existing hub as ${this.clientInfo.name}`);
       return;
     } catch (error) {
       console.error('CCM: No existing hub found, starting new hub...');
     }
 
-    // Start our own hub and connect to it
     try {
       await this.startHubAndConnect();
+      this.onConnectionSuccess();
       console.error(`CCM: Started hub and connected as ${this.clientInfo.name}`);
     } catch (error) {
+      this.connectionState = 'disconnected';
       console.error('CCM: Failed to start hub:', error);
       throw error;
     }
   }
 
-  async connectToExistingHub() {
+  onConnectionSuccess() {
+    this.connectionState = 'connected';
+    this.reconnectAttempts = 0;
+    this.lastSuccessfulConnection = Date.now();
+    this.connectionHistory.push({
+      timestamp: Date.now(),
+      event: 'connected',
+      attempt: this.reconnectAttempts
+    });
+    
+    // Start connection health monitoring
+    this.startConnectionHealthCheck();
+  }
+
+  startConnectionHealthCheck() {
+    if (this.connectionHealthInterval) {
+      clearInterval(this.connectionHealthInterval);
+    }
+
+    this.connectionHealthInterval = setInterval(() => {
+      if (!this.isConnectionHealthy()) {
+        this.debug.warn('Connection unhealthy, initiating reconnection');
+        this.scheduleReconnect();
+      }
+    }, 10000); // Check every 10 seconds
+  }
+
+  isConnectionHealthy() {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      return false;
+    }
+
+    // Check if we've had recent activity
+    const timeSinceLastActivity = Date.now() - this.lastActivityTime;
+    if (timeSinceLastActivity > 60000) { // 1 minute without activity
+      this.debug.warn('No recent activity detected');
+      return false;
+    }
+
+    return true;
+  }
+
+  async connectToExistingHub(timeoutMs = 5000) {
     return new Promise((resolve, reject) => {
       const ws = new WebSocket(`ws://localhost:${HUB_PORT}`);
       
       const timeout = setTimeout(() => {
         ws.close();
         reject(new Error('Connection timeout'));
-      }, 2000);
+      }, timeoutMs);
+
+      const cleanup = () => {
+        clearTimeout(timeout);
+      };
 
       ws.on('open', () => {
-        clearTimeout(timeout);
+        cleanup();
         this.ws = ws;
         this.setupWebSocketHandlers(resolve, reject);
         this.registerWithHub();
       });
 
       ws.on('error', (error) => {
-        clearTimeout(timeout);
+        cleanup();
         reject(error);
       });
     });
@@ -526,10 +1154,12 @@ class AutoHubClient {
 
   setupWebSocketHandlers(connectResolve, connectReject) {
     this.ws.on('message', (data) => {
+      this.lastActivityTime = Date.now();
       try {
         const message = JSON.parse(data.toString());
         this.handleMessage(message, connectResolve, connectReject);
       } catch (error) {
+        this.errorTracker.logError(error, { action: 'parse_message' });
         console.error('CCM: Error parsing message:', error);
       }
     });
@@ -537,13 +1167,46 @@ class AutoHubClient {
     this.ws.on('close', (code, reason) => {
       console.error('CCM: Connection closed:', code, reason.toString());
       this.connected = false;
-      this.scheduleReconnect();
+      this.connectionState = 'disconnected';
+      
+      if (this.connectionHealthInterval) {
+        clearInterval(this.connectionHealthInterval);
+        this.connectionHealthInterval = null;
+      }
+      
+      this.connectionHistory.push({
+        timestamp: Date.now(),
+        event: 'disconnected',
+        code,
+        reason: reason.toString()
+      });
+      
+      // Only reconnect if not intentionally closing
+      if (code !== 1000 && this.connectionState !== 'shutting_down') {
+        this.scheduleReconnect();
+      }
     });
 
     this.ws.on('error', (error) => {
+      this.errorTracker.logError(error, { action: 'websocket_error' });
       console.error('CCM: Connection error:', error);
-      this.connected = false;
+      this.connectionHistory.push({
+        timestamp: Date.now(),
+        event: 'error',
+        error: error.message
+      });
+      
       if (connectReject) connectReject(error);
+    });
+
+    // Setup ping/pong for connection health
+    this.ws.on('ping', () => {
+      this.ws.pong();
+      this.lastActivityTime = Date.now();
+    });
+
+    this.ws.on('pong', () => {
+      this.lastActivityTime = Date.now();
     });
   }
 
@@ -593,6 +1256,11 @@ class AutoHubClient {
     const pendingRequest = this.pendingRequests.get(requestId);
     
     if (pendingRequest) {
+      // Clear timeout
+      if (pendingRequest.timeoutId) {
+        clearTimeout(pendingRequest.timeoutId);
+      }
+      
       this.pendingRequests.delete(requestId);
       
       if (error) {
@@ -605,12 +1273,22 @@ class AutoHubClient {
 
   async sendRequest(type, params = {}) {
     if (!this.connected || !this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      throw new Error('Not connected to hub');
+      // Try to reconnect if not connected
+      if (this.connectionState === 'disconnected') {
+        this.debug.info('Attempting to reconnect for request');
+        await this.connect();
+      }
+      
+      if (!this.connected) {
+        throw new Error('Not connected to hub and reconnection failed');
+      }
     }
 
     const requestId = `req-${++this.requestCounter}`;
     
     return new Promise((resolve, reject) => {
+      const timeoutMs = 30000; // Increased timeout
+      
       this.pendingRequests.set(requestId, { resolve, reject });
       
       this.ws.send(JSON.stringify({
@@ -620,36 +1298,91 @@ class AutoHubClient {
         timestamp: Date.now()
       }));
       
-      setTimeout(() => {
+      const timeoutId = setTimeout(() => {
         if (this.pendingRequests.has(requestId)) {
           this.pendingRequests.delete(requestId);
-          reject(new Error('Request timeout'));
+          reject(new Error(`Request timeout after ${timeoutMs}ms (requestId: ${requestId}, type: ${type})`));
         }
-      }, 10000);
+      }, timeoutMs);
+      
+      this.pendingRequests.get(requestId).timeoutId = timeoutId;
     });
   }
 
+  gracefulShutdown() {
+    console.error('CCM: Initiating graceful shutdown');
+    this.connectionState = 'shutting_down';
+    
+    // Clear intervals
+    if (this.connectionHealthInterval) {
+      clearInterval(this.connectionHealthInterval);
+    }
+    if (this.parentCheckInterval) {
+      clearInterval(this.parentCheckInterval);
+    }
+    if (this.parentMonitor) {
+      clearInterval(this.parentMonitor);
+    }
+    
+    // Close connection
+    this.close();
+    
+    // Exit process
+    setTimeout(() => {
+      process.exit(0);
+    }, 1000);
+  }
+
   scheduleReconnect() {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('CCM: Max reconnection attempts reached');
+    if (this.connectionState === 'shutting_down') {
       return;
     }
 
-    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+    if (this.connectionState === 'reconnecting') {
+      return; // Already reconnecting
+    }
+
+    this.connectionState = 'reconnecting';
     this.reconnectAttempts++;
     
-    console.error(`CCM: Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+    // Smart exponential backoff with jitter
+    const baseDelay = Math.min(
+      this.baseReconnectDelay * Math.pow(1.5, this.reconnectAttempts),
+      this.maxReconnectDelay
+    );
+    const jitter = Math.random() * 1000; // Add up to 1s jitter
+    const delay = baseDelay + jitter;
     
-    setTimeout(() => {
-      this.connect().catch(() => {
-        // Connection failed, will retry again
-      });
+    console.error(`CCM: Reconnecting in ${Math.round(delay)}ms (attempt ${this.reconnectAttempts})`);
+    
+    this.connectionHistory.push({
+      timestamp: Date.now(),
+      event: 'reconnect_scheduled',
+      attempt: this.reconnectAttempts,
+      delay
+    });
+    
+    setTimeout(async () => {
+      try {
+        await this.connect();
+        console.error('CCM: Reconnection successful');
+      } catch (error) {
+        console.error('CCM: Reconnection failed:', error.message);
+        // scheduleReconnect will be called again via the close handler
+      }
     }, delay);
   }
 
   close() {
+    this.connectionState = 'shutting_down';
+    
+    if (this.connectionHealthInterval) {
+      clearInterval(this.connectionHealthInterval);
+      this.connectionHealthInterval = null;
+    }
+    
     if (this.ws) {
-      this.ws.close();
+      this.ws.close(1000, 'Client shutting down');
       this.ws = null;
     }
     
@@ -661,7 +1394,26 @@ class AutoHubClient {
     }
     
     this.connected = false;
-    this.pendingRequests.clear(); // Clear any pending requests
+    
+    // Clear pending requests with timeout cleanup
+    for (const [requestId, pendingRequest] of this.pendingRequests) {
+      if (pendingRequest.timeoutId) {
+        clearTimeout(pendingRequest.timeoutId);
+      }
+      pendingRequest.reject(new Error('Client shutting down'));
+    }
+    this.pendingRequests.clear();
+  }
+
+  getConnectionStats() {
+    return {
+      state: this.connectionState,
+      reconnectAttempts: this.reconnectAttempts,
+      lastSuccessfulConnection: this.lastSuccessfulConnection,
+      pendingRequests: this.pendingRequests.size,
+      isHubOwner: this.isHubOwner,
+      connectionHistory: this.connectionHistory.slice(-10) // Last 10 events
+    };
   }
 }
 
@@ -674,7 +1426,7 @@ class ChromeMCPServer {
     this.server = new Server(
       {
         name: 'claude-chrome-mcp',
-        version: '2.0.0',
+        version: '2.1.0',
       },
       {
         capabilities: {
@@ -684,7 +1436,34 @@ class ChromeMCPServer {
     );
 
     this.hubClient = new AutoHubClient();
+    this.lifecycleManager = new ProcessLifecycleManager();
+    this.setupLifecycleIntegration();
     this.setupToolHandlers();
+  }
+
+  setupLifecycleIntegration() {
+    // Register cleanup tasks
+    this.lifecycleManager.addCleanupTask('hub-client', async () => {
+      if (this.hubClient) {
+        this.hubClient.close();
+      }
+    });
+
+    this.lifecycleManager.addCleanupTask('mcp-server', async () => {
+      if (this.server) {
+        await this.server.close();
+      }
+    });
+
+    this.lifecycleManager.addCleanupTask('websocket-connections', async () => {
+      // Close any remaining WebSocket connections
+      if (this.hubClient && this.hubClient.ownedHub) {
+        this.hubClient.ownedHub.stop();
+      }
+    });
+
+    // Start activity heartbeat
+    this.lifecycleManager.startHeartbeat(30000);
   }
 
   setupToolHandlers() {
@@ -817,6 +1596,35 @@ class ChromeMCPServer {
               required: ['tabId'],
               additionalProperties: false
             }
+          },
+          {
+            name: 'delete_claude_conversation',
+            description: 'Delete a conversation from Claude.ai',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                tabId: {
+                  type: 'number',
+                  description: 'The tab ID of the Claude session'
+                },
+                conversationId: {
+                  type: 'string',
+                  description: 'Optional conversation ID. If not provided, deletes current conversation',
+                  default: null
+                }
+              },
+              required: ['tabId'],
+              additionalProperties: false
+            }
+          },
+          {
+            name: 'reload_extension',
+            description: 'Reload the Chrome extension to apply code changes',
+            inputSchema: {
+              type: 'object',
+              properties: {},
+              additionalProperties: false
+            }
           }
         ]
       };
@@ -825,6 +1633,9 @@ class ChromeMCPServer {
     // Handle tool calls
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
+
+      // Update activity for lifecycle management
+      this.lifecycleManager.updateActivity();
 
       try {
         let result;
@@ -853,6 +1664,12 @@ class ChromeMCPServer {
             break;
           case 'debug_claude_page':
             result = await this.hubClient.sendRequest('debug_claude_page', args);
+            break;
+          case 'delete_claude_conversation':
+            result = await this.hubClient.sendRequest('delete_claude_conversation', args);
+            break;
+          case 'reload_extension':
+            result = await this.hubClient.sendRequest('reload_extension', args);
             break;
           default:
             throw new Error(`Unknown tool: ${name}`);
@@ -888,23 +1705,21 @@ class ChromeMCPServer {
       
       const transport = new StdioServerTransport();
       
-      // Listen for transport close to shutdown gracefully
+      // Enhanced transport close handler
       transport.onclose = () => {
-        console.error('Claude Chrome MCP: Client disconnected, shutting down...');
-        this.stop().then(() => {
-          process.exit(0);
-        }).catch((error) => {
-          console.error('Claude Chrome MCP: Error during shutdown:', error);
-          process.exit(1);
-        });
+        console.error('Claude Chrome MCP: Client disconnected, initiating shutdown...');
+        this.lifecycleManager.gracefulShutdown('mcp_client_disconnect');
       };
       
       await this.server.connect(transport);
       console.error('Claude Chrome MCP: MCP server started');
       
+      // Update activity on successful start
+      this.lifecycleManager.updateActivity();
+      
     } catch (error) {
       console.error('Claude Chrome MCP: Startup failed:', error);
-      process.exit(1);
+      this.lifecycleManager.emergencyShutdown('startup_failed');
     }
   }
 
@@ -928,51 +1743,8 @@ class ChromeMCPServer {
 
 const server = new ChromeMCPServer();
 
-// Enhanced signal handling for graceful shutdown
-const gracefulShutdown = async (signal) => {
-  console.error(`Claude Chrome MCP: Received ${signal}, shutting down gracefully...`);
-  try {
-    await server.stop();
-    process.exit(0);
-  } catch (error) {
-    console.error('Claude Chrome MCP: Force exit due to shutdown error:', error);
-    process.exit(1);
-  }
-};
-
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGPIPE', () => gracefulShutdown('SIGPIPE'));
-
-// Handle parent process exit (important for MCP clients)
-process.on('disconnect', () => gracefulShutdown('disconnect'));
-
-// Monitor parent process more aggressively
-if (process.send) {
-  const parentPid = process.ppid;
-  const checkParent = () => {
-    try {
-      process.kill(parentPid, 0); // Check if parent is alive
-    } catch (e) {
-      console.error('Claude Chrome MCP: Parent process dead, shutting down...');
-      gracefulShutdown('parent-dead');
-    }
-  };
-  
-  // Check parent every 5 seconds
-  setInterval(checkParent, 5000);
-}
-
-// Handle uncaught errors to prevent hanging
-process.on('uncaughtException', (error) => {
-  console.error('Claude Chrome MCP: Uncaught exception:', error);
-  process.exit(1);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Claude Chrome MCP: Unhandled rejection at:', promise, 'reason:', reason);
-  process.exit(1);
-});
+// Process lifecycle is now handled by ProcessLifecycleManager
+// which is integrated into the ChromeMCPServer class
 
 // Start the server
 server.start().catch((error) => {

@@ -207,6 +207,14 @@ class CCMExtensionHub {
           result = await this.debugClaudePage(message.params?.tabId);
           break;
           
+        case 'delete_claude_conversation':
+          result = await this.deleteClaudeConversation(message.params);
+          break;
+          
+        case 'reload_extension':
+          result = await this.reloadExtension();
+          break;
+          
         default:
           throw new Error(`Unknown message type: ${type}`);
       }
@@ -444,6 +452,223 @@ class CCMExtensionHub {
     return result.result?.value || { pageReady: false };
   }
 
+  async deleteClaudeConversation(params) {
+    const { tabId } = params;
+    
+    // Ensure debugger is attached with retry logic
+    try {
+      await this.ensureDebuggerAttached(tabId);
+    } catch (error) {
+      return { 
+        success: false, 
+        reason: 'Failed to attach debugger',
+        error: error.message 
+      };
+    }
+
+    const script = `
+      new Promise(async (resolve) => {
+        try {
+          // Find the conversation title dropdown using the robust data-testid selector
+          const chatMenuTrigger = document.querySelector('[data-testid="chat-menu-trigger"]');
+          
+          if (!chatMenuTrigger) {
+            resolve({ success: false, reason: 'Chat menu trigger not found' });
+            return;
+          }
+          
+          const conversationTitle = chatMenuTrigger.textContent?.trim();
+          console.log('Opening menu for conversation:', conversationTitle);
+          
+          // Click the chat menu trigger to open dropdown
+          chatMenuTrigger.click();
+          
+          // Wait for menu to appear and find delete option
+          await new Promise(r => setTimeout(r, 300));
+          
+          const deleteButton = document.querySelector('[data-testid="delete-chat-trigger"]');
+          
+          if (!deleteButton) {
+            resolve({ success: false, reason: 'Delete button not found in menu' });
+            return;
+          }
+          
+          console.log('Clicking delete button');
+          deleteButton.click();
+          
+          // Wait for potential confirmation dialog and handle it
+          await new Promise(r => setTimeout(r, 500));
+          
+          const confirmButtons = document.querySelectorAll('button');
+          const confirmDelete = Array.from(confirmButtons).find(btn => {
+            const text = btn.textContent?.toLowerCase() || '';
+            const ariaLabel = btn.getAttribute('aria-label')?.toLowerCase() || '';
+            return text.includes('delete') || text.includes('confirm') || 
+                   ariaLabel.includes('delete') || ariaLabel.includes('confirm');
+          });
+          
+          if (confirmDelete) {
+            console.log('Confirming deletion');
+            confirmDelete.click();
+          }
+          
+          // Wait a moment and check if we were redirected
+          await new Promise(r => setTimeout(r, 1000));
+          
+          const newUrl = window.location.href;
+          const wasRedirected = newUrl.includes('/new') || !newUrl.includes('/chat/');
+          
+          resolve({ 
+            success: true, 
+            conversationTitle: conversationTitle,
+            wasRedirected: wasRedirected,
+            newUrl: newUrl,
+            deletedAt: Date.now()
+          });
+          
+        } catch (error) {
+          resolve({ 
+            success: false, 
+            error: error.toString()
+          });
+        }
+      })
+    `;
+    
+    try {
+      const result = await this.executeScriptWithRetry(tabId, script);
+      return result.result?.value || { success: false, reason: 'Script execution failed' };
+    } catch (error) {
+      return { 
+        success: false, 
+        reason: 'Script execution error',
+        error: error.message 
+      };
+    }
+  }
+
+  async ensureDebuggerAttached(tabId) {
+    const maxRetries = 3;
+    let retries = 0;
+    
+    while (retries < maxRetries) {
+      try {
+        // Check if debugger is already attached
+        const tabs = await chrome.tabs.query({});
+        const tab = tabs.find(t => t.id === tabId);
+        
+        if (!tab) {
+          throw new Error(`Tab ${tabId} not found`);
+        }
+        
+        // First test if debugger is already working
+        try {
+          await new Promise((resolve, reject) => {
+            chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
+              expression: 'true',
+              returnByValue: true
+            }, (result) => {
+              if (chrome.runtime.lastError) {
+                reject(new Error(chrome.runtime.lastError.message));
+                return;
+              }
+              resolve(result);
+            });
+          });
+          console.log(`Debugger already working on tab ${tabId}`);
+          this.debuggerSessions.set(tabId, { attached: Date.now() });
+          return; // Success - debugger is already functional
+        } catch (testError) {
+          // Debugger not working, try to attach
+        }
+        
+        // Try to attach debugger
+        await new Promise((resolve, reject) => {
+          chrome.debugger.attach({ tabId }, '1.0', () => {
+            if (chrome.runtime.lastError) {
+              // Already attached is not an error if it's working
+              if (chrome.runtime.lastError.message?.includes('already attached')) {
+                resolve();
+                return;
+              }
+              reject(new Error(chrome.runtime.lastError.message));
+              return;
+            }
+            resolve();
+          });
+        });
+        
+        // Test debugger connection with a simple command
+        await new Promise((resolve, reject) => {
+          chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
+            expression: 'true',
+            returnByValue: true
+          }, (result) => {
+            if (chrome.runtime.lastError) {
+              reject(new Error(chrome.runtime.lastError.message));
+              return;
+            }
+            resolve(result);
+          });
+        });
+        
+        console.log(`Debugger successfully attached to tab ${tabId}`);
+        this.debuggerSessions.set(tabId, { attached: Date.now() });
+        return; // Success
+        
+      } catch (error) {
+        retries++;
+        console.log(`Debugger attach attempt ${retries}/${maxRetries} failed:`, error.message);
+        
+        if (retries >= maxRetries) {
+          throw new Error(`Failed to attach debugger after ${maxRetries} attempts: ${error.message}`);
+        }
+        
+        // Detach and wait before retry
+        try {
+          await new Promise(resolve => {
+            chrome.debugger.detach({ tabId }, () => {
+              // Ignore errors on detach
+              resolve();
+            });
+          });
+        } catch (detachError) {
+          // Ignore detach errors
+        }
+        
+        // Wait before retry
+        await new Promise(resolve => setTimeout(resolve, 1000 * retries));
+      }
+    }
+  }
+
+  async executeScriptWithRetry(tabId, script, maxRetries = 2) {
+    let lastError;
+    
+    for (let retry = 0; retry <= maxRetries; retry++) {
+      try {
+        const result = await this.executeScript({ tabId, script });
+        return result;
+        
+      } catch (error) {
+        lastError = error;
+        console.log(`Script execution attempt ${retry + 1}/${maxRetries + 1} failed:`, error.message);
+        
+        if (retry < maxRetries) {
+          // Try to reattach debugger before retry
+          try {
+            await this.ensureDebuggerAttached(tabId);
+            await new Promise(resolve => setTimeout(resolve, 500));
+          } catch (reattachError) {
+            console.log('Failed to reattach debugger:', reattachError.message);
+          }
+        }
+      }
+    }
+    
+    throw lastError;
+  }
+
   updateGlobalState() {
     const connectedCount = this.connectedClients.size;
     
@@ -516,6 +741,32 @@ class CCMExtensionHub {
         this.connectToHub();
       }
     }, KEEPALIVE_INTERVAL);
+  }
+
+  async reloadExtension() {
+    try {
+      // Send notification to any connected clients before reload
+      if (this.hubConnection && this.hubConnection.readyState === WebSocket.OPEN) {
+        this.hubConnection.send(JSON.stringify({
+          type: 'extension_reloading',
+          timestamp: Date.now()
+        }));
+      }
+
+      // Small delay to allow message to be sent
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Reload the extension
+      chrome.runtime.reload();
+      
+      return { success: true, message: 'Extension reloaded successfully' };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error.message,
+        message: 'Failed to reload extension'
+      };
+    }
   }
 }
 
