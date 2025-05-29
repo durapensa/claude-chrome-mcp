@@ -227,6 +227,14 @@ class CCMExtensionHub {
           result = await this.getCapturedRequests(message.params?.tabId);
           break;
           
+        case 'close_claude_tab':
+          result = await this.closeClaudeTab(message.params);
+          break;
+          
+        case 'open_claude_conversation_tab':
+          result = await this.openClaudeConversationTab(message.params);
+          break;
+          
         default:
           throw new Error(`Unknown message type: ${type}`);
       }
@@ -265,13 +273,23 @@ class CCMExtensionHub {
   async getClaudeTabs() {
     return new Promise((resolve) => {
       chrome.tabs.query({ url: 'https://claude.ai/*' }, (tabs) => {
-        const claudeTabs = tabs.map(tab => ({
-          id: tab.id,
-          url: tab.url,
-          title: tab.title,
-          active: tab.active,
-          debuggerAttached: this.debuggerSessions.has(tab.id)
-        }));
+        const claudeTabs = tabs.map(tab => {
+          // Extract conversation ID from URL if present
+          let conversationId = null;
+          const chatMatch = tab.url.match(/\/chat\/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/);
+          if (chatMatch) {
+            conversationId = chatMatch[1];
+          }
+
+          return {
+            id: tab.id,
+            url: tab.url,
+            title: tab.title,
+            active: tab.active,
+            debuggerAttached: this.debuggerSessions.has(tab.id),
+            conversationId: conversationId
+          };
+        });
         resolve(claudeTabs);
       });
     });
@@ -911,6 +929,305 @@ class CCMExtensionHub {
         error: error.message,
         message: 'Failed to reload extension'
       };
+    }
+  }
+
+  /**
+   * Close a specific Claude.ai tab by tab ID
+   */
+  async closeClaudeTab(params) {
+    const { tabId, force = false } = params;
+    
+    if (!tabId || typeof tabId !== 'number') {
+      throw new Error('tabId is required and must be a number');
+    }
+
+    try {
+      // First, get tab information
+      const tab = await new Promise((resolve, reject) => {
+        chrome.tabs.get(tabId, (tab) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+          } else {
+            resolve(tab);
+          }
+        });
+      });
+
+      // Verify it's a Claude.ai tab
+      if (!tab.url.includes('claude.ai')) {
+        return {
+          success: false,
+          reason: 'Tab is not a Claude.ai tab',
+          tabId: tabId,
+          tabUrl: tab.url
+        };
+      }
+
+      // Extract conversation ID from URL if possible
+      const conversationIdMatch = tab.url.match(/\/chat\/([a-f0-9-]{36})/);
+      const conversationId = conversationIdMatch ? conversationIdMatch[1] : null;
+
+      // If not forcing closure, check for unsaved content
+      if (!force) {
+        try {
+          // Ensure debugger is attached
+          await this.ensureDebuggerAttached(tabId);
+          
+          // Check for unsaved content
+          const hasUnsavedScript = `
+            (function() {
+              const textarea = document.querySelector('div[contenteditable="true"]');
+              const hasText = textarea && textarea.textContent && textarea.textContent.trim().length > 0;
+              return {
+                hasUnsavedContent: hasText,
+                textLength: hasText ? textarea.textContent.trim().length : 0
+              };
+            })()
+          `;
+          
+          const result = await this.executeScript({ tabId, script: hasUnsavedScript });
+          const checkResult = result.result?.value;
+          
+          if (checkResult && checkResult.hasUnsavedContent) {
+            return {
+              success: false,
+              reason: 'unsaved_content',
+              tabId: tabId,
+              conversationId: conversationId,
+              tabUrl: tab.url,
+              textLength: checkResult.textLength,
+              message: 'Tab has unsaved content. Use force=true to close anyway.'
+            };
+          }
+        } catch (error) {
+          // If we can't check for unsaved content, proceed with warning
+          console.warn('Could not check for unsaved content:', error.message);
+        }
+      }
+
+      // Close the tab
+      await new Promise((resolve, reject) => {
+        chrome.tabs.remove(tabId, () => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+          } else {
+            resolve();
+          }
+        });
+      });
+
+      // Clean up debugger session if exists
+      if (this.debuggerSessions.has(tabId)) {
+        this.debuggerSessions.delete(tabId);
+      }
+
+      // Clean up captured requests if exists
+      if (this.capturedRequests && this.capturedRequests.has(tabId)) {
+        this.capturedRequests.delete(tabId);
+      }
+
+      console.log(`CCM Extension: Closed Claude tab ${tabId}`);
+      
+      return {
+        success: true,
+        tabId: tabId,
+        conversationId: conversationId,
+        tabUrl: tab.url,
+        tabTitle: tab.title,
+        closedAt: Date.now(),
+        wasForced: force
+      };
+
+    } catch (error) {
+      console.error(`CCM Extension: Error closing tab ${tabId}:`, error);
+      throw new Error(`Failed to close tab: ${error.message}`);
+    }
+  }
+
+  /**
+   * Open a specific Claude conversation in a new tab using conversation ID
+   */
+  async openClaudeConversationTab(params) {
+    const { 
+      conversationId, 
+      activate = true, 
+      waitForLoad = true, 
+      loadTimeoutMs = 10000 
+    } = params;
+    
+    if (!conversationId || typeof conversationId !== 'string') {
+      throw new Error('conversationId is required and must be a string');
+    }
+
+    // Validate conversation ID format (UUID)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(conversationId)) {
+      throw new Error('conversationId must be a valid UUID format');
+    }
+
+    try {
+      // Check if conversation is already open in an existing tab
+      const existingTabs = await new Promise((resolve) => {
+        chrome.tabs.query({ url: `https://claude.ai/chat/${conversationId}` }, resolve);
+      });
+
+      if (existingTabs.length > 0) {
+        const existingTab = existingTabs[0];
+        
+        // Activate the existing tab if requested
+        if (activate) {
+          await new Promise((resolve, reject) => {
+            chrome.tabs.update(existingTab.id, { active: true }, (tab) => {
+              if (chrome.runtime.lastError) {
+                reject(new Error(chrome.runtime.lastError.message));
+              } else {
+                resolve(tab);
+              }
+            });
+          });
+        }
+
+        return {
+          success: true,
+          tabId: existingTab.id,
+          conversationId: conversationId,
+          url: existingTab.url,
+          title: existingTab.title,
+          wasExisting: true,
+          activated: activate,
+          createdAt: Date.now()
+        };
+      }
+
+      // Create new tab with conversation URL
+      const conversationUrl = `https://claude.ai/chat/${conversationId}`;
+      const newTab = await new Promise((resolve, reject) => {
+        chrome.tabs.create({ 
+          url: conversationUrl, 
+          active: activate 
+        }, (tab) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+          } else {
+            resolve(tab);
+          }
+        });
+      });
+
+      console.log(`CCM Extension: Created new tab ${newTab.id} for conversation ${conversationId}`);
+
+      let loadVerified = false;
+      let loadTimeMs = 0;
+      let conversationTitle = null;
+      let hasMessages = false;
+
+      // Wait for page to load if requested
+      if (waitForLoad) {
+        const loadStartTime = Date.now();
+        
+        try {
+          // Wait for tab to finish loading
+          await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+              reject(new Error(`Load timeout after ${loadTimeoutMs}ms`));
+            }, loadTimeoutMs);
+
+            const checkLoading = () => {
+              chrome.tabs.get(newTab.id, (tab) => {
+                if (chrome.runtime.lastError) {
+                  clearTimeout(timeout);
+                  reject(new Error(chrome.runtime.lastError.message));
+                  return;
+                }
+
+                if (tab.status === 'complete') {
+                  clearTimeout(timeout);
+                  resolve();
+                } else {
+                  setTimeout(checkLoading, 500);
+                }
+              });
+            };
+
+            checkLoading();
+          });
+
+          loadTimeMs = Date.now() - loadStartTime;
+
+          // Verify conversation loaded correctly
+          await this.ensureDebuggerAttached(newTab.id);
+          
+          const verifyScript = `
+            (function() {
+              try {
+                // Check if we're on the right conversation page
+                const isCorrectConversation = window.location.href.includes('${conversationId}');
+                
+                // Check if conversation content is loaded
+                const hasConversationContainer = !!document.querySelector('[data-testid="conversation"]') || 
+                                                !!document.querySelector('.conversation') ||
+                                                !!document.querySelector('main');
+                
+                // Try to get conversation title
+                const titleElement = document.querySelector('title') || 
+                                   document.querySelector('h1') ||
+                                   document.querySelector('[data-testid="conversation-title"]');
+                const title = titleElement ? titleElement.textContent : null;
+                
+                // Check if there are messages
+                const messageElements = document.querySelectorAll('[data-testid="user-message"], .font-claude-message, [data-message-author-role]');
+                
+                return {
+                  isCorrectConversation,
+                  hasConversationContainer,
+                  conversationTitle: title,
+                  hasMessages: messageElements.length > 0,
+                  messageCount: messageElements.length,
+                  url: window.location.href
+                };
+              } catch (error) {
+                return {
+                  error: error.toString(),
+                  url: window.location.href
+                };
+              }
+            })()
+          `;
+          
+          const verifyResult = await this.executeScript({ tabId: newTab.id, script: verifyScript });
+          const verification = verifyResult.result?.value;
+          
+          if (verification && !verification.error) {
+            loadVerified = verification.isCorrectConversation && verification.hasConversationContainer;
+            conversationTitle = verification.conversationTitle;
+            hasMessages = verification.hasMessages;
+          }
+          
+        } catch (loadError) {
+          console.warn(`CCM Extension: Load verification failed for conversation ${conversationId}:`, loadError.message);
+          // Non-fatal error - tab was created successfully
+        }
+      }
+
+      return {
+        success: true,
+        tabId: newTab.id,
+        conversationId: conversationId,
+        url: conversationUrl,
+        title: newTab.title,
+        wasExisting: false,
+        activated: activate,
+        createdAt: Date.now(),
+        loadVerified: loadVerified,
+        loadTimeMs: loadTimeMs,
+        conversationTitle: conversationTitle,
+        hasMessages: hasMessages
+      };
+
+    } catch (error) {
+      console.error(`CCM Extension: Error opening conversation ${conversationId}:`, error);
+      throw new Error(`Failed to open conversation: ${error.message}`);
     }
   }
 }

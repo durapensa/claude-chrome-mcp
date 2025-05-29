@@ -486,7 +486,8 @@ class WebSocketHub extends EventEmitter {
           'get_claude_sessions', 'spawn_claude_tab', 'send_message_to_claude',
           'get_claude_response', 'debug_attach', 'execute_script', 
           'get_dom_elements', 'debug_claude_page', 'delete_claude_conversation',
-          'reload_extension', 'start_network_inspection', 'stop_network_inspection', 'get_captured_requests'
+          'reload_extension', 'start_network_inspection', 'stop_network_inspection', 'get_captured_requests',
+          'close_claude_tab', 'open_claude_conversation_tab'
         ];
         
         if (validToolTypes.includes(type) && ws.clientType === 'mcp_client') {
@@ -1506,7 +1507,7 @@ class ChromeMCPServer {
           },
           {
             name: 'get_claude_sessions',
-            description: 'Get list of all Claude.ai tabs with their IDs and status',
+            description: 'Get list of all Claude.ai tabs with their IDs, status, and conversation IDs (if available). Use this to find conversation IDs for open_claude_conversation_tab.',
             inputSchema: {
               type: 'object',
               properties: {},
@@ -1688,6 +1689,56 @@ class ChromeMCPServer {
               required: ['tabId'],
               additionalProperties: false
             }
+          },
+          {
+            name: 'close_claude_tab',
+            description: 'Close a specific Claude.ai tab by tab ID',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                tabId: {
+                  type: 'number',
+                  description: 'The Chrome tab ID to close'
+                },
+                force: {
+                  type: 'boolean',
+                  description: 'Force close even if there are unsaved changes',
+                  default: false
+                }
+              },
+              required: ['tabId'],
+              additionalProperties: false
+            }
+          },
+          {
+            name: 'open_claude_conversation_tab',
+            description: 'Open a specific Claude conversation in a new tab using conversation ID',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                conversationId: {
+                  type: 'string',
+                  description: 'The Claude conversation ID (UUID format) to open. Example: "1c3bc7f5-24a2-4798-9c16-2530425da89b". Use get_claude_sessions to find existing conversation IDs.'
+                },
+                activate: {
+                  type: 'boolean', 
+                  description: 'Whether to activate the new tab',
+                  default: true
+                },
+                waitForLoad: {
+                  type: 'boolean',
+                  description: 'Whether to wait for the page to load completely',
+                  default: true
+                },
+                loadTimeoutMs: {
+                  type: 'number',
+                  description: 'Maximum time to wait for page load in milliseconds',
+                  default: 10000
+                }
+              },
+              required: ['conversationId'],
+              additionalProperties: false
+            }
           }
         ]
       };
@@ -1742,6 +1793,12 @@ class ChromeMCPServer {
             break;
           case 'get_captured_requests':
             result = await this.hubClient.sendRequest('get_captured_requests', args);
+            break;
+          case 'close_claude_tab':
+            result = await this.hubClient.sendRequest('close_claude_tab', args);
+            break;
+          case 'open_claude_conversation_tab':
+            result = await this.hubClient.sendRequest('open_claude_conversation_tab', args);
             break;
           default:
             throw new Error(`Unknown tool: ${name}`);
