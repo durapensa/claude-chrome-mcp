@@ -68,12 +68,17 @@ npm link  # Makes 'ccm' command globally available
 ### MCP Tools
 
 - `spawn_claude_tab` - Create new Claude.ai tab
-- `get_claude_sessions` - List active Claude tabs
-- `send_message_to_claude` - Send messages to Claude sessions
+- `get_claude_tabs` - List active Claude tabs with conversation IDs
+- `get_claude_conversations` - Fetch conversation list from Claude.ai API
+- `send_message_to_claude_tab` - Send messages to Claude sessions
 - `get_claude_response` - Get latest responses
+- `delete_claude_conversation` - Delete conversations via API
+- `open_claude_conversation_tab` - Open specific conversations by ID
+- `close_claude_tab` - Close tabs with optional force flag
 - `debug_attach` - Attach Chrome debugger
 - `execute_script` - Run JavaScript in tabs
 - `get_dom_elements` - Query DOM elements
+- Network monitoring tools for API discovery
 
 ### CLI Usage
 
