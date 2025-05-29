@@ -14,7 +14,7 @@ export function sessionsCommand(program: Command): void {
       const client = globalClient;
       
       try {
-        const sessions = await client.getClaudeSessions();
+        const sessions = await client.getClaudeTabs();
 
         if (options.quiet) {
           sessions.forEach(session => console.log(session.id));

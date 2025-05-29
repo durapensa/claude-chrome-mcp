@@ -171,10 +171,16 @@ class CCMExtensionHub {
       let result;
       
       switch (type) {
-        case 'get_claude_sessions':
-          console.log('CCM Extension: Getting Claude sessions...');
+        case 'get_claude_tabs':
+          console.log('CCM Extension: Getting Claude tabs...');
           result = await this.getClaudeTabs();
           console.log('CCM Extension: Found', result.length, 'Claude tabs');
+          break;
+          
+        case 'get_claude_conversations':
+          console.log('CCM Extension: Getting Claude conversations...');
+          result = await this.getClaudeConversations();
+          console.log('CCM Extension: Found', result.length, 'conversations');
           break;
           
         case 'spawn_claude_tab':
@@ -183,7 +189,7 @@ class CCMExtensionHub {
           console.log('CCM Extension: Created tab:', result);
           break;
           
-        case 'send_message_to_claude':
+        case 'send_message_to_claude_tab':
           result = await this.sendMessageToClaudeTab(message.params);
           break;
           
@@ -271,8 +277,19 @@ class CCMExtensionHub {
 
   // Chrome automation methods (same as before, but cleaner)
   async getClaudeTabs() {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       chrome.tabs.query({ url: 'https://claude.ai/*' }, (tabs) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+
+        // Handle case where tabs is undefined or null
+        if (!tabs) {
+          resolve([]);
+          return;
+        }
+
         const claudeTabs = tabs.map(tab => {
           // Extract conversation ID from URL if present
           let conversationId = null;
@@ -309,6 +326,89 @@ class CCMExtensionHub {
         }
       });
     });
+  }
+
+  async getClaudeConversations() {
+    try {
+      // First get current Claude tabs to match with conversations
+      const claudeTabs = await this.getClaudeTabs();
+      const tabsByConversationId = new Map();
+      
+      claudeTabs.forEach(tab => {
+        if (tab.conversationId) {
+          tabsByConversationId.set(tab.conversationId, tab.id);
+        }
+      });
+
+      // Find a Claude tab to execute the API call from
+      let claudeTab = claudeTabs.find(tab => tab.url.includes('claude.ai'));
+      
+      if (!claudeTab) {
+        // Create a temporary Claude tab for the API call
+        claudeTab = await this.createClaudeTab();
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for page load
+      }
+
+      // Attach debugger to execute script
+      await this.ensureDebuggerAttached(claudeTab.id);
+
+      // Execute script to fetch conversations from Claude API
+      const conversationsScript = `
+        (async function() {
+          try {
+            const response = await fetch('/api/organizations/' + window.organizationId + '/chat_conversations?offset=0&limit=30', {
+              method: 'GET',
+              headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+              },
+              credentials: 'include'
+            });
+            
+            if (!response.ok) {
+              throw new Error('Failed to fetch conversations: ' + response.status);
+            }
+            
+            const data = await response.json();
+            return data;
+          } catch (error) {
+            return { error: error.toString() };
+          }
+        })()
+      `;
+
+      const result = await this.executeScript({ 
+        tabId: claudeTab.id, 
+        script: conversationsScript 
+      });
+
+      const apiData = result.result?.value;
+      
+      if (apiData?.error) {
+        throw new Error('API Error: ' + apiData.error);
+      }
+
+      if (!apiData || !apiData.conversations) {
+        throw new Error('Invalid API response format');
+      }
+
+      // Transform the conversations to include tab IDs
+      const conversations = apiData.conversations.map(conv => ({
+        id: conv.uuid,
+        title: conv.name || 'Untitled Conversation',
+        created_at: conv.created_at,
+        updated_at: conv.updated_at,
+        message_count: conv.chat_messages?.length || 0,
+        tabId: tabsByConversationId.get(conv.uuid) || null,
+        isOpen: tabsByConversationId.has(conv.uuid)
+      }));
+
+      return conversations;
+
+    } catch (error) {
+      console.error('CCM Extension: Error fetching conversations:', error);
+      throw new Error(`Failed to fetch conversations: ${error.message}`);
+    }
   }
 
   async attachDebugger(tabId) {

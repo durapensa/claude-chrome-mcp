@@ -195,8 +195,8 @@ export class CCMClient {
 
   // Public API methods using MCP tools
   
-  async getClaudeSessions(): Promise<ClaudeTab[]> {
-    const result = await this.sendMCPToolCall('get_claude_sessions');
+  async getClaudeTabs(): Promise<ClaudeTab[]> {
+    const result = await this.sendMCPToolCall('get_claude_tabs');
     
     // Handle error responses
     if (result.text && result.text.includes('Error:')) {
@@ -211,6 +211,22 @@ export class CCMClient {
     // Handle wrapped response
     if (result.sessions && Array.isArray(result.sessions)) {
       return result.sessions;
+    }
+    
+    throw new Error('Invalid response format');
+  }
+
+  async getClaudeConversations(): Promise<any[]> {
+    const result = await this.sendMCPToolCall('get_claude_conversations');
+    
+    // Handle error responses
+    if (result.text && result.text.includes('Error:')) {
+      throw new Error(result.text);
+    }
+    
+    // Handle array response
+    if (Array.isArray(result)) {
+      return result;
     }
     
     throw new Error('Invalid response format');
@@ -234,7 +250,7 @@ export class CCMClient {
   }
 
   async sendMessage(tabId: number, message: string): Promise<MessageResponse> {
-    return await this.sendMCPToolCall('send_message_to_claude', { tabId, message });
+    return await this.sendMCPToolCall('send_message_to_claude_tab', { tabId, message });
   }
 
   async getLatestResponse(tabId: number): Promise<any> {

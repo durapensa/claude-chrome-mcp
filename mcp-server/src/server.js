@@ -483,7 +483,7 @@ class WebSocketHub extends EventEmitter {
       default:
         // Check if this is a tool request from an MCP client
         const validToolTypes = [
-          'get_claude_sessions', 'spawn_claude_tab', 'send_message_to_claude',
+          'get_claude_tabs', 'get_claude_conversations', 'spawn_claude_tab', 'send_message_to_claude_tab',
           'get_claude_response', 'debug_attach', 'execute_script', 
           'get_dom_elements', 'debug_claude_page', 'delete_claude_conversation',
           'reload_extension', 'start_network_inspection', 'stop_network_inspection', 'get_captured_requests',
@@ -1506,8 +1506,8 @@ class ChromeMCPServer {
             }
           },
           {
-            name: 'get_claude_sessions',
-            description: 'Get list of all Claude.ai tabs with their IDs, status, and conversation IDs (if available). Use this to find conversation IDs for open_claude_conversation_tab.',
+            name: 'get_claude_tabs',
+            description: 'Get list of all currently open Claude.ai tabs with their IDs, status, and conversation IDs (if available).',
             inputSchema: {
               type: 'object',
               properties: {},
@@ -1515,8 +1515,17 @@ class ChromeMCPServer {
             }
           },
           {
-            name: 'send_message_to_claude',
-            description: 'Send a message to a specific Claude session',
+            name: 'get_claude_conversations',
+            description: 'Get list of recent Claude conversations from API with UUIDs and current tab IDs (if open). Returns up to 30 recent conversations.',
+            inputSchema: {
+              type: 'object',
+              properties: {},
+              additionalProperties: false
+            }
+          },
+          {
+            name: 'send_message_to_claude_tab',
+            description: 'Send a message to a specific Claude tab',
             inputSchema: {
               type: 'object',
               properties: {
@@ -1535,7 +1544,7 @@ class ChromeMCPServer {
           },
           {
             name: 'get_claude_response',
-            description: 'Get the latest response from a Claude session',
+            description: 'Get the latest response from a Claude tab',
             inputSchema: {
               type: 'object',
               properties: {
@@ -1618,7 +1627,7 @@ class ChromeMCPServer {
           },
           {
             name: 'delete_claude_conversation',
-            description: 'Delete a conversation from Claude.ai',
+            description: 'Delete a conversation from Claude.ai using API (works from any Claude tab)',
             inputSchema: {
               type: 'object',
               properties: {
@@ -1718,7 +1727,7 @@ class ChromeMCPServer {
               properties: {
                 conversationId: {
                   type: 'string',
-                  description: 'The Claude conversation ID (UUID format) to open. Example: "1c3bc7f5-24a2-4798-9c16-2530425da89b". Use get_claude_sessions to find existing conversation IDs.'
+                  description: 'The Claude conversation ID (UUID format) to open. Example: "1c3bc7f5-24a2-4798-9c16-2530425da89b". Use get_claude_conversations to find existing conversation IDs.'
                 },
                 activate: {
                   type: 'boolean', 
@@ -1755,14 +1764,17 @@ class ChromeMCPServer {
         let result;
         
         switch (name) {
-          case 'get_claude_sessions':
-            result = await this.hubClient.sendRequest('get_claude_sessions');
+          case 'get_claude_tabs':
+            result = await this.hubClient.sendRequest('get_claude_tabs');
+            break;
+          case 'get_claude_conversations':
+            result = await this.hubClient.sendRequest('get_claude_conversations');
             break;
           case 'spawn_claude_tab':
             result = await this.hubClient.sendRequest('spawn_claude_tab', args);
             break;
-          case 'send_message_to_claude':
-            result = await this.hubClient.sendRequest('send_message_to_claude', args);
+          case 'send_message_to_claude_tab':
+            result = await this.hubClient.sendRequest('send_message_to_claude_tab', args);
             break;
           case 'get_claude_response':
             result = await this.hubClient.sendRequest('get_claude_response', args);

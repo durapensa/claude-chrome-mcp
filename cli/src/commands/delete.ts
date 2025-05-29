@@ -21,7 +21,7 @@ export function deleteCommand(program: Command): void {
 
       try {
         // Get current sessions to validate tab exists and show conversation title
-        const sessions = await client.getClaudeSessions();
+        const sessions = await client.getClaudeTabs();
         const targetSession = sessions.find(s => s.id === tabIdNum);
         
         if (!targetSession) {

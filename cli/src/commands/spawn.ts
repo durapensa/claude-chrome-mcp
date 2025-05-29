@@ -35,7 +35,7 @@ export function spawnCommand(program: Command): void {
           await new Promise(resolve => setTimeout(resolve, waitSeconds * 1000));
           
           // Check if tab is loaded by getting sessions
-          const sessions = await client.getClaudeSessions();
+          const sessions = await client.getClaudeTabs();
           const newTab = sessions.find(s => s.id === result.id);
           
           if (newTab) {
