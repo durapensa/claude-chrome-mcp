@@ -484,8 +484,8 @@ class WebSocketHub extends EventEmitter {
         // Check if this is a tool request from an MCP client
         const validToolTypes = [
           'get_claude_tabs', 'get_claude_conversations', 'spawn_claude_tab', 'send_message_to_claude_tab',
-          'get_claude_response', 'debug_attach', 'execute_script', 
-          'get_dom_elements', 'debug_claude_page', 'delete_claude_conversation',
+          'get_claude_response', 'batch_send_messages', 'get_conversation_metadata', 'export_conversation_transcript',
+          'debug_attach', 'execute_script', 'get_dom_elements', 'debug_claude_page', 'delete_claude_conversation',
           'reload_extension', 'start_network_inspection', 'stop_network_inspection', 'get_captured_requests',
           'close_claude_tab', 'open_claude_conversation_tab'
         ];
@@ -525,7 +525,7 @@ class WebSocketHub extends EventEmitter {
       extensionId: message.extensionId
     };
 
-    console.error('WebSocket Hub: Chrome extension registered');
+    console.log('WebSocket Hub: Chrome extension registered from', message.extensionId);
     
     this.sendToClient(ws, {
       type: 'registration_confirmed',
@@ -1544,13 +1544,103 @@ class ChromeMCPServer {
           },
           {
             name: 'get_claude_response',
-            description: 'Get the latest response from a Claude tab',
+            description: 'Get the latest response from a Claude tab with optional waiting for completion',
             inputSchema: {
               type: 'object',
               properties: {
                 tabId: {
                   type: 'number',
                   description: 'The tab ID of the Claude session'
+                },
+                waitForCompletion: {
+                  type: 'boolean',
+                  description: 'Whether to wait for the response to complete before returning (default: true)',
+                  default: true
+                },
+                timeoutMs: {
+                  type: 'number',
+                  description: 'Maximum time to wait for response completion in milliseconds (default: 10000). For longer responses, consider setting this based on expected generation time.',
+                  default: 10000
+                },
+                includeMetadata: {
+                  type: 'boolean',
+                  description: 'Whether to include metadata about the response (completion indicators, timing, etc.)',
+                  default: false
+                }
+              },
+              required: ['tabId'],
+              additionalProperties: false
+            }
+          },
+          {
+            name: 'batch_send_messages',
+            description: 'Send messages to multiple Claude tabs simultaneously or sequentially',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                messages: {
+                  type: 'array',
+                  description: 'Array of message objects, each containing tabId and message',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      tabId: {
+                        type: 'number',
+                        description: 'The tab ID to send the message to'
+                      },
+                      message: {
+                        type: 'string',
+                        description: 'The message to send'
+                      }
+                    },
+                    required: ['tabId', 'message']
+                  }
+                },
+                sequential: {
+                  type: 'boolean',
+                  description: 'Whether to send messages sequentially (wait for each) or in parallel',
+                  default: false
+                }
+              },
+              required: ['messages'],
+              additionalProperties: false
+            }
+          },
+          {
+            name: 'get_conversation_metadata',
+            description: 'Get detailed metadata about a Claude conversation including message count, content analysis, and features',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                tabId: {
+                  type: 'number',
+                  description: 'The tab ID of the Claude conversation'
+                },
+                includeMessages: {
+                  type: 'boolean',
+                  description: 'Whether to include detailed message information',
+                  default: false
+                }
+              },
+              required: ['tabId'],
+              additionalProperties: false
+            }
+          },
+          {
+            name: 'export_conversation_transcript',
+            description: 'Export a full conversation transcript with metadata in markdown or JSON format',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                tabId: {
+                  type: 'number',
+                  description: 'The tab ID of the Claude conversation to export'
+                },
+                format: {
+                  type: 'string',
+                  enum: ['markdown', 'json'],
+                  description: 'Export format (markdown or json)',
+                  default: 'markdown'
                 }
               },
               required: ['tabId'],
@@ -1778,6 +1868,15 @@ class ChromeMCPServer {
             break;
           case 'get_claude_response':
             result = await this.hubClient.sendRequest('get_claude_response', args);
+            break;
+          case 'batch_send_messages':
+            result = await this.hubClient.sendRequest('batch_send_messages', args);
+            break;
+          case 'get_conversation_metadata':
+            result = await this.hubClient.sendRequest('get_conversation_metadata', args);
+            break;
+          case 'export_conversation_transcript':
+            result = await this.hubClient.sendRequest('export_conversation_transcript', args);
             break;
           case 'debug_attach':
             result = await this.hubClient.sendRequest('debug_attach', args);

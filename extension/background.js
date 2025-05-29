@@ -4,6 +4,16 @@
 const WEBSOCKET_PORT = 54321;
 const KEEPALIVE_INTERVAL = 20000;
 
+// Keep service worker alive
+chrome.runtime.onStartup.addListener(() => {
+  console.log('CCM Extension: Service worker started');
+});
+
+// Ensure service worker stays active
+self.addEventListener('activate', event => {
+  console.log('CCM Extension: Service worker activated');
+});
+
 class MCPClient {
   constructor(ws, clientInfo) {
     this.id = clientInfo.id || `client-${Date.now()}`;
@@ -53,6 +63,7 @@ class CCMExtensionHub {
   }
 
   async init() {
+    console.log('CCM Extension: Initializing...');
     await this.connectToHub();
     this.setupEventListeners();
     this.startKeepalive();
@@ -63,7 +74,11 @@ class CCMExtensionHub {
     try {
       console.log('CCM Extension: Connecting to WebSocket Hub on port', WEBSOCKET_PORT);
       
-      this.hubConnection = new WebSocket(`ws://localhost:${WEBSOCKET_PORT}`);
+      // Use 127.0.0.1 instead of localhost to avoid potential DNS issues
+      const wsUrl = `ws://127.0.0.1:${WEBSOCKET_PORT}`;
+      console.log('CCM Extension: Attempting connection to', wsUrl);
+      
+      this.hubConnection = new WebSocket(wsUrl);
       
       this.hubConnection.onopen = () => {
         console.log('CCM Extension: Connected to WebSocket Hub');
@@ -98,6 +113,11 @@ class CCMExtensionHub {
       
       this.hubConnection.onerror = (error) => {
         console.error('CCM Extension: Hub connection error:', error);
+        console.error('Error details:', {
+          readyState: this.hubConnection?.readyState,
+          url: this.hubConnection?.url,
+          error: error
+        });
         this.updateBadge('hub-error');
       };
       
@@ -192,9 +212,21 @@ class CCMExtensionHub {
         case 'send_message_to_claude_tab':
           result = await this.sendMessageToClaudeTab(message.params);
           break;
+        
+        case 'batch_send_messages':
+          result = await this.batchSendMessages(message.params);
+          break;
           
         case 'get_claude_response':
           result = await this.getClaudeResponse(message.params);
+          break;
+        
+        case 'get_conversation_metadata':
+          result = await this.getConversationMetadata(message.params);
+          break;
+        
+        case 'export_conversation_transcript':
+          result = await this.exportConversationTranscript(message.params);
           break;
           
         case 'debug_attach':
@@ -502,67 +534,540 @@ class CCMExtensionHub {
     return result.result?.value || { success: false, reason: 'Script execution failed' };
   }
 
+  async batchSendMessages(params) {
+    const { messages, sequential = false } = params;
+    
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return { 
+        success: false, 
+        reason: 'Messages array is required and must not be empty' 
+      };
+    }
+    
+    const results = [];
+    const startTime = Date.now();
+    
+    if (sequential) {
+      // Send messages one by one, waiting for each to complete
+      for (const msg of messages) {
+        try {
+          const sendResult = await this.sendMessageToClaudeTab({
+            tabId: msg.tabId,
+            message: msg.message
+          });
+          
+          results.push({
+            tabId: msg.tabId,
+            success: sendResult.success,
+            result: sendResult,
+            timestamp: Date.now()
+          });
+          
+          // Small delay between sequential messages
+          if (messages.indexOf(msg) < messages.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        } catch (error) {
+          results.push({
+            tabId: msg.tabId,
+            success: false,
+            error: error.message,
+            timestamp: Date.now()
+          });
+        }
+      }
+    } else {
+      // Send all messages in parallel
+      const promises = messages.map(async (msg) => {
+        try {
+          const sendResult = await this.sendMessageToClaudeTab({
+            tabId: msg.tabId,
+            message: msg.message
+          });
+          
+          return {
+            tabId: msg.tabId,
+            success: sendResult.success,
+            result: sendResult,
+            timestamp: Date.now()
+          };
+        } catch (error) {
+          return {
+            tabId: msg.tabId,
+            success: false,
+            error: error.message,
+            timestamp: Date.now()
+          };
+        }
+      });
+      
+      const parallelResults = await Promise.allSettled(promises);
+      parallelResults.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          results.push(result.value);
+        } else {
+          results.push({
+            tabId: messages[index].tabId,
+            success: false,
+            error: result.reason,
+            timestamp: Date.now()
+          });
+        }
+      });
+    }
+    
+    const successCount = results.filter(r => r.success).length;
+    const failureCount = results.length - successCount;
+    
+    return {
+      success: failureCount === 0,
+      summary: {
+        total: results.length,
+        successful: successCount,
+        failed: failureCount,
+        sequential: sequential,
+        durationMs: Date.now() - startTime
+      },
+      results: results
+    };
+  }
+
   async getClaudeResponse(params) {
-    const { tabId } = params;
+    const { 
+      tabId, 
+      waitForCompletion = true, 
+      timeoutMs = 10000, // Lower default with guidance
+      includeMetadata = false 
+    } = params;
+    
+    // Helper function to get response immediately
+    const getResponseImmediate = async () => {
+      const script = `
+        (function() {
+          try {
+            // Get all conversation messages in order
+            const allMessages = [];
+            
+            // Find conversation container
+            const conversationContainer = document.querySelector('[data-testid="conversation"]') || 
+                                         document.querySelector('.conversation') || 
+                                         document.querySelector('main') || 
+                                         document.body;
+            
+            if (!conversationContainer) {
+              return { success: false, reason: 'No conversation container found' };
+            }
+            
+            // Get all message elements with better selectors
+            // First try to get user and assistant messages specifically
+            const userMessages = conversationContainer.querySelectorAll('[data-testid="user-message"]');
+            const assistantMessages = conversationContainer.querySelectorAll('.font-claude-message:not([data-testid="user-message"])');
+            
+            // Combine and sort by DOM position
+            const messageElements = [...userMessages, ...assistantMessages].sort((a, b) => {
+              const position = a.compareDocumentPosition(b);
+              if (position & Node.DOCUMENT_POSITION_PRECEDING) return 1;
+              if (position & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
+              return 0;
+            });
+            
+            if (messageElements.length === 0) {
+              return { success: false, reason: 'No messages found' };
+            }
+            
+            // Process messages in DOM order
+            messageElements.forEach((el, index) => {
+              const text = el.textContent || el.innerText;
+              if (!text || text.trim().length === 0) return;
+              
+              // Determine message type
+              const isUser = el.hasAttribute('data-testid') && el.getAttribute('data-testid') === 'user-message' ||
+                            el.hasAttribute('data-message-author-role') && el.getAttribute('data-message-author-role') === 'user';
+              const isAssistant = el.classList.contains('font-claude-message') ||
+                                 el.hasAttribute('data-message-author-role') && el.getAttribute('data-message-author-role') === 'assistant';
+              
+              allMessages.push({
+                index,
+                text: text.trim(),
+                isUser: !!isUser,
+                isAssistant: !!isAssistant || !isUser // Default to assistant if not clearly user
+              });
+            });
+            
+            if (allMessages.length === 0) {
+              return { success: false, reason: 'No valid messages found' };
+            }
+            
+            // Get the last message
+            const lastMessage = allMessages[allMessages.length - 1];
+            
+            // Check for completion indicators
+            let isComplete = false;
+            let completionIndicators = [];
+            
+            // Check if last message is from assistant
+            if (lastMessage.isAssistant) {
+              // Method 1: Check for stop button (indicates still generating)
+              const stopButton = document.querySelector('button[aria-label*="Stop"], button[title*="Stop"]');
+              const hasStopButton = stopButton && stopButton.offsetParent !== null;
+              
+              if (hasStopButton) {
+                completionIndicators.push('stop_button_visible');
+              } else {
+                // Method 2: Check for dropdown button with retry option
+                const assistantMessages = document.querySelectorAll('.font-claude-message');
+                const lastAssistantEl = assistantMessages[assistantMessages.length - 1];
+                
+                if (lastAssistantEl) {
+                  const parent = lastAssistantEl.closest('.bg-bg-000');
+                  const dropdownButtons = parent ? parent.querySelectorAll('button[aria-expanded]') : [];
+                  
+                  if (dropdownButtons.length > 0) {
+                    isComplete = true;
+                    completionIndicators.push('dropdown_button_present');
+                  }
+                }
+                
+                // Method 3: Check for no loading/streaming indicators
+                const streamingIndicators = document.querySelectorAll('[data-state="streaming"], [class*="animate-pulse"], .loading');
+                if (streamingIndicators.length === 0 && !hasStopButton) {
+                  isComplete = true;
+                  completionIndicators.push('no_streaming_indicators');
+                }
+              }
+            } else {
+              // If last message is from user, consider it complete
+              isComplete = true;
+              completionIndicators.push('last_message_is_user');
+            }
+            
+            const response = {
+              success: true,
+              text: lastMessage.text,
+              isUser: lastMessage.isUser,
+              isAssistant: lastMessage.isAssistant,
+              timestamp: Date.now(),
+              totalMessages: allMessages.length,
+              isComplete: isComplete
+            };
+            
+            // Add metadata if requested
+            if (${includeMetadata}) {
+              response.metadata = {
+                completionIndicators: completionIndicators,
+                messageLength: lastMessage.text.length,
+                hasStopButton: completionIndicators.includes('stop_button_visible'),
+                hasDropdownButton: completionIndicators.includes('dropdown_button_present')
+              };
+            }
+            
+            return response;
+          } catch (error) {
+            return { success: false, reason: 'Error getting messages: ' + error.toString() };
+          }
+        })()
+      `;
+      
+      const result = await this.executeScript({ tabId, script });
+      return result.result?.value || { success: false, reason: 'Script execution failed' };
+    };
+    
+    // If not waiting for completion, return immediately
+    if (!waitForCompletion) {
+      return await getResponseImmediate();
+    }
+    
+    // Wait for completion with polling
+    const startTime = Date.now();
+    let lastResponse = null;
+    let lastTextLength = 0;
+    let stableCount = 0;
+    
+    while (Date.now() - startTime < timeoutMs) {
+      const response = await getResponseImmediate();
+      
+      if (!response.success) {
+        return response;
+      }
+      
+      // Check if response is complete
+      if (response.isComplete) {
+        // Additional stability check: ensure text hasn't changed
+        if (lastResponse && lastResponse.text === response.text) {
+          stableCount++;
+          if (stableCount >= 2) { // Text stable for 2 checks
+            return response;
+          }
+        } else {
+          stableCount = 0;
+        }
+      }
+      
+      lastResponse = response;
+      lastTextLength = response.text.length;
+      
+      // Wait before next check
+      await new Promise(resolve => setTimeout(resolve, 250));
+    }
+    
+    // Timeout reached
+    if (lastResponse) {
+      lastResponse.timedOut = true;
+      if (includeMetadata) {
+        lastResponse.metadata = lastResponse.metadata || {};
+        lastResponse.metadata.timeoutMs = timeoutMs;
+        lastResponse.metadata.elapsedMs = Date.now() - startTime;
+      }
+      return lastResponse;
+    }
+    
+    return { 
+      success: false, 
+      reason: 'Response timeout', 
+      timedOut: true,
+      timeoutMs: timeoutMs
+    };
+  }
+
+  async getConversationMetadata(params) {
+    const { tabId, includeMessages = false } = params;
+    
     const script = `
       (function() {
         try {
-          // Get all conversation messages in order
-          const allMessages = [];
+          const metadata = {
+            url: window.location.href,
+            title: document.title,
+            conversationId: null,
+            messageCount: 0,
+            messages: [],
+            lastActivity: null,
+            hasArtifacts: false,
+            artifactCount: 0,
+            features: {
+              hasCodeBlocks: false,
+              hasImages: false,
+              hasTables: false,
+              hasLists: false
+            }
+          };
           
-          // Find conversation container
-          const conversationContainer = document.querySelector('[data-testid="conversation"]') || 
-                                       document.querySelector('.conversation') || 
-                                       document.querySelector('main') || 
-                                       document.body;
-          
-          if (!conversationContainer) {
-            return { success: false, reason: 'No conversation container found' };
+          // Extract conversation ID from URL
+          const urlMatch = window.location.pathname.match(/\\/chat\\/([a-f0-9-]+)/);
+          if (urlMatch) {
+            metadata.conversationId = urlMatch[1];
           }
           
-          // Get all message elements with better selectors
-          const messageElements = conversationContainer.querySelectorAll('[data-testid="user-message"], .font-claude-message, [data-message-author-role], [data-testid*="message"]');
+          // Count messages
+          const userMessages = document.querySelectorAll('[data-testid="user-message"]');
+          const assistantMessages = document.querySelectorAll('.font-claude-message:not([data-testid="user-message"])');
+          metadata.messageCount = userMessages.length + assistantMessages.length;
           
-          if (messageElements.length === 0) {
-            return { success: false, reason: 'No messages found' };
+          // Check for artifacts
+          const artifacts = document.querySelectorAll('[data-testid*="artifact"], .artifact-container, [class*="artifact"]');
+          metadata.hasArtifacts = artifacts.length > 0;
+          metadata.artifactCount = artifacts.length;
+          
+          // Analyze content features
+          const allContent = document.querySelector('main')?.textContent || '';
+          metadata.features.hasCodeBlocks = !!document.querySelector('pre, code, .code-block');
+          metadata.features.hasImages = !!document.querySelector('img, [data-testid*="image"]');
+          metadata.features.hasTables = !!document.querySelector('table');
+          metadata.features.hasLists = !!document.querySelector('ul, ol');
+          
+          // Get all messages for token counting
+          const allMessages = [...userMessages, ...assistantMessages].sort((a, b) => {
+            const position = a.compareDocumentPosition(b);
+            if (position & Node.DOCUMENT_POSITION_PRECEDING) return 1;
+            if (position & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
+            return 0;
+          });
+          
+          // Get token count estimation (rough estimate: ~4 chars per token)
+          const totalChars = Array.from(allMessages).reduce((sum, el) => sum + (el.textContent?.length || 0), 0);
+          metadata.estimatedTokens = Math.round(totalChars / 4);
+          
+          // Get messages if requested
+          if (${includeMessages}) {
+            metadata.messages = allMessages.map((el, index) => {
+              const isUser = el.getAttribute('data-testid') === 'user-message';
+              const text = el.textContent || '';
+              
+              // Check if this message has special content
+              const hasCode = !!el.querySelector('pre, code');
+              const hasArtifact = !!el.closest('[class*="artifact"]');
+              
+              return {
+                index,
+                type: isUser ? 'user' : 'assistant',
+                textLength: text.length,
+                textPreview: text.substring(0, 200) + (text.length > 200 ? '...' : ''),
+                hasCode,
+                hasArtifact,
+                timestamp: null // Would need to extract from DOM if available
+              };
+            });
+            
+            // Last activity approximation
+            if (metadata.messages.length > 0) {
+              metadata.lastActivity = Date.now(); // Approximate
+            }
           }
           
-          // Process messages in DOM order
-          messageElements.forEach((el, index) => {
-            const text = el.textContent || el.innerText;
-            if (!text || text.trim().length === 0) return;
+          // Check conversation state
+          const inputField = document.querySelector('div[contenteditable="true"]');
+          metadata.isActive = !!inputField && !inputField.disabled;
+          
+          return metadata;
+        } catch (error) {
+          return { success: false, reason: 'Error getting metadata: ' + error.toString() };
+        }
+      })()
+    `;
+    
+    const result = await this.executeScript({ tabId, script });
+    return result.result?.value || { success: false, reason: 'Script execution failed' };
+  }
+
+  async exportConversationTranscript(params) {
+    const { tabId, format = 'markdown' } = params;
+    
+    const script = `
+      (function() {
+        try {
+          const transcript = {
+            metadata: {
+              url: window.location.href,
+              title: document.title,
+              exportedAt: new Date().toISOString(),
+              conversationId: null,
+              format: '${format}'
+            },
+            messages: [],
+            artifacts: [],
+            statistics: {
+              totalMessages: 0,
+              userMessages: 0,
+              assistantMessages: 0,
+              totalCharacters: 0,
+              estimatedTokens: 0
+            }
+          };
+          
+          // Extract conversation ID
+          const urlMatch = window.location.pathname.match(/\\/chat\\/([a-f0-9-]+)/);
+          if (urlMatch) {
+            transcript.metadata.conversationId = urlMatch[1];
+          }
+          
+          // Get all messages
+          const userMessages = document.querySelectorAll('[data-testid="user-message"]');
+          const assistantMessages = document.querySelectorAll('.font-claude-message:not([data-testid="user-message"])');
+          
+          // Combine and sort by DOM position
+          const allMessages = [...userMessages, ...assistantMessages].sort((a, b) => {
+            const position = a.compareDocumentPosition(b);
+            if (position & Node.DOCUMENT_POSITION_PRECEDING) return 1;
+            if (position & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
+            return 0;
+          });
+          
+          // Process each message
+          allMessages.forEach((el, index) => {
+            const isUser = el.getAttribute('data-testid') === 'user-message';
+            const text = el.textContent || '';
             
-            // Determine message type
-            const isUser = el.hasAttribute('data-testid') && el.getAttribute('data-testid') === 'user-message' ||
-                          el.hasAttribute('data-message-author-role') && el.getAttribute('data-message-author-role') === 'user';
-            const isAssistant = el.classList.contains('font-claude-message') ||
-                               el.hasAttribute('data-message-author-role') && el.getAttribute('data-message-author-role') === 'assistant';
+            // Check for code blocks
+            const codeBlocks = [];
+            el.querySelectorAll('pre, code').forEach(codeEl => {
+              codeBlocks.push({
+                language: codeEl.className?.match(/language-(\\w+)/)?.[1] || 'plain',
+                content: codeEl.textContent
+              });
+            });
             
-            allMessages.push({
+            // Check for artifacts
+            const artifactEl = el.closest('[class*="artifact"]');
+            const hasArtifact = !!artifactEl;
+            
+            const messageData = {
               index,
-              text: text.trim(),
-              isUser: !!isUser,
-              isAssistant: !!isAssistant || !isUser // Default to assistant if not clearly user
+              type: isUser ? 'user' : 'assistant',
+              content: text,
+              characterCount: text.length,
+              codeBlocks: codeBlocks,
+              hasArtifact: hasArtifact
+            };
+            
+            transcript.messages.push(messageData);
+            
+            // Update statistics
+            transcript.statistics.totalMessages++;
+            if (isUser) {
+              transcript.statistics.userMessages++;
+            } else {
+              transcript.statistics.assistantMessages++;
+            }
+            transcript.statistics.totalCharacters += text.length;
+          });
+          
+          // Extract artifacts
+          const artifactElements = document.querySelectorAll('[data-testid*="artifact"], .artifact-container');
+          artifactElements.forEach((artifact, index) => {
+            transcript.artifacts.push({
+              index,
+              type: artifact.getAttribute('data-artifact-type') || 'unknown',
+              content: artifact.textContent?.substring(0, 1000) // Limit size
             });
           });
           
-          if (allMessages.length === 0) {
-            return { success: false, reason: 'No valid messages found' };
+          // Estimate tokens (rough: ~4 chars per token)
+          transcript.statistics.estimatedTokens = Math.round(transcript.statistics.totalCharacters / 4);
+          
+          // Format output based on requested format
+          if (${JSON.stringify(format)} === 'markdown') {
+            let markdown = '# ' + transcript.metadata.title + '\n\n';
+            markdown += '**Exported:** ' + transcript.metadata.exportedAt + '\n';
+            markdown += '**Messages:** ' + transcript.statistics.totalMessages + '\n';
+            markdown += '**Estimated Tokens:** ' + transcript.statistics.estimatedTokens + '\n\n';
+            markdown += '---\n\n';
+            
+            transcript.messages.forEach(msg => {
+              if (msg.type === 'user') {
+                markdown += '## User\n\n';
+              } else {
+                markdown += '## Assistant\n\n';
+              }
+              markdown += msg.content + '\n\n';
+              if (msg.codeBlocks.length > 0) {
+                msg.codeBlocks.forEach(block => {
+                  markdown += '\\\`\\\`\\\`' + block.language + '\\n';
+                  markdown += block.content + '\\n';
+                  markdown += '\\\`\\\`\\\`\\n\\n';
+                });
+              }
+              markdown += '---\n\n';
+            });
+            
+            return {
+              success: true,
+              format: 'markdown',
+              content: markdown,
+              metadata: transcript.metadata,
+              statistics: transcript.statistics
+            };
+          } else {
+            // JSON format
+            return {
+              success: true,
+              format: 'json',
+              content: transcript,
+              metadata: transcript.metadata,
+              statistics: transcript.statistics
+            };
           }
-          
-          // Get the last message
-          const lastMessage = allMessages[allMessages.length - 1];
-          
-          return {
-            success: true,
-            text: lastMessage.text,
-            isUser: lastMessage.isUser,
-            isAssistant: lastMessage.isAssistant,
-            timestamp: Date.now(),
-            totalMessages: allMessages.length
-          };
         } catch (error) {
-          return { success: false, reason: 'Error getting messages: ' + error.toString() };
+          return { success: false, reason: 'Error exporting transcript: ' + error.toString() };
         }
       })()
     `;
@@ -1342,3 +1847,13 @@ class CCMExtensionHub {
 
 // Initialize Extension Hub
 const ccmHub = new CCMExtensionHub();
+
+// Ensure connection is established when service worker wakes up
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  // Handle wake-up by ensuring WebSocket is connected
+  if (!ccmHub.hubConnection || ccmHub.hubConnection.readyState !== WebSocket.OPEN) {
+    console.log('CCM Extension: WebSocket not connected, attempting reconnection...');
+    ccmHub.connectToHub();
+  }
+  return false; // Let the existing handler process the message
+});
