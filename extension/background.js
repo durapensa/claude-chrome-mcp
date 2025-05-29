@@ -272,6 +272,18 @@ class CCMExtensionHub {
         case 'open_claude_conversation_tab':
           result = await this.openClaudeConversationTab(message.params);
           break;
+        
+        case 'extract_conversation_elements':
+          result = await this.extractConversationElements(message.params);
+          break;
+        
+        case 'get_claude_response_status':
+          result = await this.getClaudeResponseStatus(message.params);
+          break;
+        
+        case 'batch_get_responses':
+          result = await this.batchGetResponses(message.params);
+          break;
           
         default:
           throw new Error(`Unknown message type: ${type}`);
@@ -932,148 +944,170 @@ class CCMExtensionHub {
   async exportConversationTranscript(params) {
     const { tabId, format = 'markdown' } = params;
     
-    const script = `
-      (function() {
-        try {
-          const transcript = {
-            metadata: {
-              url: window.location.href,
-              title: document.title,
-              exportedAt: new Date().toISOString(),
-              conversationId: null,
-              format: '${format}'
-            },
-            messages: [],
-            artifacts: [],
-            statistics: {
-              totalMessages: 0,
-              userMessages: 0,
-              assistantMessages: 0,
-              totalCharacters: 0,
-              estimatedTokens: 0
-            }
+    try {
+      // First extract conversation elements using our new tool
+      const elements = await this.extractConversationElements({ tabId });
+      
+      await this.ensureDebuggerAttached(tabId);
+      
+      // Simpler script focused on message extraction
+      const messageScript = `
+        (function() {
+          const messages = [];
+          const metadata = {
+            url: window.location.href,
+            title: document.title,
+            exportedAt: new Date().toISOString(),
+            conversationId: null
           };
           
           // Extract conversation ID
           const urlMatch = window.location.pathname.match(/\\/chat\\/([a-f0-9-]+)/);
           if (urlMatch) {
-            transcript.metadata.conversationId = urlMatch[1];
+            metadata.conversationId = urlMatch[1];
           }
           
-          // Get all messages
-          const userMessages = document.querySelectorAll('[data-testid="user-message"]');
-          const assistantMessages = document.querySelectorAll('.font-claude-message:not([data-testid="user-message"])');
+          // Multiple strategies to find messages
+          const messageSelectors = [
+            '[data-testid="user-message"]',
+            '.font-claude-message',
+            '[data-message-role]',
+            '.prose'
+          ];
           
-          // Combine and sort by DOM position
-          const allMessages = [...userMessages, ...assistantMessages].sort((a, b) => {
+          // Collect all potential message elements
+          const messageElements = new Set();
+          messageSelectors.forEach(selector => {
+            document.querySelectorAll(selector).forEach(el => messageElements.add(el));
+          });
+          
+          // Convert to array and sort by DOM position
+          const sortedMessages = Array.from(messageElements).sort((a, b) => {
             const position = a.compareDocumentPosition(b);
             if (position & Node.DOCUMENT_POSITION_PRECEDING) return 1;
             if (position & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
             return 0;
           });
           
-          // Process each message
-          allMessages.forEach((el, index) => {
-            const isUser = el.getAttribute('data-testid') === 'user-message';
-            const text = el.textContent || '';
+          // Process messages
+          sortedMessages.forEach((el, index) => {
+            const text = el.textContent || el.innerText || '';
+            if (!text.trim()) return;
             
-            // Check for code blocks
-            const codeBlocks = [];
-            el.querySelectorAll('pre, code').forEach(codeEl => {
-              codeBlocks.push({
-                language: codeEl.className?.match(/language-(\\w+)/)?.[1] || 'plain',
-                content: codeEl.textContent
-              });
-            });
+            // Determine role
+            const isUser = el.getAttribute('data-testid') === 'user-message' ||
+                          el.getAttribute('data-message-role') === 'user' ||
+                          el.className.includes('user');
             
-            // Check for artifacts
-            const artifactEl = el.closest('[class*="artifact"]');
-            const hasArtifact = !!artifactEl;
-            
-            const messageData = {
+            messages.push({
               index,
-              type: isUser ? 'user' : 'assistant',
-              content: text,
-              characterCount: text.length,
-              codeBlocks: codeBlocks,
-              hasArtifact: hasArtifact
-            };
-            
-            transcript.messages.push(messageData);
-            
-            // Update statistics
-            transcript.statistics.totalMessages++;
-            if (isUser) {
-              transcript.statistics.userMessages++;
-            } else {
-              transcript.statistics.assistantMessages++;
-            }
-            transcript.statistics.totalCharacters += text.length;
-          });
-          
-          // Extract artifacts
-          const artifactElements = document.querySelectorAll('[data-testid*="artifact"], .artifact-container');
-          artifactElements.forEach((artifact, index) => {
-            transcript.artifacts.push({
-              index,
-              type: artifact.getAttribute('data-artifact-type') || 'unknown',
-              content: artifact.textContent?.substring(0, 1000) // Limit size
+              role: isUser ? 'user' : 'assistant',
+              content: text.trim(),
+              length: text.length
             });
           });
           
-          // Estimate tokens (rough: ~4 chars per token)
-          transcript.statistics.estimatedTokens = Math.round(transcript.statistics.totalCharacters / 4);
-          
-          // Format output based on requested format
-          if (${JSON.stringify(format)} === 'markdown') {
-            let markdown = '# ' + transcript.metadata.title + '\n\n';
-            markdown += '**Exported:** ' + transcript.metadata.exportedAt + '\n';
-            markdown += '**Messages:** ' + transcript.statistics.totalMessages + '\n';
-            markdown += '**Estimated Tokens:** ' + transcript.statistics.estimatedTokens + '\n\n';
-            markdown += '---\n\n';
-            
-            transcript.messages.forEach(msg => {
-              if (msg.type === 'user') {
-                markdown += '## User\n\n';
-              } else {
-                markdown += '## Assistant\n\n';
-              }
-              markdown += msg.content + '\n\n';
-              if (msg.codeBlocks.length > 0) {
-                msg.codeBlocks.forEach(block => {
-                  markdown += '\\\`\\\`\\\`' + block.language + '\\n';
-                  markdown += block.content + '\\n';
-                  markdown += '\\\`\\\`\\\`\\n\\n';
-                });
-              }
-              markdown += '---\n\n';
-            });
-            
-            return {
-              success: true,
-              format: 'markdown',
-              content: markdown,
-              metadata: transcript.metadata,
-              statistics: transcript.statistics
-            };
-          } else {
-            // JSON format
-            return {
-              success: true,
-              format: 'json',
-              content: transcript,
-              metadata: transcript.metadata,
-              statistics: transcript.statistics
-            };
-          }
-        } catch (error) {
-          return { success: false, reason: 'Error exporting transcript: ' + error.toString() };
+          return {
+            metadata,
+            messages,
+            messageCount: messages.length
+          };
+        })()
+      `;
+      
+      const messageResult = await this.executeScript({ tabId, script: messageScript });
+      const messageData = messageResult.result?.value || { messages: [], metadata: {} };
+      
+      // Calculate statistics
+      const statistics = {
+        totalMessages: messageData.messages.length,
+        userMessages: messageData.messages.filter(m => m.role === 'user').length,
+        assistantMessages: messageData.messages.filter(m => m.role === 'assistant').length,
+        totalCharacters: messageData.messages.reduce((sum, m) => sum + m.length, 0),
+        estimatedTokens: Math.round(messageData.messages.reduce((sum, m) => sum + m.length, 0) / 4),
+        artifactCount: elements.success ? elements.data.artifacts.length : 0,
+        codeBlockCount: elements.success ? elements.data.codeBlocks.length : 0
+      };
+      
+      // Format output
+      if (format === 'markdown') {
+        let markdown = `# ${messageData.metadata.title}\n\n`;
+        markdown += `**Exported:** ${messageData.metadata.exportedAt}\n`;
+        markdown += `**URL:** ${messageData.metadata.url}\n`;
+        if (messageData.metadata.conversationId) {
+          markdown += `**Conversation ID:** ${messageData.metadata.conversationId}\n`;
         }
-      })()
-    `;
-    
-    const result = await this.executeScript({ tabId, script });
-    return result.result?.value || { success: false, reason: 'Script execution failed' };
+        markdown += `**Messages:** ${statistics.totalMessages} (${statistics.userMessages} user, ${statistics.assistantMessages} assistant)\n`;
+        markdown += `**Estimated Tokens:** ${statistics.estimatedTokens}\n`;
+        if (statistics.artifactCount > 0) {
+          markdown += `**Artifacts:** ${statistics.artifactCount}\n`;
+        }
+        if (statistics.codeBlockCount > 0) {
+          markdown += `**Code Blocks:** ${statistics.codeBlockCount}\n`;
+        }
+        markdown += `\n---\n\n`;
+        
+        // Add messages
+        messageData.messages.forEach(msg => {
+          markdown += `## ${msg.role === 'user' ? 'Human' : 'Assistant'}\n\n`;
+          markdown += `${msg.content}\n\n`;
+          markdown += `---\n\n`;
+        });
+        
+        // Add artifacts section if present
+        if (elements.success && elements.data.artifacts.length > 0) {
+          markdown += `## Artifacts (${elements.data.artifacts.length})\n\n`;
+          elements.data.artifacts.forEach((artifact, idx) => {
+            markdown += `### Artifact ${idx + 1}: ${artifact.title}\n`;
+            markdown += `**Type:** ${artifact.type}\n`;
+            markdown += `**Element:** ${artifact.elementType}\n\n`;
+            markdown += '```\n' + artifact.content.substring(0, 500) + '\n```\n\n';
+          });
+        }
+        
+        // Add code blocks section if present
+        if (elements.success && elements.data.codeBlocks.length > 0) {
+          markdown += `## Code Blocks (${elements.data.codeBlocks.length})\n\n`;
+          elements.data.codeBlocks.forEach((block, idx) => {
+            markdown += `### Code Block ${idx + 1}\n`;
+            markdown += `\`\`\`${block.language}\n`;
+            markdown += block.content + '\n';
+            markdown += '```\n\n';
+          });
+        }
+        
+        return {
+          success: true,
+          format: 'markdown',
+          content: markdown,
+          metadata: messageData.metadata,
+          statistics: statistics
+        };
+        
+      } else {
+        // JSON format
+        return {
+          success: true,
+          format: 'json',
+          content: {
+            metadata: messageData.metadata,
+            messages: messageData.messages,
+            artifacts: elements.success ? elements.data.artifacts : [],
+            codeBlocks: elements.success ? elements.data.codeBlocks : [],
+            statistics: statistics
+          },
+          metadata: messageData.metadata,
+          statistics: statistics
+        };
+      }
+      
+    } catch (error) {
+      return { 
+        success: false, 
+        reason: 'Error exporting transcript', 
+        error: error.message 
+      };
+    }
   }
 
   async debugClaudePage(tabId) {
@@ -1841,6 +1875,391 @@ class CCMExtensionHub {
     } catch (error) {
       console.error(`CCM Extension: Error opening conversation ${conversationId}:`, error);
       throw new Error(`Failed to open conversation: ${error.message}`);
+    }
+  }
+
+  /**
+   * Extract conversation elements including artifacts, code blocks, and tool usage
+   */
+  async extractConversationElements(params) {
+    const { tabId } = params;
+    
+    try {
+      await this.ensureDebuggerAttached(tabId);
+      
+      const script = `
+        (function() {
+          const artifacts = [];
+          const codeBlocks = [];
+          const toolUsage = [];
+          
+          // Extract artifacts with multiple selector strategies
+          const artifactSelectors = [
+            'iframe[title*="artifact"]',
+            'iframe[src*="artifact"]', 
+            '[data-testid*="artifact"]',
+            '.artifact',
+            '[class*="artifact"]',
+            'iframe[sandbox]',
+            '[data-component*="artifact"]'
+          ];
+          
+          artifactSelectors.forEach(selector => {
+            document.querySelectorAll(selector).forEach((element, index) => {
+              let content = '';
+              let type = 'unknown';
+              
+              if (element.tagName === 'IFRAME') {
+                try {
+                  // Try to access iframe content if same-origin
+                  content = element.contentDocument?.documentElement?.outerHTML || 
+                           element.outerHTML;
+                  type = 'html';
+                } catch (e) {
+                  // Cross-origin iframe, get what we can
+                  content = element.outerHTML;
+                  type = 'iframe';
+                }
+              } else {
+                content = element.outerHTML;
+                type = element.dataset.type || 'unknown';
+              }
+              
+              // Avoid duplicates
+              const isDuplicate = artifacts.some(a => 
+                a.content === content || 
+                (element.id && a.id === element.id)
+              );
+              
+              if (!isDuplicate) {
+                artifacts.push({
+                  id: element.id || 'artifact_' + artifacts.length,
+                  selector: selector,
+                  type: type,
+                  title: element.title || element.getAttribute('aria-label') || 'Untitled',
+                  content: content.substring(0, 2000), // Limit size
+                  elementType: element.tagName.toLowerCase(),
+                  attributes: Object.fromEntries(
+                    Array.from(element.attributes).map(attr => [attr.name, attr.value])
+                  )
+                });
+              }
+            });
+          });
+          
+          // Extract code blocks
+          const codeSelectors = [
+            'pre code',
+            '.highlight',
+            '[class*="code-block"]',
+            '[data-language]'
+          ];
+          
+          codeSelectors.forEach(selector => {
+            document.querySelectorAll(selector).forEach((element, index) => {
+              const content = element.textContent;
+              
+              // Avoid duplicates
+              const isDuplicate = codeBlocks.some(cb => cb.content === content);
+              
+              if (!isDuplicate && content && content.trim()) {
+                codeBlocks.push({
+                  id: 'code_' + codeBlocks.length,
+                  language: element.className.match(/language-(\\w+)/)?.[1] || 
+                           element.dataset.language || 'text',
+                  content: content,
+                  html: element.outerHTML.substring(0, 500) // Truncate HTML
+                });
+              }
+            });
+          });
+          
+          // Extract tool usage indicators
+          const toolIndicators = document.querySelectorAll(
+            '[data-testid*="search"], [class*="search"], ' +
+            '[data-testid*="repl"], [class*="repl"], ' + 
+            '[data-testid*="tool"], [class*="tool-usage"]'
+          );
+          
+          toolIndicators.forEach((element, index) => {
+            const content = element.textContent?.trim();
+            if (content) {
+              toolUsage.push({
+                id: 'tool_' + toolUsage.length,
+                type: element.dataset.testid || element.className,
+                content: content.substring(0, 500),
+                html: element.outerHTML.substring(0, 500)
+              });
+            }
+          });
+          
+          return {
+            artifacts,
+            codeBlocks,
+            toolUsage,
+            extractedAt: new Date().toISOString(),
+            totalElements: artifacts.length + codeBlocks.length + toolUsage.length
+          };
+        })()
+      `;
+      
+      const result = await this.executeScript({ tabId, script });
+      
+      return {
+        success: true,
+        data: result.result?.value || { artifacts: [], codeBlocks: [], toolUsage: [] },
+        tabId: tabId
+      };
+      
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+        tabId: tabId
+      };
+    }
+  }
+
+  /**
+   * Get Claude response generation status
+   */
+  async getClaudeResponseStatus(params) {
+    const { tabId } = params;
+    
+    try {
+      await this.ensureDebuggerAttached(tabId);
+      
+      const script = `
+        (function() {
+          // Look for Claude's response generation indicators
+          const typingIndicator = document.querySelector('[data-testid*="typing"], .typing, [class*="generating"]');
+          const responseContainer = document.querySelector('[data-testid*="response"], [class*="response"]');
+          const sendButton = document.querySelector('button[data-testid*="send"], button[type="submit"]');
+          const errorElements = document.querySelectorAll('[class*="error"], [data-testid*="error"]');
+          
+          // Check for stop button (indicates active generation)
+          const stopButton = document.querySelector('button[aria-label*="Stop"], button[title*="Stop"]');
+          const hasStopButton = stopButton && stopButton.offsetParent !== null;
+          
+          // Estimate progress based on UI elements
+          let status = 'unknown';
+          let progress = null;
+          
+          if (hasStopButton) {
+            status = 'generating';
+            // Try to estimate progress from content length
+            const allMessages = document.querySelectorAll('.font-claude-message');
+            const lastMessage = allMessages[allMessages.length - 1];
+            const responseText = lastMessage?.textContent || '';
+            
+            // Store response start time if not already stored
+            if (!window.responseStartTime) {
+              window.responseStartTime = Date.now();
+            }
+            
+            progress = {
+              estimatedCompletion: Math.min(responseText.length / 2000, 0.95), // Rough estimate
+              tokensGenerated: Math.floor(responseText.length / 4), // ~4 chars per token
+              timeElapsed: (Date.now() - window.responseStartTime) / 1000,
+              responseLength: responseText.length
+            };
+          } else if (typingIndicator && typingIndicator.style.display !== 'none') {
+            status = 'generating';
+            if (!window.responseStartTime) {
+              window.responseStartTime = Date.now();
+            }
+          } else if (errorElements.length > 0) {
+            status = 'error';
+            window.responseStartTime = null;
+          } else if (sendButton && !sendButton.disabled) {
+            status = 'complete';
+            window.responseStartTime = null;
+          } else if (sendButton && sendButton.disabled) {
+            status = 'waiting_input';
+            window.responseStartTime = null;
+          }
+          
+          // Check for active tool usage
+          const toolStates = {
+            webSearchActive: !!document.querySelector('[data-testid*="search"][class*="active"]'),
+            replActive: !!document.querySelector('[data-testid*="repl"][class*="active"]'),
+            artifactsActive: !!document.querySelector('[data-testid*="artifact"][class*="generating"]')
+          };
+          
+          // Get last message length for tracking
+          const allMessages = document.querySelectorAll('.font-claude-message');
+          const lastMessage = allMessages[allMessages.length - 1];
+          const responseLength = lastMessage?.textContent?.length || 0;
+          
+          return {
+            status,
+            progress,
+            isStreaming: status === 'generating',
+            lastUpdate: Date.now(),
+            tools: toolStates,
+            responseLength: responseLength,
+            hasErrors: errorElements.length > 0,
+            errorMessages: Array.from(errorElements).map(el => el.textContent.trim()),
+            hasStopButton: hasStopButton
+          };
+        })()
+      `;
+      
+      const result = await this.executeScript({ tabId, script });
+      
+      return {
+        success: true,
+        ...result.result?.value,
+        tabId: tabId
+      };
+      
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+        tabId: tabId,
+        status: 'error'
+      };
+    }
+  }
+
+  /**
+   * Get responses from multiple tabs with polling
+   */
+  async batchGetResponses(params) {
+    const {
+      tabIds,
+      timeoutMs = 30000,
+      waitForAll = true,
+      pollIntervalMs = 1000
+    } = params;
+    
+    const results = [];
+    const startTime = Date.now();
+    
+    try {
+      if (waitForAll) {
+        // Wait for all responses to complete
+        const promises = tabIds.map(async (tabId) => {
+          const startTabTime = Date.now();
+          
+          // Poll for completion
+          while (Date.now() - startTime < timeoutMs) {
+            const status = await this.getClaudeResponseStatus({ tabId });
+            
+            if (status.status === 'complete' || status.status === 'error') {
+              const response = await this.getClaudeResponse({ 
+                tabId, 
+                waitForCompletion: false,
+                timeoutMs: 5000
+              });
+              
+              return {
+                tabId,
+                response,
+                status: status.status,
+                completedAt: Date.now(),
+                duration: Date.now() - startTabTime,
+                success: status.status === 'complete'
+              };
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+          }
+          
+          // Timeout reached
+          return {
+            tabId,
+            response: null,
+            status: 'timeout',
+            completedAt: Date.now(),
+            duration: Date.now() - startTabTime,
+            success: false,
+            error: 'Response timeout'
+          };
+        });
+        
+        const allResults = await Promise.all(promises);
+        results.push(...allResults);
+        
+      } else {
+        // Return responses as they complete
+        const pendingTabs = [...tabIds];
+        
+        while (pendingTabs.length > 0 && Date.now() - startTime < timeoutMs) {
+          for (let i = pendingTabs.length - 1; i >= 0; i--) {
+            const tabId = pendingTabs[i];
+            const status = await this.getClaudeResponseStatus({ tabId });
+            
+            if (status.status === 'complete' || status.status === 'error') {
+              const response = await this.getClaudeResponse({ 
+                tabId, 
+                waitForCompletion: false,
+                timeoutMs: 5000 
+              });
+              
+              results.push({
+                tabId,
+                response,
+                status: status.status,
+                completedAt: Date.now(),
+                duration: Date.now() - startTime,
+                success: status.status === 'complete'
+              });
+              
+              pendingTabs.splice(i, 1);
+            }
+          }
+          
+          if (pendingTabs.length > 0) {
+            await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+          }
+        }
+        
+        // Add timeout results for remaining tabs
+        pendingTabs.forEach(tabId => {
+          results.push({
+            tabId,
+            response: null,
+            status: 'timeout',
+            completedAt: Date.now(),
+            duration: timeoutMs,
+            success: false,
+            error: 'Response timeout'
+          });
+        });
+      }
+      
+      const summary = {
+        total: tabIds.length,
+        completed: results.filter(r => r.success).length,
+        failed: results.filter(r => !r.success).length,
+        timedOut: results.filter(r => r.status === 'timeout').length,
+        totalTime: Date.now() - startTime,
+        averageResponseTime: results
+          .filter(r => r.success)
+          .reduce((sum, r) => sum + r.duration, 0) / Math.max(results.filter(r => r.success).length, 1)
+      };
+      
+      return {
+        success: true,
+        results,
+        summary,
+        waitForAll,
+        requestedTabs: tabIds.length
+      };
+      
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+        results,
+        summary: {
+          total: tabIds.length,
+          completed: results.filter(r => r.success).length,
+          failed: results.filter(r => !r.success).length + 1
+        }
+      };
     }
   }
 }

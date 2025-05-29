@@ -437,7 +437,14 @@ class WebSocketHub extends EventEmitter {
 
   handleMessage(ws, data) {
     try {
-      const message = JSON.parse(data.toString());
+      const dataStr = data.toString();
+      // Filter out non-JSON WebSocket protocol messages
+      if (dataStr.startsWith('WebSocket') || dataStr === 'ping' || dataStr === 'pong') {
+        this.debug.verbose('Ignoring WebSocket protocol message from client:', ws.clientId, dataStr);
+        return;
+      }
+      
+      const message = JSON.parse(dataStr);
       ws.lastActivity = Date.now();
       ws.messageCount++;
       this.messageCounter++;
@@ -445,8 +452,8 @@ class WebSocketHub extends EventEmitter {
       this.routeMessage(ws, message);
       
     } catch (error) {
-      this.errorTracker.logError(error, { clientId: ws.clientId, action: 'parse_message' });
-      console.error(`WebSocket Hub: Invalid JSON from client ${ws.clientId}:`, error);
+      this.errorTracker.logError(error, { clientId: ws.clientId, action: 'parse_message', data: data.toString() });
+      console.error(`WebSocket Hub: Invalid JSON from client ${ws.clientId}:`, error, 'Data:', data.toString());
       this.sendToClient(ws, {
         type: 'error',
         error: 'Invalid JSON message',
@@ -525,7 +532,7 @@ class WebSocketHub extends EventEmitter {
       extensionId: message.extensionId
     };
 
-    console.log('WebSocket Hub: Chrome extension registered from', message.extensionId);
+    console.error('WebSocket Hub: Chrome extension registered from', message.extensionId);
     
     this.sendToClient(ws, {
       type: 'registration_confirmed',
@@ -1175,11 +1182,17 @@ class AutoHubClient {
     this.ws.on('message', (data) => {
       this.lastActivityTime = Date.now();
       try {
-        const message = JSON.parse(data.toString());
+        const dataStr = data.toString();
+        // Filter out non-JSON WebSocket protocol messages
+        if (dataStr.startsWith('WebSocket') || dataStr === 'ping' || dataStr === 'pong') {
+          this.debug.verbose('Ignoring WebSocket protocol message:', dataStr);
+          return;
+        }
+        const message = JSON.parse(dataStr);
         this.handleMessage(message, connectResolve, connectReject);
       } catch (error) {
-        this.errorTracker.logError(error, { action: 'parse_message' });
-        console.error('CCM: Error parsing message:', error);
+        this.errorTracker.logError(error, { action: 'parse_message', data: data.toString() });
+        console.error('CCM: Error parsing message:', error, 'Data:', data.toString());
       }
     });
 
@@ -1838,6 +1851,67 @@ class ChromeMCPServer {
               required: ['conversationId'],
               additionalProperties: false
             }
+          },
+          {
+            name: 'extract_conversation_elements',
+            description: 'Extract conversation elements including artifacts, code blocks, and tool usage',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                tabId: {
+                  type: 'number',
+                  description: 'The tab ID of the Claude conversation'
+                }
+              },
+              required: ['tabId'],
+              additionalProperties: false
+            }
+          },
+          {
+            name: 'get_claude_response_status',
+            description: 'Get real-time status of Claude response generation including progress estimation',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                tabId: {
+                  type: 'number',
+                  description: 'The tab ID of the Claude conversation'
+                }
+              },
+              required: ['tabId'],
+              additionalProperties: false
+            }
+          },
+          {
+            name: 'batch_get_responses',
+            description: 'Get responses from multiple Claude tabs with polling and progress tracking',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                tabIds: {
+                  type: 'array',
+                  items: { type: 'number' },
+                  description: 'Array of tab IDs to monitor'
+                },
+                timeoutMs: {
+                  type: 'number',
+                  description: 'Maximum time to wait for all responses in milliseconds',
+                  default: 30000
+                },
+                waitForAll: {
+                  type: 'boolean',
+                  description: 'Whether to wait for all responses or return as they complete',
+                  default: true
+                },
+                pollIntervalMs: {
+                  type: 'number',
+                  description: 'Polling interval in milliseconds',
+                  default: 1000
+                }
+              },
+              required: ['tabIds'],
+              additionalProperties: false
+            }
           }
         ]
       };
@@ -1910,6 +1984,15 @@ class ChromeMCPServer {
             break;
           case 'open_claude_conversation_tab':
             result = await this.hubClient.sendRequest('open_claude_conversation_tab', args);
+            break;
+          case 'extract_conversation_elements':
+            result = await this.hubClient.sendRequest('extract_conversation_elements', args);
+            break;
+          case 'get_claude_response_status':
+            result = await this.hubClient.sendRequest('get_claude_response_status', args);
+            break;
+          case 'batch_get_responses':
+            result = await this.hubClient.sendRequest('batch_get_responses', args);
             break;
           default:
             throw new Error(`Unknown tool: ${name}`);
