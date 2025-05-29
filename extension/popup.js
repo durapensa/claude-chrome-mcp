@@ -72,8 +72,7 @@ class CCMPopup {
       client && 
       client.name && 
       client.name !== 'Unknown Client' && 
-      client.connected !== false &&
-      client.websocketState === 1 // WebSocket.OPEN
+      client.connected === true
     );
     
     if (validClients.length === 0) {

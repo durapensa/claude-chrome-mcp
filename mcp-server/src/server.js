@@ -481,12 +481,24 @@ class WebSocketHub extends EventEmitter {
         break;
         
       default:
-        console.warn(`WebSocket Hub: Unknown message type '${type}' from ${ws.clientId}`);
-        this.sendToClient(ws, {
-          type: 'error',
-          error: `Unknown message type: ${type}`,
-          timestamp: Date.now()
-        });
+        // Check if this is a tool request from an MCP client
+        const validToolTypes = [
+          'get_claude_sessions', 'spawn_claude_tab', 'send_message_to_claude',
+          'get_claude_response', 'debug_attach', 'execute_script', 
+          'get_dom_elements', 'debug_claude_page', 'delete_claude_conversation',
+          'reload_extension', 'start_network_inspection', 'stop_network_inspection', 'get_captured_requests'
+        ];
+        
+        if (validToolTypes.includes(type) && ws.clientType === 'mcp_client') {
+          this.forwardRequest(ws, message);
+        } else {
+          console.warn(`WebSocket Hub: Unknown message type '${type}' from ${ws.clientId}`);
+          this.sendToClient(ws, {
+            type: 'error',
+            error: `Unknown message type: ${type}`,
+            timestamp: Date.now()
+          });
+        }
     }
   }
 
@@ -872,6 +884,12 @@ class AutoHubClient {
   }
 
   setupProcessMonitoring() {
+    // Skip parent monitoring if disabled
+    if (process.env.CCM_NO_PARENT_MONITOR === '1') {
+      console.error('CCM: Parent monitoring disabled');
+      return;
+    }
+    
     // Enhanced parent process monitoring
     if (process.ppid) {
       this.parentCheckInterval = setInterval(() => {
@@ -1625,6 +1643,51 @@ class ChromeMCPServer {
               properties: {},
               additionalProperties: false
             }
+          },
+          {
+            name: 'start_network_inspection',
+            description: 'Start network request monitoring on a tab',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                tabId: {
+                  type: 'number',
+                  description: 'The tab ID to monitor network requests'
+                }
+              },
+              required: ['tabId'],
+              additionalProperties: false
+            }
+          },
+          {
+            name: 'stop_network_inspection',
+            description: 'Stop network request monitoring on a tab',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                tabId: {
+                  type: 'number',
+                  description: 'The tab ID to stop monitoring'
+                }
+              },
+              required: ['tabId'],
+              additionalProperties: false
+            }
+          },
+          {
+            name: 'get_captured_requests',
+            description: 'Get captured network requests from monitoring',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                tabId: {
+                  type: 'number',
+                  description: 'The tab ID to get captured requests for'
+                }
+              },
+              required: ['tabId'],
+              additionalProperties: false
+            }
           }
         ]
       };
@@ -1670,6 +1733,15 @@ class ChromeMCPServer {
             break;
           case 'reload_extension':
             result = await this.hubClient.sendRequest('reload_extension', args);
+            break;
+          case 'start_network_inspection':
+            result = await this.hubClient.sendRequest('start_network_inspection', args);
+            break;
+          case 'stop_network_inspection':
+            result = await this.hubClient.sendRequest('stop_network_inspection', args);
+            break;
+          case 'get_captured_requests':
+            result = await this.hubClient.sendRequest('get_captured_requests', args);
             break;
           default:
             throw new Error(`Unknown tool: ${name}`);

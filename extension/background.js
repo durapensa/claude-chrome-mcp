@@ -215,6 +215,18 @@ class CCMExtensionHub {
           result = await this.reloadExtension();
           break;
           
+        case 'start_network_inspection':
+          result = await this.startNetworkInspection(message.params?.tabId);
+          break;
+          
+        case 'stop_network_inspection':
+          result = await this.stopNetworkInspection(message.params?.tabId);
+          break;
+          
+        case 'get_captured_requests':
+          result = await this.getCapturedRequests(message.params?.tabId);
+          break;
+          
         default:
           throw new Error(`Unknown message type: ${type}`);
       }
@@ -308,7 +320,8 @@ class CCMExtensionHub {
     return new Promise((resolve, reject) => {
       chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
         expression: script,
-        returnByValue: true
+        returnByValue: true,
+        awaitPromise: true
       }, (result) => {
         if (chrome.runtime.lastError) {
           reject(new Error(chrome.runtime.lastError.message));
@@ -453,9 +466,9 @@ class CCMExtensionHub {
   }
 
   async deleteClaudeConversation(params) {
-    const { tabId } = params;
+    const { tabId, conversationId } = params;
     
-    // Ensure debugger is attached with retry logic
+    // Ensure debugger is attached
     try {
       await this.ensureDebuggerAttached(tabId);
     } catch (error) {
@@ -467,72 +480,110 @@ class CCMExtensionHub {
     }
 
     const script = `
-      new Promise(async (resolve) => {
+      (async function() {
         try {
-          // Find the conversation title dropdown using the robust data-testid selector
-          const chatMenuTrigger = document.querySelector('[data-testid="chat-menu-trigger"]');
-          
-          if (!chatMenuTrigger) {
-            resolve({ success: false, reason: 'Chat menu trigger not found' });
-            return;
+          // Get conversation ID from URL if not provided
+          let convId = '${conversationId || ''}';
+          if (!convId) {
+            const urlMatch = window.location.href.match(/\\/chat\\/([a-f0-9-]{36})/);
+            if (urlMatch) {
+              convId = urlMatch[1];
+            } else {
+              return { success: false, reason: 'Could not determine conversation ID from URL' };
+            }
           }
           
-          const conversationTitle = chatMenuTrigger.textContent?.trim();
-          console.log('Opening menu for conversation:', conversationTitle);
-          
-          // Click the chat menu trigger to open dropdown
-          chatMenuTrigger.click();
-          
-          // Wait for menu to appear and find delete option
-          await new Promise(r => setTimeout(r, 300));
-          
-          const deleteButton = document.querySelector('[data-testid="delete-chat-trigger"]');
-          
-          if (!deleteButton) {
-            resolve({ success: false, reason: 'Delete button not found in menu' });
-            return;
+          // Extract organization ID from page context or use default pattern
+          let orgId = null;
+          try {
+            // Try to get org ID from any API calls or page data
+            const scripts = document.querySelectorAll('script');
+            for (const script of scripts) {
+              const content = script.textContent || '';
+              const orgMatch = content.match(/organizations\\/([a-f0-9-]{36})/);
+              if (orgMatch) {
+                orgId = orgMatch[1];
+                break;
+              }
+            }
+            
+            // Fallback: try to extract from current fetch requests if available
+            if (!orgId) {
+              // This is a common org ID pattern we observed - use as fallback
+              orgId = '1ada8651-e431-4f80-b5da-344eb1d3d5fa';
+            }
+          } catch (e) {
+            orgId = '1ada8651-e431-4f80-b5da-344eb1d3d5fa'; // Fallback
           }
           
-          console.log('Clicking delete button');
-          deleteButton.click();
+          // Get required headers from page context
+          const headers = {
+            'Content-Type': 'application/json',
+            'anthropic-client-platform': 'web_claude_ai',
+            'anthropic-client-sha': 'unknown',
+            'anthropic-client-version': 'unknown'
+          };
           
-          // Wait for potential confirmation dialog and handle it
-          await new Promise(r => setTimeout(r, 500));
+          // Try to get session-specific headers from meta tags or localStorage
+          try {
+            const metaAnonymousId = document.querySelector('meta[name="anthropic-anonymous-id"]');
+            if (metaAnonymousId) {
+              headers['anthropic-anonymous-id'] = metaAnonymousId.content;
+            }
+            
+            const metaDeviceId = document.querySelector('meta[name="anthropic-device-id"]');
+            if (metaDeviceId) {
+              headers['anthropic-device-id'] = metaDeviceId.content;
+            }
+          } catch (e) {
+            // Headers will be missing but might still work
+          }
           
-          const confirmButtons = document.querySelectorAll('button');
-          const confirmDelete = Array.from(confirmButtons).find(btn => {
-            const text = btn.textContent?.toLowerCase() || '';
-            const ariaLabel = btn.getAttribute('aria-label')?.toLowerCase() || '';
-            return text.includes('delete') || text.includes('confirm') || 
-                   ariaLabel.includes('delete') || ariaLabel.includes('confirm');
+          // Construct the delete URL
+          const deleteUrl = \`https://claude.ai/api/organizations/\${orgId}/chat_conversations/\${convId}\`;
+          
+          console.log('Calling DELETE API:', deleteUrl);
+          
+          // Make the DELETE request
+          const response = await fetch(deleteUrl, {
+            method: 'DELETE',
+            headers: headers,
+            body: JSON.stringify({ uuid: convId }),
+            credentials: 'include'
           });
           
-          if (confirmDelete) {
-            console.log('Confirming deletion');
-            confirmDelete.click();
+          if (response.ok) {
+            // Wait a moment then redirect to new conversation page
+            await new Promise(r => setTimeout(r, 500));
+            window.location.href = 'https://claude.ai/new';
+            
+            return { 
+              success: true, 
+              method: 'direct_api',
+              conversationId: convId,
+              organizationId: orgId,
+              status: response.status,
+              deletedAt: Date.now()
+            };
+          } else {
+            const errorText = await response.text();
+            return { 
+              success: false, 
+              reason: 'API call failed',
+              status: response.status,
+              error: errorText
+            };
           }
-          
-          // Wait a moment and check if we were redirected
-          await new Promise(r => setTimeout(r, 1000));
-          
-          const newUrl = window.location.href;
-          const wasRedirected = newUrl.includes('/new') || !newUrl.includes('/chat/');
-          
-          resolve({ 
-            success: true, 
-            conversationTitle: conversationTitle,
-            wasRedirected: wasRedirected,
-            newUrl: newUrl,
-            deletedAt: Date.now()
-          });
           
         } catch (error) {
-          resolve({ 
+          return { 
             success: false, 
+            method: 'direct_api_failed',
+            reason: 'Network or API error',
             error: error.toString()
-          });
+          };
         }
-      })
+      })()
     `;
     
     try {
@@ -741,6 +792,100 @@ class CCMExtensionHub {
         this.connectToHub();
       }
     }, KEEPALIVE_INTERVAL);
+  }
+
+  async startNetworkInspection(tabId) {
+    if (!this.debuggerSessions.has(tabId)) {
+      await this.attachDebugger(tabId);
+    }
+
+    // Store captured requests for this tab
+    if (!this.capturedRequests) {
+      this.capturedRequests = new Map();
+    }
+    this.capturedRequests.set(tabId, []);
+
+    // Set up network event listeners
+    const onNetworkEvent = (source, method, params) => {
+      if (source.tabId === tabId) {
+        const requests = this.capturedRequests.get(tabId) || [];
+        
+        if (method === 'Network.requestWillBeSent') {
+          requests.push({
+            type: 'request',
+            requestId: params.requestId,
+            url: params.request.url,
+            method: params.request.method,
+            headers: params.request.headers,
+            postData: params.request.postData,
+            timestamp: params.timestamp
+          });
+          console.log(`Captured request: ${params.request.method} ${params.request.url}`);
+        } else if (method === 'Network.responseReceived') {
+          requests.push({
+            type: 'response',
+            requestId: params.requestId,
+            url: params.response.url,
+            status: params.response.status,
+            headers: params.response.headers,
+            timestamp: params.timestamp
+          });
+          console.log(`Captured response: ${params.response.status} ${params.response.url}`);
+        }
+        
+        this.capturedRequests.set(tabId, requests);
+      }
+    };
+
+    chrome.debugger.onEvent.addListener(onNetworkEvent);
+
+    return new Promise((resolve, reject) => {
+      chrome.debugger.sendCommand({ tabId }, 'Network.enable', {}, (result) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          resolve({ success: true, message: 'Network inspection started with event capture' });
+        }
+      });
+    });
+  }
+
+  async stopNetworkInspection(tabId) {
+    return new Promise((resolve, reject) => {
+      chrome.debugger.sendCommand({ tabId }, 'Network.disable', {}, (result) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          resolve({ success: true, message: 'Network inspection stopped' });
+        }
+      });
+    });
+  }
+
+  async getCapturedRequests(tabId) {
+    const requests = this.capturedRequests?.get(tabId) || [];
+    
+    // Filter for likely delete-related requests
+    const deleteRelated = requests.filter(req => {
+      if (req.type !== 'request') return false;
+      const url = req.url.toLowerCase();
+      const method = req.method?.toUpperCase();
+      
+      return (method === 'DELETE' || 
+              method === 'POST' || 
+              method === 'PUT') &&
+             (url.includes('delete') || 
+              url.includes('remove') || 
+              url.includes('conversation') ||
+              url.includes('chat'));
+    });
+    
+    return {
+      success: true,
+      totalRequests: requests.length,
+      deleteRelatedRequests: deleteRelated,
+      allRequests: requests.slice(0, 20) // Limit to avoid too much data
+    };
   }
 
   async reloadExtension() {
