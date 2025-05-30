@@ -244,6 +244,66 @@ export interface ConversationTranscript {
   }>;
 }
 
+export interface ConversationSearchCriteria {
+  titleSearch?: string;
+  titleRegex?: string;
+  createdAfter?: string;
+  createdBefore?: string;
+  updatedAfter?: string;
+  updatedBefore?: string;
+  minMessageCount?: number;
+  maxMessageCount?: number;
+  isOpen?: boolean;
+  sortBy?: 'created_at' | 'updated_at' | 'title' | 'message_count';
+  sortOrder?: 'asc' | 'desc';
+  limit?: number;
+}
+
+export interface ConversationSearchResult {
+  success: boolean;
+  conversations: Array<{
+    id: string;
+    title: string;
+    created_at: string;
+    updated_at: string;
+    message_count: number;
+    tabId: number | null;
+    isOpen: boolean;
+  }>;
+  search_metadata: {
+    total_found: number;
+    returned: number;
+    filters_applied: number;
+    search_criteria: ConversationSearchCriteria;
+  };
+}
+
+export interface BulkDeleteOptions {
+  conversationIds?: string[];
+  filterCriteria?: ConversationSearchCriteria;
+  dryRun?: boolean;
+  batchSize?: number;
+  delayBetweenBatches?: number;
+  skipOpenConversations?: boolean;
+}
+
+export interface BulkDeleteResult {
+  success: boolean;
+  deleted: number;
+  errors: string[];
+  total_processed: number;
+  deletion_summary: {
+    successful: number;
+    failed: number;
+    success_rate: string;
+  };
+  deleted_conversations: Array<{
+    id: string;
+    title: string;
+  }>;
+  message: string;
+}
+
 export interface NetworkRequest {
   url: string;
   method: string;

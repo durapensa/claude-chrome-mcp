@@ -1682,6 +1682,121 @@ class ChromeMCPServer {
             }
           },
           {
+            name: 'search_claude_conversations',
+            description: 'Search and filter Claude conversations with advanced criteria (title search, date ranges, message counts, open status)',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                titleSearch: {
+                  type: 'string',
+                  description: 'Search text to match against conversation titles (supports partial matching)'
+                },
+                titleRegex: {
+                  type: 'string', 
+                  description: 'Regular expression pattern for title matching'
+                },
+                createdAfter: {
+                  type: 'string',
+                  description: 'ISO date string - only return conversations created after this date'
+                },
+                createdBefore: {
+                  type: 'string', 
+                  description: 'ISO date string - only return conversations created before this date'
+                },
+                updatedAfter: {
+                  type: 'string',
+                  description: 'ISO date string - only return conversations updated after this date'  
+                },
+                updatedBefore: {
+                  type: 'string',
+                  description: 'ISO date string - only return conversations updated before this date'
+                },
+                minMessageCount: {
+                  type: 'number',
+                  description: 'Minimum number of messages in conversation'
+                },
+                maxMessageCount: {
+                  type: 'number', 
+                  description: 'Maximum number of messages in conversation'
+                },
+                isOpen: {
+                  type: 'boolean',
+                  description: 'Filter by whether conversation is currently open in a tab'
+                },
+                sortBy: {
+                  type: 'string',
+                  enum: ['created_at', 'updated_at', 'title', 'message_count'],
+                  description: 'Field to sort results by',
+                  default: 'updated_at'
+                },
+                sortOrder: {
+                  type: 'string',
+                  enum: ['asc', 'desc'], 
+                  description: 'Sort direction',
+                  default: 'desc'
+                },
+                limit: {
+                  type: 'number',
+                  description: 'Maximum number of results to return',
+                  default: 30,
+                  maximum: 100
+                }
+              },
+              additionalProperties: false
+            }
+          },
+          {
+            name: 'bulk_delete_conversations',
+            description: 'Delete multiple conversations with safety checks and progress tracking',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                conversationIds: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Array of conversation UUIDs to delete'
+                },
+                filterCriteria: {
+                  type: 'object',
+                  description: 'Alternative to conversationIds - delete based on search criteria',
+                  properties: {
+                    titleSearch: { type: 'string' },
+                    titleRegex: { type: 'string' },
+                    createdAfter: { type: 'string' },
+                    createdBefore: { type: 'string' },
+                    updatedAfter: { type: 'string' },
+                    updatedBefore: { type: 'string' },
+                    minMessageCount: { type: 'number' },
+                    maxMessageCount: { type: 'number' },
+                    isOpen: { type: 'boolean' }
+                  }
+                },
+                dryRun: {
+                  type: 'boolean',
+                  description: 'If true, only return what would be deleted without actually deleting',
+                  default: false
+                },
+                batchSize: {
+                  type: 'number',
+                  description: 'Number of conversations to delete per batch',
+                  default: 5,
+                  maximum: 10
+                },
+                delayBetweenBatches: {
+                  type: 'number',
+                  description: 'Milliseconds to wait between batches',
+                  default: 1000
+                },
+                skipOpenConversations: {
+                  type: 'boolean', 
+                  description: 'Skip conversations that are currently open in tabs',
+                  default: true
+                }
+              },
+              additionalProperties: false
+            }
+          },
+          {
             name: 'send_message_to_claude_tab',
             description: 'Send a message to a specific Claude tab',
             inputSchema: {
@@ -2110,6 +2225,12 @@ class ChromeMCPServer {
           case 'get_claude_conversations':
             result = await this.hubClient.sendRequest('get_claude_conversations');
             break;
+          case 'search_claude_conversations':
+            result = await this.searchConversations(args);
+            break;
+          case 'bulk_delete_conversations':
+            result = await this.bulkDeleteConversations(args);
+            break;
           case 'spawn_claude_tab':
             result = await this.hubClient.sendRequest('spawn_claude_tab', args);
             break;
@@ -2198,6 +2319,399 @@ class ChromeMCPServer {
         };
       }
     });
+  }
+
+  async searchConversations(filters = {}) {
+    try {
+      // First get all conversations from the hub
+      const allConversationsResult = await this.hubClient.sendRequest('get_claude_conversations');
+      
+      if (!allConversationsResult || !allConversationsResult.data) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: false,
+                error: 'Failed to retrieve conversations'
+              })
+            }
+          ]
+        };
+      }
+      
+      let conversations;
+      if (typeof allConversationsResult.data === 'string') {
+        conversations = JSON.parse(allConversationsResult.data);
+      } else {
+        conversations = allConversationsResult.data;
+      }
+      
+      if (!Array.isArray(conversations)) {
+        return {
+          content: [
+            {
+              type: 'text', 
+              text: JSON.stringify({
+                success: false,
+                error: 'Invalid conversation data format'
+              })
+            }
+          ]
+        };
+      }
+      
+      // Apply filters
+      let filteredConversations = conversations.filter(conv => {
+        // Title search (case-insensitive partial matching)
+        if (filters.titleSearch) {
+          const title = conv.title || '';
+          if (!title.toLowerCase().includes(filters.titleSearch.toLowerCase())) {
+            return false;
+          }
+        }
+        
+        // Title regex matching
+        if (filters.titleRegex) {
+          try {
+            const regex = new RegExp(filters.titleRegex, 'i');
+            const title = conv.title || '';
+            if (!regex.test(title)) {
+              return false;
+            }
+          } catch (e) {
+            // Invalid regex, skip this filter
+          }
+        }
+        
+        // Date filtering
+        if (filters.createdAfter) {
+          const createdDate = new Date(conv.created_at);
+          const afterDate = new Date(filters.createdAfter);
+          if (createdDate < afterDate) {
+            return false;
+          }
+        }
+        
+        if (filters.createdBefore) {
+          const createdDate = new Date(conv.created_at);
+          const beforeDate = new Date(filters.createdBefore);
+          if (createdDate > beforeDate) {
+            return false;
+          }
+        }
+        
+        if (filters.updatedAfter) {
+          const updatedDate = new Date(conv.updated_at);
+          const afterDate = new Date(filters.updatedAfter);
+          if (updatedDate < afterDate) {
+            return false;
+          }
+        }
+        
+        if (filters.updatedBefore) {
+          const updatedDate = new Date(conv.updated_at);
+          const beforeDate = new Date(filters.updatedBefore);
+          if (updatedDate > beforeDate) {
+            return false;
+          }
+        }
+        
+        // Message count filtering
+        if (filters.minMessageCount !== undefined) {
+          const messageCount = conv.message_count || 0;
+          if (messageCount < filters.minMessageCount) {
+            return false;
+          }
+        }
+        
+        if (filters.maxMessageCount !== undefined) {
+          const messageCount = conv.message_count || 0;
+          if (messageCount > filters.maxMessageCount) {
+            return false;
+          }
+        }
+        
+        // Open status filtering
+        if (filters.isOpen !== undefined) {
+          const isOpen = conv.isOpen || false;
+          if (isOpen !== filters.isOpen) {
+            return false;
+          }
+        }
+        
+        return true;
+      });
+      
+      // Apply sorting
+      const sortBy = filters.sortBy || 'updated_at';
+      const sortOrder = filters.sortOrder || 'desc';
+      
+      filteredConversations.sort((a, b) => {
+        let aValue, bValue;
+        
+        switch (sortBy) {
+          case 'created_at':
+            aValue = new Date(a.created_at);
+            bValue = new Date(b.created_at);
+            break;
+          case 'updated_at':
+            aValue = new Date(a.updated_at);
+            bValue = new Date(b.updated_at);
+            break;
+          case 'title':
+            aValue = (a.title || '').toLowerCase();
+            bValue = (b.title || '').toLowerCase();
+            break;
+          case 'message_count':
+            aValue = a.message_count || 0;
+            bValue = b.message_count || 0;
+            break;
+          default:
+            aValue = new Date(a.updated_at);
+            bValue = new Date(b.updated_at);
+        }
+        
+        if (aValue < bValue) {
+          return sortOrder === 'asc' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortOrder === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+      
+      // Apply limit
+      const limit = Math.min(filters.limit || 30, 100);
+      const limitedConversations = filteredConversations.slice(0, limit);
+      
+      // Prepare result with search metadata
+      const searchResult = {
+        success: true,
+        conversations: limitedConversations,
+        search_metadata: {
+          total_found: filteredConversations.length,
+          returned: limitedConversations.length,
+          filters_applied: Object.keys(filters).length,
+          search_criteria: filters
+        }
+      };
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(searchResult, null, 2)
+          }
+        ]
+      };
+      
+    } catch (error) {
+      console.error('CCM: Error in searchConversations:', error);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              success: false,
+              error: error.message,
+              details: 'Failed to search conversations'
+            })
+          }
+        ],
+        isError: true
+      };
+    }
+  }
+
+  async bulkDeleteConversations(options = {}) {
+    try {
+      const {
+        conversationIds,
+        filterCriteria,
+        dryRun = false,
+        batchSize = 5,
+        delayBetweenBatches = 1000,
+        skipOpenConversations = true
+      } = options;
+      
+      let targetConversations = [];
+      
+      // Get conversations to delete
+      if (conversationIds && conversationIds.length > 0) {
+        // Get all conversations and filter by provided IDs
+        const allConversationsResult = await this.hubClient.sendRequest('get_claude_conversations');
+        if (!allConversationsResult || !allConversationsResult.data) {
+          throw new Error('Failed to retrieve conversations');
+        }
+        
+        let allConversations;
+        if (typeof allConversationsResult.data === 'string') {
+          allConversations = JSON.parse(allConversationsResult.data);
+        } else {
+          allConversations = allConversationsResult.data;
+        }
+        
+        targetConversations = allConversations.filter(conv => conversationIds.includes(conv.id));
+        
+      } else if (filterCriteria) {
+        // Use search functionality to find conversations based on criteria
+        const searchResult = await this.searchConversations(filterCriteria);
+        const searchData = JSON.parse(searchResult.content[0].text);
+        
+        if (!searchData.success) {
+          throw new Error(`Search failed: ${searchData.error}`);
+        }
+        
+        targetConversations = searchData.conversations;
+      } else {
+        throw new Error('Either conversationIds or filterCriteria must be provided');
+      }
+      
+      // Filter out open conversations if requested
+      if (skipOpenConversations) {
+        const originalCount = targetConversations.length;
+        targetConversations = targetConversations.filter(conv => !conv.isOpen);
+        const skippedCount = originalCount - targetConversations.length;
+        if (skippedCount > 0) {
+          console.log(`CCM: Skipped ${skippedCount} open conversations`);
+        }
+      }
+      
+      if (targetConversations.length === 0) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                deleted: 0,
+                skipped: 0,
+                errors: [],
+                message: 'No conversations found matching criteria'
+              })
+            }
+          ]
+        };
+      }
+      
+      // Dry run - just return what would be deleted
+      if (dryRun) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                dry_run: true,
+                would_delete: targetConversations.length,
+                conversations: targetConversations.map(conv => ({
+                  id: conv.id,
+                  title: conv.title,
+                  message_count: conv.message_count,
+                  created_at: conv.created_at,
+                  isOpen: conv.isOpen
+                })),
+                message: `Would delete ${targetConversations.length} conversations`
+              })
+            }
+          ]
+        };
+      }
+      
+      // Perform actual deletion in batches
+      const results = {
+        deleted: 0,
+        skipped: 0,
+        errors: [],
+        deletedConversations: []
+      };
+      
+      const actualBatchSize = Math.min(batchSize, 10); // Safety limit
+      
+      for (let i = 0; i < targetConversations.length; i += actualBatchSize) {
+        const batch = targetConversations.slice(i, i + actualBatchSize);
+        
+        // Delete conversations in this batch
+        const batchPromises = batch.map(async (conv) => {
+          try {
+            const deleteResult = await this.hubClient.sendRequest('delete_claude_conversation', {
+              conversationId: conv.id
+            });
+            
+            // Check if deletion was successful
+            if (deleteResult && deleteResult.data) {
+              const deleteData = typeof deleteResult.data === 'string' 
+                ? JSON.parse(deleteResult.data) 
+                : deleteResult.data;
+              
+              if (deleteData.success) {
+                results.deleted++;
+                results.deletedConversations.push({
+                  id: conv.id,
+                  title: conv.title
+                });
+                return { success: true, conversation: conv };
+              } else {
+                results.errors.push(`Failed to delete "${conv.title}": ${deleteData.error || 'Unknown error'}`);
+                return { success: false, conversation: conv, error: deleteData.error };
+              }
+            } else {
+              results.errors.push(`Failed to delete "${conv.title}": No response from server`);
+              return { success: false, conversation: conv, error: 'No response' };
+            }
+          } catch (error) {
+            results.errors.push(`Failed to delete "${conv.title}": ${error.message}`);
+            return { success: false, conversation: conv, error: error.message };
+          }
+        });
+        
+        // Wait for batch to complete
+        await Promise.all(batchPromises);
+        
+        // Delay between batches if there are more batches to process
+        if (i + actualBatchSize < targetConversations.length) {
+          await new Promise(resolve => setTimeout(resolve, delayBetweenBatches));
+        }
+      }
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              success: true,
+              deleted: results.deleted,
+              errors: results.errors,
+              total_processed: targetConversations.length,
+              deletion_summary: {
+                successful: results.deleted,
+                failed: results.errors.length,
+                success_rate: `${Math.round((results.deleted / targetConversations.length) * 100)}%`
+              },
+              deleted_conversations: results.deletedConversations,
+              message: `Bulk deletion completed: ${results.deleted} deleted, ${results.errors.length} errors`
+            }, null, 2)
+          }
+        ]
+      };
+      
+    } catch (error) {
+      console.error('CCM: Error in bulkDeleteConversations:', error);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              success: false,
+              error: error.message,
+              details: 'Failed to perform bulk delete operation'
+            })
+          }
+        ],
+        isError: true
+      };
+    }
   }
 
   async start() {
