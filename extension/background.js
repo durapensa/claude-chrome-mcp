@@ -274,7 +274,9 @@ class CCMExtensionHub {
           break;
         
         case 'extract_conversation_elements':
+          console.log('CCM Extension: Extracting conversation elements for tab:', message.params?.tabId);
           result = await this.extractConversationElements(message.params);
+          console.log('CCM Extension: Extraction completed');
           break;
         
         case 'get_claude_response_status':
@@ -283,6 +285,11 @@ class CCMExtensionHub {
         
         case 'batch_get_responses':
           result = await this.batchGetResponses(message.params);
+          break;
+          
+        case 'test_simple':
+          console.log('CCM Extension: Test simple message received');
+          result = { success: true, message: 'Test successful', timestamp: Date.now() };
           break;
           
         default:
@@ -517,26 +524,89 @@ class CCMExtensionHub {
     return result.result?.value || [];
   }
 
+  async waitForClaudeReady(tabId, maxWaitMs = 30000) {
+    // Wait for Claude to be ready to receive a new message
+    const startTime = Date.now();
+    
+    while (Date.now() - startTime < maxWaitMs) {
+      try {
+        // Check if there's an active stop button (indicates streaming)
+        const checkScript = `
+          (function() {
+            const stopButton = document.querySelector('button[aria-label*="Stop"]');
+            const hasStopButton = stopButton && stopButton.offsetParent !== null;
+            
+            // Also check if input is available and editable
+            const inputField = document.querySelector('[contenteditable="true"]');
+            const inputAvailable = inputField && inputField.getAttribute('contenteditable') === 'true';
+            
+            return {
+              isStreaming: hasStopButton,
+              inputReady: inputAvailable
+            };
+          })()
+        `;
+        
+        const result = await this.executeScript({ tabId, script: checkScript });
+        const status = result.result?.value || {};
+        
+        if (!status.isStreaming && status.inputReady) {
+          // Claude is ready
+          return true;
+        }
+        
+        // Wait a bit before checking again
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+      } catch (error) {
+        console.error('Error checking Claude ready state:', error);
+        return false;
+      }
+    }
+    
+    return false; // Timeout
+  }
+
   async sendMessageToClaudeTab(params) {
-    const { tabId, message } = params;
+    const { tabId, message, waitForReady = false } = params;
+    
+    // Wait for Claude to be ready if requested
+    if (waitForReady) {
+      const isReady = await this.waitForClaudeReady(tabId);
+      if (!isReady) {
+        return { success: false, reason: 'Claude is not ready to receive messages (timeout or still streaming)' };
+      }
+    }
+    
+    // Properly escape the message for JavaScript string literal
+    const escapedMessage = message
+      .replace(/\\/g, '\\\\')  // Escape backslashes first
+      .replace(/'/g, "\\'")    // Escape single quotes
+      .replace(/"/g, '\\"')    // Escape double quotes
+      .replace(/\n/g, '\\n')   // Escape newlines
+      .replace(/\r/g, '\\r')   // Escape carriage returns
+      .replace(/\t/g, '\\t');  // Escape tabs
+    
     const script = `
       (function() {
         const textarea = document.querySelector('div[contenteditable="true"]');
         if (textarea) {
           textarea.focus();
-          textarea.textContent = '${message.replace(/'/g, "\\'")}';
+          textarea.textContent = '${escapedMessage}';
           textarea.dispatchEvent(new Event('input', { bubbles: true }));
           
-          setTimeout(() => {
-            const sendButton = document.querySelector('button[aria-label*="Send"], button:has(svg[stroke])');
-            if (sendButton && !sendButton.disabled) {
-              sendButton.click();
-              return { success: true, sent: true };
-            }
-            return { success: false, reason: 'Send button not found or disabled' };
-          }, 100);
-          
-          return { success: true, messageSent: true };
+          // Wait a bit for the UI to update, then click send
+          return new Promise((resolve) => {
+            setTimeout(() => {
+              const sendButton = document.querySelector('button[aria-label*="Send"], button:has(svg[stroke])');
+              if (sendButton && !sendButton.disabled) {
+                sendButton.click();
+                resolve({ success: true, messageSent: true });
+              } else {
+                resolve({ success: false, reason: 'Send button not found or disabled' });
+              }
+            }, 200); // Increased delay for UI to update
+          });
         }
         return { success: false, reason: 'Message input not found' };
       })()
@@ -565,7 +635,8 @@ class CCMExtensionHub {
         try {
           const sendResult = await this.sendMessageToClaudeTab({
             tabId: msg.tabId,
-            message: msg.message
+            message: msg.message,
+            waitForReady: true  // Always wait for ready in sequential mode
           });
           
           results.push({
@@ -575,10 +646,7 @@ class CCMExtensionHub {
             timestamp: Date.now()
           });
           
-          // Small delay between sequential messages
-          if (messages.indexOf(msg) < messages.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 500));
-          }
+          // No longer need artificial delay - waitForReady handles it
         } catch (error) {
           results.push({
             tabId: msg.tabId,
@@ -1883,9 +1951,15 @@ class CCMExtensionHub {
    */
   async extractConversationElements(params) {
     const { tabId } = params;
+    console.log('CCM Extension: extractConversationElements called for tab:', tabId);
     
     try {
-      await this.ensureDebuggerAttached(tabId);
+      // Skip debugger attachment if already attached
+      if (!this.debuggerSessions.has(tabId)) {
+        console.log('CCM Extension: Attaching debugger...');
+        await this.ensureDebuggerAttached(tabId);
+        console.log('CCM Extension: Debugger attached');
+      }
       
       const script = `
         (function() {
@@ -1893,105 +1967,119 @@ class CCMExtensionHub {
           const codeBlocks = [];
           const toolUsage = [];
           
-          // Extract artifacts with multiple selector strategies
+          // Use Sets for efficient duplicate detection
+          const seenArtifactIds = new Set();
+          const seenCodeHashes = new Set();
+          
+          // Simple hash function for duplicate detection
+          function simpleHash(str) {
+            let hash = 0;
+            for (let i = 0; i < Math.min(str.length, 100); i++) {
+              hash = ((hash << 5) - hash) + str.charCodeAt(i);
+              hash = hash & hash;
+            }
+            return hash.toString(36);
+          }
+          
+          // Extract artifacts with optimized selector strategy
+          // Only use most specific selectors to avoid overlap
           const artifactSelectors = [
-            'iframe[title*="artifact"]',
-            'iframe[src*="artifact"]', 
             '[data-testid*="artifact"]',
             '.artifact',
-            '[class*="artifact"]',
-            'iframe[sandbox]',
-            '[data-component*="artifact"]'
+            'iframe[title*="artifact"]:not([data-testid*="artifact"])'
           ];
           
-          artifactSelectors.forEach(selector => {
-            document.querySelectorAll(selector).forEach((element, index) => {
+          // Use a single combined selector for better performance
+          try {
+            const allArtifacts = document.querySelectorAll(artifactSelectors.join(','));
+            
+            // Process artifacts with early exit and optimizations
+            for (let i = 0; i < allArtifacts.length; i++) {
+              const element = allArtifacts[i];
+              
+              // Create unique identifier
+              const elementId = element.id || simpleHash(element.outerHTML);
+              if (seenArtifactIds.has(elementId)) continue;
+              seenArtifactIds.add(elementId);
+              
               let content = '';
               let type = 'unknown';
               
               if (element.tagName === 'IFRAME') {
-                try {
-                  // Try to access iframe content if same-origin
-                  content = element.contentDocument?.documentElement?.outerHTML || 
-                           element.outerHTML;
-                  type = 'html';
-                } catch (e) {
-                  // Cross-origin iframe, get what we can
-                  content = element.outerHTML;
-                  type = 'iframe';
-                }
+                // Don't try to access cross-origin content - just get attributes
+                type = 'iframe';
+                content = \`src: \${element.src || 'none'}, title: \${element.title || 'none'}\`;
               } else {
-                content = element.outerHTML;
-                type = element.dataset.type || 'unknown';
+                // Get text content for non-iframes (much faster than outerHTML)
+                content = element.textContent || '';
+                type = element.dataset.type || 'element';
               }
               
-              // Avoid duplicates
-              const isDuplicate = artifacts.some(a => 
-                a.content === content || 
-                (element.id && a.id === element.id)
-              );
-              
-              if (!isDuplicate) {
-                artifacts.push({
-                  id: element.id || 'artifact_' + artifacts.length,
-                  selector: selector,
-                  type: type,
-                  title: element.title || element.getAttribute('aria-label') || 'Untitled',
-                  content: content.substring(0, 2000), // Limit size
-                  elementType: element.tagName.toLowerCase(),
-                  attributes: Object.fromEntries(
-                    Array.from(element.attributes).map(attr => [attr.name, attr.value])
-                  )
-                });
-              }
-            });
-          });
-          
-          // Extract code blocks
-          const codeSelectors = [
-            'pre code',
-            '.highlight',
-            '[class*="code-block"]',
-            '[data-language]'
-          ];
-          
-          codeSelectors.forEach(selector => {
-            document.querySelectorAll(selector).forEach((element, index) => {
-              const content = element.textContent;
-              
-              // Avoid duplicates
-              const isDuplicate = codeBlocks.some(cb => cb.content === content);
-              
-              if (!isDuplicate && content && content.trim()) {
-                codeBlocks.push({
-                  id: 'code_' + codeBlocks.length,
-                  language: element.className.match(/language-(\\w+)/)?.[1] || 
-                           element.dataset.language || 'text',
-                  content: content,
-                  html: element.outerHTML.substring(0, 500) // Truncate HTML
-                });
-              }
-            });
-          });
-          
-          // Extract tool usage indicators
-          const toolIndicators = document.querySelectorAll(
-            '[data-testid*="search"], [class*="search"], ' +
-            '[data-testid*="repl"], [class*="repl"], ' + 
-            '[data-testid*="tool"], [class*="tool-usage"]'
-          );
-          
-          toolIndicators.forEach((element, index) => {
-            const content = element.textContent?.trim();
-            if (content) {
-              toolUsage.push({
-                id: 'tool_' + toolUsage.length,
-                type: element.dataset.testid || element.className,
-                content: content.substring(0, 500),
-                html: element.outerHTML.substring(0, 500)
+              artifacts.push({
+                id: element.id || 'artifact_' + i,
+                type: type,
+                title: element.title || element.getAttribute('aria-label') || 'Untitled',
+                content: content.substring(0, 500), // Small limit
+                elementType: element.tagName.toLowerCase(),
+                // Only essential attributes
+                attributes: {
+                  id: element.id || '',
+                  class: element.className || '',
+                  'data-testid': element.dataset?.testid || ''
+                }
               });
             }
-          });
+          } catch (e) {
+            console.error('Error extracting artifacts:', e);
+          }
+          
+          // Extract code blocks - use very specific selector
+          try {
+            const codeElements = document.querySelectorAll('pre > code');
+            
+            for (let i = 0; i < codeElements.length; i++) {
+              const element = codeElements[i];
+              const content = element.textContent;
+              
+              // Skip empty content
+              if (!content || content.trim().length < 10) continue;
+              
+              // Use hash for duplicate detection
+              const contentHash = simpleHash(content);
+              if (seenCodeHashes.has(contentHash)) continue;
+              seenCodeHashes.add(contentHash);
+              
+              codeBlocks.push({
+                id: 'code_' + i,
+                language: element.className.match(/language-(\\w+)/)?.[1] || 
+                         element.dataset?.language || 'text',
+                content: content.substring(0, 1000), // Limit content
+                lineCount: content.split('\\n').length
+              });
+            }
+          } catch (e) {
+            console.error('Error extracting code blocks:', e);
+          }
+          
+          // Extract tool usage - very limited search
+          try {
+            const toolElements = document.querySelectorAll('[data-testid*="tool-use"]');
+            
+            for (let i = 0; i < toolElements.length; i++) {
+              const element = toolElements[i];
+              const content = element.textContent?.trim();
+              
+              if (content && content.length > 20) {
+                toolUsage.push({
+                  id: 'tool_' + i,
+                  type: element.dataset.testid || 'unknown',
+                  content: content.substring(0, 200)
+                });
+              }
+            }
+          } catch (e) {
+            console.error('Error extracting tools:', e);
+          }
           
           return {
             artifacts,
@@ -2003,7 +2091,9 @@ class CCMExtensionHub {
         })()
       `;
       
+      console.log('CCM Extension: Executing extraction script...');
       const result = await this.executeScript({ tabId, script });
+      console.log('CCM Extension: Script execution completed, result:', result ? 'received' : 'null');
       
       return {
         success: true,

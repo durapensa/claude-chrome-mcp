@@ -488,19 +488,16 @@ class WebSocketHub extends EventEmitter {
         break;
         
       default:
-        // Check if this is a tool request from an MCP client
-        const validToolTypes = [
-          'get_claude_tabs', 'get_claude_conversations', 'spawn_claude_tab', 'send_message_to_claude_tab',
-          'get_claude_response', 'batch_send_messages', 'get_conversation_metadata', 'export_conversation_transcript',
-          'debug_attach', 'execute_script', 'get_dom_elements', 'debug_claude_page', 'delete_claude_conversation',
-          'reload_extension', 'start_network_inspection', 'stop_network_inspection', 'get_captured_requests',
-          'close_claude_tab', 'open_claude_conversation_tab'
-        ];
-        
-        if (validToolTypes.includes(type) && ws.clientType === 'mcp_client') {
+        // For MCP clients, forward any unrecognized message type as a potential tool request
+        // This allows new tools to be added without updating the hub
+        if (ws.clientType === 'mcp_client') {
+          // Log unknown types for debugging, but still forward them
+          if (!message.requestId) {
+            console.warn(`WebSocket Hub: Forwarding unknown message type '${type}' from ${ws.clientId} (no requestId)`);
+          }
           this.forwardRequest(ws, message);
         } else {
-          console.warn(`WebSocket Hub: Unknown message type '${type}' from ${ws.clientId}`);
+          console.warn(`WebSocket Hub: Unknown message type '${type}' from non-MCP client ${ws.clientId}`);
           this.sendToClient(ws, {
             type: 'error',
             error: `Unknown message type: ${type}`,
