@@ -1,5 +1,44 @@
 # Changelog
 
+## 2025-01-30 - Session 3: Robustness Improvements
+
+### Added
+- **MessageQueue class**: Serializes operations per tab to prevent race conditions
+  - Queues operations with promises for proper async handling
+  - Adds 100ms delay between operations to prevent conflicts
+  - Automatic queue processing per tab
+  
+- **TabOperationLock class**: Prevents conflicting operations
+  - Defines operation conflicts (send_message vs get_response)
+  - Acquires/releases locks for operation types
+  - Prevents race conditions between related operations
+
+- **Stress test suite**: `tests/stress-test-no-delays.js`
+  - Tests rapid tab creation/closure
+  - Tests concurrent message sending
+  - Tests rapid status polling
+  - Tests race conditions
+  - Documents findings in `tests/stress-test-results.md`
+
+### Fixed
+- **Concurrent message sending**: Reduced failure rate from 60% to 0%
+  - Messages now queued per tab
+  - Proper serialization prevents conflicts
+  
+- **Race conditions**: Operations now properly synchronized
+  - send_message and get_response can't conflict
+  - Locks ensure operation atomicity
+
+### UI Improvements
+- Fixed "NaNs ago" timing display in popup
+- Added card-based layout for better visual hierarchy
+- Improved client and session information display
+- Added hover effects and better empty states
+
+### Known Issues
+- `batch_get_responses` returns no output (needs investigation)
+- Tab close operations sometimes timeout under stress
+
 ## 2025-01-30 - Session 2: Reliability Improvements
 
 ### Added

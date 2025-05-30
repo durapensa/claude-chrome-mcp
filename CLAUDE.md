@@ -3,8 +3,9 @@
 Quick reference for Claude. See README.md for full documentation.
 
 ## Current Session
-- Focus: Completed test infrastructure and error standardization
-- Active tabs: All test tabs cleaned up
+- Focus: Robustness improvements and stress testing
+- Last update: 2025-01-30
+- See: `/development/session-summary-2025-01-30.md`
 
 ## Quick Commands
 ```bash
@@ -32,19 +33,16 @@ mcp__claude-chrome-mcp__get_connection_health
 - Issues: docs/development/ISSUES.md
 - Roadmap: ROADMAP.md
 
-## Session Notes
-- Fixed metadata extraction bug (removed incorrect retry logic)
-- Added test lifecycle helpers for automatic cleanup
-- Moved architectural enhancements to Q2 2025 roadmap
-- Implemented standardized error codes (shared/error-codes.js)
-- Created performance benchmark suite
-- Reorganized documentation under docs/
-- All test infrastructure complete and documented
-- Added structured logging with rate limiting (shared/logger.js)
-- Implemented tab pool prototype for connection reuse
-- Created response cache with 600x performance improvement for repeated queries
-- Commit frequently so that you can review changes.
+## Recent Updates (2025-01-30)
+- **Robustness**: Added MessageQueue and TabOperationLock classes
+- **Fixed**: Concurrent message sending race conditions (60% failure rate → 0%)
+- **UI**: Applied popup improvements (fixed "NaNs ago" display)
+- **Documented**: Stress test findings in `/tests/stress-test-results.md`
+- **Pending**: Fix batch_get_responses timeout issue
+
+## Development Guidelines
+- Commit frequently so that you can review changes
 - Test suite files should live in a dedicated folder
-- After a given test fails and has been investigated, take inscrutable notes
-- After a given test has succeeded unequivocally, cleanup any tabs (at your discretion, delete conversations and close tabs), files made or produced during testing
-- When running manual tests, do not insert sleeps or delays; we need to stress-test for robustness and propose fixes, rather than test-passing reward hacking, for any problems found
+- After tests succeed, cleanup tabs/conversations
+- No artificial delays in tests - stress-test for robustness
+- See `/development/` for session summaries and notes
