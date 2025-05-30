@@ -1133,41 +1133,9 @@ class CCMExtensionHub {
       })()
     `;
     
-    // Try sending the message with retry logic
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      try {
-        const result = await this.executeScript({ tabId, script });
-        const sendResult = result.result?.value || { success: false, reason: 'Script execution failed' };
-        
-        if (sendResult.success) {
-          // Success! Add retry info if there were retries
-          if (attempt > 0) {
-            sendResult.retriesNeeded = attempt;
-          }
-          return sendResult;
-        }
-        
-        // Failed, check if we should retry
-        lastError = sendResult.reason || 'Unknown error';
-        if (attempt < maxRetries - 1 && lastError !== 'Message input not found') {
-          console.log(`CCM Extension: Retry ${attempt + 1}/${maxRetries} after send failed:`, lastError);
-          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
-        }
-      } catch (error) {
-        lastError = error.message;
-        if (attempt < maxRetries - 1) {
-          console.log(`CCM Extension: Retry ${attempt + 1}/${maxRetries} after execution error:`, error.message);
-          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
-        }
-      }
-    }
     
-    // All retries failed
-    return { 
-      success: false, 
-      reason: lastError || 'Failed after all retries',
-      retriesAttempted: maxRetries
-    };
+    const result = await this.executeScript({ tabId, script });
+    return result.result?.value || { success: false, reason: 'Script execution failed' };
   }
 
   async exportConversationTranscript(params) {
