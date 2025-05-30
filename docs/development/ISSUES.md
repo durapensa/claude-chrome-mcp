@@ -54,17 +54,19 @@
 
 ## Evaluation Needed
 
-### 7. Logging Infrastructure
+### 7. Logging Infrastructure ✅ EVALUATED
 - **Current State**: Basic console.log statements throughout codebase
-- **Evaluation Needed**:
-  - Current logging volume and usefulness
-  - Performance impact of existing logs
-  - Which components need better observability
-- **Considerations**:
-  - Chrome extension logs go to service worker console
-  - MCP server logs to stdout
-  - No centralized log aggregation
-- **Next Steps**: Audit existing logs before implementing structured logging
+- **Evaluation Completed**:
+  - Extension: ~38 logs (mix of useful lifecycle events and noisy keepalives)
+  - MCP Server: ~109 logs (comprehensive but repetitive)
+  - Tests: ~50+ logs (appropriate for test output)
+  - Main issues: Repetitive keepalive logs, no log levels, inconsistent formatting
+- **Solution Implemented**:
+  - Created `shared/logger.js` with log levels and rate limiting
+  - Supports environment variables (CCM_LOG_LEVEL, CCM_QUIET)
+  - Provides consistent formatting and child loggers
+  - Migration examples provided
+- **Next Steps**: Gradually migrate components to use new logger
 
 ## Reporting Issues
 
