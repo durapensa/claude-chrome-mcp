@@ -3,8 +3,8 @@
 Quick reference for Claude. See README.md for full documentation.
 
 ## Current Session
-- Focus: Testing and architecture improvements
-- Active tabs: Check with `get_claude_tabs`
+- Focus: Completed test infrastructure and error standardization
+- Active tabs: All test tabs cleaned up
 
 ## Quick Commands
 ```bash
@@ -36,6 +36,10 @@ mcp__claude-chrome-mcp__get_connection_health
 - Fixed metadata extraction bug (removed incorrect retry logic)
 - Added test lifecycle helpers for automatic cleanup
 - Moved architectural enhancements to Q2 2025 roadmap
+- Implemented standardized error codes (shared/error-codes.js)
+- Created performance benchmark suite
+- Reorganized documentation under docs/
+- All test infrastructure complete and documented
 - Commit frequently so that you can review changes.
 - Test suite files should live in a dedicated folder
 - After a given test fails and has been investigated, take inscrutable notes

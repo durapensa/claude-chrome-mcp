@@ -5,9 +5,9 @@
 When beginning work on this project:
 
 1. **Load CLAUDE.md** - MCP server configuration and quick reference
-2. **Check development/ISSUES.md** - Current bugs and their status  
+2. **Check docs/development/ISSUES.md** - Current bugs and their status  
 3. **Review ROADMAP.md** - Planned features and priorities
-4. **Follow development/TESTING.md** - When testing changes
+4. **Follow docs/development/TESTING.md** - When testing changes
 
 ## Working Principles
 
