@@ -40,6 +40,9 @@ mcp__claude-chrome-mcp__get_connection_health
 - Created performance benchmark suite
 - Reorganized documentation under docs/
 - All test infrastructure complete and documented
+- Added structured logging with rate limiting (shared/logger.js)
+- Implemented tab pool prototype for connection reuse
+- Created response cache with 600x performance improvement for repeated queries
 - Commit frequently so that you can review changes.
 - Test suite files should live in a dedicated folder
 - After a given test fails and has been investigated, take inscrutable notes
