@@ -85,14 +85,21 @@ throw createError(ERROR_CODES.TAB_NOT_FOUND, {
 - End-to-end scenarios
 - Chrome interaction
 
-### 3. Performance Benchmarks
+### 3. Integration Tests (No Server Spawn)
+Located in `tests/integration/`:
+- Use existing MCP connections (like Claude Code)
+- Non-destructive, safe to run anytime
+- Real API testing without side effects
+- See `integration/README.md` for details
+
+### 4. Performance Benchmarks
 - Tab creation speed
 - Message sending latency
 - Response retrieval time
 - Metadata extraction performance
 - Health check overhead
 
-### 4. Stability Tests
+### 5. Stability Tests
 - Service worker persistence
 - WebSocket reconnection
 - Long-running operations

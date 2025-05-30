@@ -15,9 +15,15 @@ class SharedMCPClient {
     this.connectionPromise = null;
     this.isConnecting = false;
     this.isConnected = false;
+    this.connectionAttempts = 0;
+    this.maxReconnectAttempts = 3;
     
     // Generate unique client ID for this test session
     this.clientId = `test-client-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+    
+    // Track connection health
+    this.lastHealthCheck = null;
+    this.healthCheckInterval = null;
   }
 
   async connect() {
@@ -80,11 +86,71 @@ class SharedMCPClient {
   }
 
   async callTool(toolName, args) {
-    const client = await this.connect();
-    return client.callTool(toolName, args);
+    try {
+      const client = await this.connect();
+      return await client.callTool(toolName, args);
+    } catch (error) {
+      // If connection error, try to reconnect once
+      if (this.isConnectionError(error) && this.connectionAttempts < this.maxReconnectAttempts) {
+        console.log('⚠️  Connection error detected, attempting reconnect...');
+        this.isConnected = false;
+        this.connectionAttempts++;
+        
+        // Close existing connection
+        if (this.client) {
+          try {
+            await this.client.close();
+          } catch (e) {
+            // Ignore close errors
+          }
+          this.client = null;
+          this.transport = null;
+        }
+        
+        // Reconnect and retry
+        const client = await this.connect();
+        return await client.callTool(toolName, args);
+      }
+      
+      throw error;
+    }
+  }
+  
+  isConnectionError(error) {
+    const errorMessage = error.message || '';
+    return errorMessage.includes('EPIPE') || 
+           errorMessage.includes('ECONNRESET') ||
+           errorMessage.includes('transport') ||
+           errorMessage.includes('disconnected');
+  }
+  
+  async startHealthCheck() {
+    if (this.healthCheckInterval) return;
+    
+    this.healthCheckInterval = setInterval(async () => {
+      if (this.isConnected && this.client) {
+        try {
+          // Try a lightweight operation to check connection
+          await this.client.callTool('get_connection_health', {});
+          this.lastHealthCheck = Date.now();
+        } catch (error) {
+          console.warn('Health check failed:', error.message);
+          this.isConnected = false;
+        }
+      }
+    }, 30000); // Check every 30 seconds
+  }
+  
+  stopHealthCheck() {
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+      this.healthCheckInterval = null;
+    }
   }
 
   async close() {
+    this.stopHealthCheck();
+    
     if (this.client) {
       console.log('🔌 Closing shared MCP client...');
       try {
@@ -97,6 +163,7 @@ class SharedMCPClient {
       this.isConnected = false;
       this.isConnecting = false;
       this.connectionPromise = null;
+      this.connectionAttempts = 0;
     }
   }
 

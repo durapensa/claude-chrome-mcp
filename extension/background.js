@@ -1799,8 +1799,19 @@ class CCMExtensionHub {
           hubConnected: this.hubConnection && this.hubConnection.readyState === WebSocket.OPEN,
           connectedClients: clientStatus,
           debuggerSessions: Array.from(this.debuggerSessions.keys()),
-          uptime: Date.now() - (this.startTime || Date.now())
+          uptime: Date.now() - (this.startTime || Date.now()),
+          lastConnectionAttempt: this.lastConnectionAttempt,
+          reconnectAttempts: this.reconnectAttempts
         });
+      } else if (request.type === 'forceHubReconnection') {
+        // Handle forced reconnection request from popup
+        console.log('CCM: Popup requested hub reconnection');
+        
+        this.handleForcedReconnection().then(result => {
+          sendResponse(result);
+        });
+        
+        return true; // Keep message channel open for async response
       }
       return true;
     });
@@ -1833,6 +1844,60 @@ class CCMExtensionHub {
         this.connectToHub();
       }
     }, KEEPALIVE_INTERVAL);
+  }
+
+  // Add new method for forced reconnection
+  async handleForcedReconnection() {
+    console.log('CCM: Handling forced reconnection request');
+    
+    // If already connected, just return status
+    if (this.isConnected()) {
+      console.log('CCM: Hub already connected');
+      return {
+        success: true,
+        message: 'Already connected',
+        connected: true
+      };
+    }
+    
+    // Clear any existing reconnection timers
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
+    
+    // Reset reconnection state for immediate attempt
+    this.reconnectAttempts = 0;
+    this.lastReconnectAttempt = 0;
+    
+    // Try to connect immediately
+    try {
+      await this.connectToHub();
+      
+      // Wait a bit to ensure connection is established
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      if (this.isConnected()) {
+        return {
+          success: true,
+          message: 'Reconnected successfully',
+          connected: true
+        };
+      } else {
+        return {
+          success: false,
+          message: 'Connection attempt failed',
+          connected: false
+        };
+      }
+    } catch (error) {
+      console.error('CCM: Forced reconnection failed:', error);
+      return {
+        success: false,
+        message: 'Connection error: ' + error.message,
+        connected: false
+      };
+    }
   }
 
   async startNetworkInspection(tabId) {

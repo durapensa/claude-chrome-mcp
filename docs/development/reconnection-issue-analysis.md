@@ -1,7 +1,7 @@
 # Chrome Extension Reconnection Issue Analysis
 
 ## Problem Summary
-When Claude Code restarts, the Chrome extension fails to reconnect to the WebSocket hub, showing "Failed to connect to WebSocket Hub" error. Users must manually reload the extension to restore the connection.
+When an MCP host restarts, the Chrome extension fails to reconnect to the WebSocket hub, showing "Failed to connect to WebSocket Hub" error. Users must manually reload the extension to restore the connection.
 
 ## Root Cause Analysis
 

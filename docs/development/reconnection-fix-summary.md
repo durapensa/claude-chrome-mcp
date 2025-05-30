@@ -3,7 +3,7 @@
 ## Changes Made (2025-05-30)
 
 ### Problem
-When Claude Code restarts, the Chrome extension loses connection to the WebSocket hub and doesn't automatically reconnect quickly. Users had to manually reload the extension.
+When an MCP host restarts, the Chrome extension loses connection to the WebSocket hub and doesn't automatically reconnect quickly. Users had to manually reload the extension.
 
 ### Root Cause
 - MCP server owns the WebSocket hub and takes it down when shutting down
@@ -51,9 +51,9 @@ node test-reconnection-behavior.js
 ```
 
 Expected behavior:
-1. Extension connects to hub when Claude Code starts
-2. Extension shows disconnected when Claude Code stops
-3. Extension automatically reconnects within 5 seconds when Claude Code restarts
+1. Extension connects to hub when MCP host starts
+2. Extension shows disconnected when MCP host stops
+3. Extension automatically reconnects within 5 seconds when MCP host restarts
 4. No manual reload required
 
 ## Timing Improvements

@@ -3,9 +3,10 @@
 Quick reference for Claude. See README.md for full documentation.
 
 ## Current Session
-- Focus: Robustness improvements and stress testing
-- Last update: 2025-01-30
-- See: `/development/session-summary-2025-01-30.md`
+- Focus: Hub startup fix and version management
+- Last update: 2025-05-30
+- See: `/development/CURRENT_STATE.md` (CRITICAL - Read First!)
+- Session summaries: `/development/session-summary-2025-05-30*.md`
 
 ## Quick Commands
 ```bash
@@ -33,12 +34,13 @@ mcp__claude-chrome-mcp__get_connection_health
 - Issues: docs/development/ISSUES.md
 - Roadmap: ROADMAP.md
 
-## Recent Updates (2025-01-30)
-- **Robustness**: Added MessageQueue and TabOperationLock classes
-- **Fixed**: Concurrent message sending race conditions (60% failure rate → 0%)
-- **UI**: Applied popup improvements (fixed "NaNs ago" display)
-- **Documented**: Stress test findings in `/tests/stress-test-results.md`
-- **Pending**: Fix batch_get_responses timeout issue
+## Recent Updates (2025-05-30)
+- **CRITICAL**: Hub not starting - See `/development/CURRENT_STATE.md`
+- **Completed**: Test suite refactoring with shared connections
+- **Completed**: Tab pool production implementation (v2)
+- **Completed**: TypeScript types for all APIs
+- **Completed**: Integration tests without server spawn
+- **Issue**: WebSocket hub not starting in claude-chrome-mcp server
 
 ## Development Guidelines
 - Commit frequently so that you can review changes
@@ -46,3 +48,4 @@ mcp__claude-chrome-mcp__get_connection_health
 - After tests succeed, cleanup tabs/conversations
 - No artificial delays in tests - stress-test for robustness
 - See `/development/` for session summaries and notes
+- At the completion of each granular fix or task, if possible test just that fix or task before moving onto the rest; enhance the test suite if necessary, keeping it granular enough for this workflow

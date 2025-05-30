@@ -1,0 +1,336 @@
+{
+  "timestamp": "2025-05-30T13:28:42.596Z",
+  "summary": {
+    "total": 27,
+    "migrated": 5,
+    "needsMigration": 10,
+    "noMcp": 12,
+    "errors": 0
+  },
+  "details": [
+    {
+      "fileName": "benchmark.js",
+      "filePath": "/Users/dp/claude-chrome-mcp/tests/benchmark.js",
+      "status": "needs-migration",
+      "metrics": {
+        "lineCount": 308,
+        "toolCallCount": 9,
+        "hasAsyncSetup": false,
+        "hasAsyncTeardown": false,
+        "complexity": "medium"
+      }
+    },
+    {
+      "fileName": "debug-stdio-timeout.js",
+      "filePath": "/Users/dp/claude-chrome-mcp/tests/debug-stdio-timeout.js",
+      "status": "no-mcp",
+      "metrics": {
+        "lineCount": 130,
+        "toolCallCount": 0,
+        "hasAsyncSetup": false,
+        "hasAsyncTeardown": false,
+        "complexity": "low"
+      }
+    },
+    {
+      "fileName": "regression-test-quick.js",
+      "filePath": "/Users/dp/claude-chrome-mcp/tests/regression-test-quick.js",
+      "status": "needs-migration",
+      "metrics": {
+        "lineCount": 218,
+        "toolCallCount": 5,
+        "hasAsyncSetup": false,
+        "hasAsyncTeardown": false,
+        "complexity": "low"
+      }
+    },
+    {
+      "fileName": "regression-test-suite-v2.js",
+      "filePath": "/Users/dp/claude-chrome-mcp/tests/regression-test-suite-v2.js",
+      "status": "migrated",
+      "metrics": {
+        "lineCount": 403,
+        "toolCallCount": 0,
+        "hasAsyncSetup": false,
+        "hasAsyncTeardown": false,
+        "complexity": "low"
+      }
+    },
+    {
+      "fileName": "regression-test-suite.js",
+      "filePath": "/Users/dp/claude-chrome-mcp/tests/regression-test-suite.js",
+      "status": "needs-migration",
+      "metrics": {
+        "lineCount": 411,
+        "toolCallCount": 21,
+        "hasAsyncSetup": false,
+        "hasAsyncTeardown": false,
+        "complexity": "high"
+      }
+    },
+    {
+      "fileName": "run-all-tests-v2.js",
+      "filePath": "/Users/dp/claude-chrome-mcp/tests/run-all-tests-v2.js",
+      "status": "migrated",
+      "metrics": {
+        "lineCount": 232,
+        "toolCallCount": 0,
+        "hasAsyncSetup": false,
+        "hasAsyncTeardown": false,
+        "complexity": "low"
+      }
+    },
+    {
+      "fileName": "run-all-tests.js",
+      "filePath": "/Users/dp/claude-chrome-mcp/tests/run-all-tests.js",
+      "status": "no-mcp",
+      "metrics": {
+        "lineCount": 164,
+        "toolCallCount": 0,
+        "hasAsyncSetup": false,
+        "hasAsyncTeardown": false,
+        "complexity": "low"
+      }
+    },
+    {
+      "fileName": "run-comprehensive-suite.js",
+      "filePath": "/Users/dp/claude-chrome-mcp/tests/run-comprehensive-suite.js",
+      "status": "no-mcp",
+      "metrics": {
+        "lineCount": 290,
+        "toolCallCount": 0,
+        "hasAsyncSetup": false,
+        "hasAsyncTeardown": false,
+        "complexity": "low"
+      }
+    },
+    {
+      "fileName": "stress-test-no-delays.js",
+      "filePath": "/Users/dp/claude-chrome-mcp/tests/stress-test-no-delays.js",
+      "status": "no-mcp",
+      "metrics": {
+        "lineCount": 317,
+        "toolCallCount": 0,
+        "hasAsyncSetup": false,
+        "hasAsyncTeardown": false,
+        "complexity": "low"
+      }
+    },
+    {
+      "fileName": "test-batch-get-responses-debug.js",
+      "filePath": "/Users/dp/claude-chrome-mcp/tests/test-batch-get-responses-debug.js",
+      "status": "no-mcp",
+      "metrics": {
+        "lineCount": 151,
+        "toolCallCount": 0,
+        "hasAsyncSetup": false,
+        "hasAsyncTeardown": false,
+        "complexity": "low"
+      }
+    },
+    {
+      "fileName": "test-direct-mcp.js",
+      "filePath": "/Users/dp/claude-chrome-mcp/tests/test-direct-mcp.js",
+      "status": "no-mcp",
+      "metrics": {
+        "lineCount": 131,
+        "toolCallCount": 0,
+        "hasAsyncSetup": false,
+        "hasAsyncTeardown": false,
+        "complexity": "low"
+      }
+    },
+    {
+      "fileName": "test-extract-elements-v2.js",
+      "filePath": "/Users/dp/claude-chrome-mcp/tests/test-extract-elements-v2.js",
+      "status": "migrated",
+      "metrics": {
+        "lineCount": 133,
+        "toolCallCount": 0,
+        "hasAsyncSetup": false,
+        "hasAsyncTeardown": false,
+        "complexity": "low"
+      }
+    },
+    {
+      "fileName": "test-extract-elements.js",
+      "filePath": "/Users/dp/claude-chrome-mcp/tests/test-extract-elements.js",
+      "status": "needs-migration",
+      "metrics": {
+        "lineCount": 163,
+        "toolCallCount": 7,
+        "hasAsyncSetup": false,
+        "hasAsyncTeardown": false,
+        "complexity": "medium"
+      }
+    },
+    {
+      "fileName": "test-hub-connection.js",
+      "filePath": "/Users/dp/claude-chrome-mcp/tests/test-hub-connection.js",
+      "status": "no-mcp",
+      "metrics": {
+        "lineCount": 94,
+        "toolCallCount": 0,
+        "hasAsyncSetup": false,
+        "hasAsyncTeardown": false,
+        "complexity": "low"
+      }
+    },
+    {
+      "fileName": "test-lifecycle-example.js",
+      "filePath": "/Users/dp/claude-chrome-mcp/tests/test-lifecycle-example.js",
+      "status": "needs-migration",
+      "metrics": {
+        "lineCount": 190,
+        "toolCallCount": 5,
+        "hasAsyncSetup": false,
+        "hasAsyncTeardown": false,
+        "complexity": "low"
+      }
+    },
+    {
+      "fileName": "test-mcp-direct.js",
+      "filePath": "/Users/dp/claude-chrome-mcp/tests/test-mcp-direct.js",
+      "status": "no-mcp",
+      "metrics": {
+        "lineCount": 111,
+        "toolCallCount": 0,
+        "hasAsyncSetup": false,
+        "hasAsyncTeardown": false,
+        "complexity": "low"
+      }
+    },
+    {
+      "fileName": "test-mcp-spawn-debug.js",
+      "filePath": "/Users/dp/claude-chrome-mcp/tests/test-mcp-spawn-debug.js",
+      "status": "needs-migration",
+      "metrics": {
+        "lineCount": 93,
+        "toolCallCount": 1,
+        "hasAsyncSetup": false,
+        "hasAsyncTeardown": false,
+        "complexity": "low"
+      }
+    },
+    {
+      "fileName": "test-rapid-messages-v2.js",
+      "filePath": "/Users/dp/claude-chrome-mcp/tests/test-rapid-messages-v2.js",
+      "status": "migrated",
+      "metrics": {
+        "lineCount": 141,
+        "toolCallCount": 0,
+        "hasAsyncSetup": false,
+        "hasAsyncTeardown": false,
+        "complexity": "low"
+      }
+    },
+    {
+      "fileName": "test-rapid-messages.js",
+      "filePath": "/Users/dp/claude-chrome-mcp/tests/test-rapid-messages.js",
+      "status": "needs-migration",
+      "metrics": {
+        "lineCount": 137,
+        "toolCallCount": 8,
+        "hasAsyncSetup": false,
+        "hasAsyncTeardown": false,
+        "complexity": "medium"
+      }
+    },
+    {
+      "fileName": "test-reconnection-behavior.js",
+      "filePath": "/Users/dp/claude-chrome-mcp/tests/test-reconnection-behavior.js",
+      "status": "no-mcp",
+      "metrics": {
+        "lineCount": 154,
+        "toolCallCount": 0,
+        "hasAsyncSetup": false,
+        "hasAsyncTeardown": false,
+        "complexity": "low"
+      }
+    },
+    {
+      "fileName": "test-service-worker-stability-v2.js",
+      "filePath": "/Users/dp/claude-chrome-mcp/tests/test-service-worker-stability-v2.js",
+      "status": "migrated",
+      "metrics": {
+        "lineCount": 128,
+        "toolCallCount": 0,
+        "hasAsyncSetup": false,
+        "hasAsyncTeardown": false,
+        "complexity": "low"
+      }
+    },
+    {
+      "fileName": "test-service-worker-stability.js",
+      "filePath": "/Users/dp/claude-chrome-mcp/tests/test-service-worker-stability.js",
+      "status": "needs-migration",
+      "metrics": {
+        "lineCount": 138,
+        "toolCallCount": 6,
+        "hasAsyncSetup": false,
+        "hasAsyncTeardown": false,
+        "complexity": "medium"
+      }
+    },
+    {
+      "fileName": "test-shutdown-behavior.js",
+      "filePath": "/Users/dp/claude-chrome-mcp/tests/test-shutdown-behavior.js",
+      "status": "no-mcp",
+      "metrics": {
+        "lineCount": 184,
+        "toolCallCount": 0,
+        "hasAsyncSetup": false,
+        "hasAsyncTeardown": false,
+        "complexity": "low"
+      }
+    },
+    {
+      "fileName": "test-suite-via-mcp.js",
+      "filePath": "/Users/dp/claude-chrome-mcp/tests/test-suite-via-mcp.js",
+      "status": "no-mcp",
+      "metrics": {
+        "lineCount": 114,
+        "toolCallCount": 0,
+        "hasAsyncSetup": false,
+        "hasAsyncTeardown": false,
+        "complexity": "low"
+      }
+    },
+    {
+      "fileName": "test-tab-pool.js",
+      "filePath": "/Users/dp/claude-chrome-mcp/tests/test-tab-pool.js",
+      "status": "needs-migration",
+      "metrics": {
+        "lineCount": 147,
+        "toolCallCount": 2,
+        "hasAsyncSetup": false,
+        "hasAsyncTeardown": false,
+        "complexity": "low"
+      }
+    },
+    {
+      "fileName": "test-with-unique-id.js",
+      "filePath": "/Users/dp/claude-chrome-mcp/tests/test-with-unique-id.js",
+      "status": "needs-migration",
+      "metrics": {
+        "lineCount": 81,
+        "toolCallCount": 4,
+        "hasAsyncSetup": false,
+        "hasAsyncTeardown": false,
+        "complexity": "low"
+      }
+    },
+    {
+      "fileName": "view-results.js",
+      "filePath": "/Users/dp/claude-chrome-mcp/tests/view-results.js",
+      "status": "no-mcp",
+      "metrics": {
+        "lineCount": 143,
+        "toolCallCount": 0,
+        "hasAsyncSetup": false,
+        "hasAsyncTeardown": false,
+        "complexity": "low"
+      }
+    }
+  ]
+}

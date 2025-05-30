@@ -2,12 +2,12 @@
 
 ## System Overview
 
-Claude Chrome MCP uses a three-tier architecture to enable communication between Claude Desktop and Chrome browser tabs.
+Claude Chrome MCP uses a three-tier architecture to enable communication between any MCP host and Chrome browser tabs.
 
 ```
-Claude Desktop (MCP Client)
+MCP Host (Claude Desktop, Claude Code, Cursor, etc.)
         ↓
-MCP Server (Node.js)
+claude-chrome-mcp Server (Node.js)
         ↓
 WebSocket Hub (Port 54321)
         ↓
@@ -21,7 +21,7 @@ Claude.ai Tabs
 ### 1. MCP Server (`mcp-server/src/server.js`)
 - Implements Model Context Protocol (MCP) specification
 - Connects to WebSocket hub as a client
-- Exposes tools for Claude Desktop to use
+- Exposes tools for any MCP host to use
 - Handles request/response routing
 
 ### 2. WebSocket Hub
@@ -50,6 +50,16 @@ Claude.ai Tabs
 - **Why**: Chrome extensions can't directly expose servers
 - **Benefits**: Decouples MCP server from Chrome extension
 - **Resilience**: Automatic reconnection with exponential backoff
+
+### Multi-Client Hub Support
+- **Design**: Multiple MCP clients can connect simultaneously to the same Chrome extension
+- **Clients**: Claude Code, Claude Desktop, Cursor, and other MCP-compatible tools
+- **Hub Transfer**: Automatic handoff when one MCP server exits and another starts
+  - Old hub from exiting server gracefully disconnects
+  - New hub from starting server takes over quickly
+  - Chrome extension automatically reconnects to the new hub
+  - All operations resume without manual intervention
+- **Benefits**: Seamless workflow switching between different AI coding tools
 
 ### Chrome Debugger API
 - **Why**: Enables script execution and network inspection

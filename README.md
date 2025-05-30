@@ -7,6 +7,7 @@ Developer tool suite enabling Claude Desktop, Claude Code, and other MCP hosts l
 - [Architecture](docs/ARCHITECTURE.md) - System design and components
 - [MCP Configuration](CLAUDE.md) - Claude Desktop setup  
 - [Development](docs/development/) - Contributing and testing
+- [TypeScript Types](shared/TYPES.md) - Complete TypeScript API documentation
 - [Changelog](CHANGELOG.md) - Release history
 - [Roadmap](ROADMAP.md) - Planned features
 
@@ -187,3 +188,24 @@ ccm send $TAB_ID "Hello from script!"
                                                 │  (Port 54322)   │
                                                 └─────────────────┘
 ```
+
+## TypeScript Support
+
+The project includes comprehensive TypeScript type definitions for all APIs:
+
+```typescript
+import { 
+  ClaudeTab, 
+  SendMessageResponse,
+  MCPToolName 
+} from '@claude-chrome-mcp/shared';
+
+// All tool parameters and responses are fully typed
+const response: SendMessageResponse = await client.sendMessage({
+  tabId: 123,
+  message: "Hello, Claude!",
+  waitForReady: true
+});
+```
+
+See [TypeScript Types Documentation](shared/TYPES.md) for complete API reference and examples.
