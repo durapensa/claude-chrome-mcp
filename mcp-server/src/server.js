@@ -1062,7 +1062,7 @@ class AutoHubClient {
     
     try {
       // Try existing hub first with shorter timeout
-      await this.connectToExistingHub(5000);
+      await this.connectToExistingHub(2000);
       this.onConnectionSuccess();
       console.error(`CCM: Connected to existing hub as ${this.clientInfo.name}`);
       return;
@@ -1123,7 +1123,7 @@ class AutoHubClient {
     return true;
   }
 
-  async connectToExistingHub(timeoutMs = 5000) {
+  async connectToExistingHub(timeoutMs = 2000) {
     return new Promise((resolve, reject) => {
       const ws = new WebSocket(`ws://localhost:${HUB_PORT}`);
       

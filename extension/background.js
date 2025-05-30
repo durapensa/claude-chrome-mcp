@@ -31,9 +31,10 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     console.log('CCM Extension: Keep-alive alarm triggered');
     
     // Check WebSocket connection status
-    if (!ccmHub.hubConnection || ccmHub.hubConnection.readyState !== WebSocket.OPEN) {
-      console.log('CCM Extension: WebSocket not connected, attempting to reconnect...');
-      ccmHub.connectToHub();
+    if (!ccmHub.isConnected()) {
+      console.log('CCM Extension: WebSocket not connected');
+      // Don't attempt reconnection here - let the persistent reconnection handle it
+      // This prevents multiple reconnection attempts from different mechanisms
     } else {
       console.log('CCM Extension: WebSocket connection is healthy');
     }
@@ -42,7 +43,9 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     chrome.storage.local.set({
       lastAliveTime: Date.now(),
       connectionState: ccmHub.hubConnection ? ccmHub.hubConnection.readyState : 'disconnected',
-      connectedClients: ccmHub.connectedClients.size
+      connectedClients: ccmHub.connectedClients.size,
+      reconnectAttempts: ccmHub.reconnectAttempts,
+      hasPersistentReconnect: !!ccmHub.persistentReconnectInterval
     });
   }
 });
@@ -178,10 +181,16 @@ class CCMExtensionHub {
     this.serverPort = WEBSOCKET_PORT;
     this.requestCounter = 0;
     this.reconnectAttempts = 0;
-    this.maxReconnectDelay = 30000; // Max 30 seconds
-    this.baseReconnectDelay = 1000; // Start with 1 second
+    this.maxReconnectDelay = 5000; // Max 5 seconds for quick recovery
+    this.baseReconnectDelay = 500; // Start with 500ms
     this.messageQueue = new MessageQueue(); // Add message queue
     this.operationLock = new TabOperationLock(); // Add operation lock
+    
+    // Enhanced reconnection settings
+    this.lastConnectionAttempt = 0;
+    this.resetAttemptsAfter = 300000; // Reset after 5 minutes
+    this.persistentReconnectInterval = null;
+    this.maxReconnectAttempts = -1; // Infinite attempts
     
     this.init();
   }
@@ -203,6 +212,10 @@ class CCMExtensionHub {
     console.log('CCM Extension: Extension-as-Hub client initialized');
   }
 
+  isConnected() {
+    return this.hubConnection && this.hubConnection.readyState === WebSocket.OPEN;
+  }
+
   async connectToHub() {
     try {
       console.log('CCM Extension: Connecting to WebSocket Hub on port', WEBSOCKET_PORT);
@@ -218,6 +231,14 @@ class CCMExtensionHub {
         
         // Reset reconnection attempts on successful connection
         this.reconnectAttempts = 0;
+        this.lastConnectionAttempt = Date.now();
+        
+        // Clear persistent reconnection interval if active
+        if (this.persistentReconnectInterval) {
+          console.log('CCM Extension: Clearing persistent reconnection interval');
+          clearInterval(this.persistentReconnectInterval);
+          this.persistentReconnectInterval = null;
+        }
         
         // Register as Chrome extension
         this.hubConnection.send(JSON.stringify({
@@ -238,13 +259,19 @@ class CCMExtensionHub {
         }
       };
       
-      this.hubConnection.onclose = () => {
-        console.log('CCM Extension: Disconnected from WebSocket Hub');
+      this.hubConnection.onclose = (event) => {
+        console.log('CCM Extension: Disconnected from WebSocket Hub', event.code, event.reason);
         this.hubConnection = null;
         this.updateBadge('hub-disconnected');
         
-        // Try to reconnect with exponential backoff
-        this.scheduleReconnect();
+        // Immediately try to reconnect if it was a clean shutdown (hub restarting)
+        if (event.code === 1000 || event.code === 1001) {
+          console.log('CCM Extension: Clean shutdown detected, attempting immediate reconnection');
+          setTimeout(() => this.connectToHub(), 100);
+        } else {
+          // Try to reconnect with exponential backoff for other cases
+          this.scheduleReconnect();
+        }
       };
       
       this.hubConnection.onerror = (error) => {
@@ -266,6 +293,12 @@ class CCMExtensionHub {
   }
 
   scheduleReconnect() {
+    // Reset attempts if enough time has passed
+    if (Date.now() - this.lastConnectionAttempt > this.resetAttemptsAfter) {
+      console.log('CCM Extension: Resetting reconnection attempts after timeout');
+      this.reconnectAttempts = 0;
+    }
+    
     const delay = Math.min(
       this.baseReconnectDelay * Math.pow(2, this.reconnectAttempts),
       this.maxReconnectDelay
@@ -276,6 +309,7 @@ class CCMExtensionHub {
     const finalDelay = delay + jitter;
     
     this.reconnectAttempts++;
+    this.lastConnectionAttempt = Date.now();
     
     console.log(`CCM Extension: Scheduling reconnection attempt ${this.reconnectAttempts} in ${Math.round(finalDelay)}ms`);
     
@@ -284,6 +318,23 @@ class CCMExtensionHub {
         this.connectToHub();
       }
     }, finalDelay);
+    
+    // Set up persistent retry every 5 seconds if not already running
+    // This ensures quick reconnection when hub becomes available
+    if (!this.persistentReconnectInterval) {
+      console.log('CCM Extension: Setting up persistent reconnection interval (5s)');
+      this.persistentReconnectInterval = setInterval(() => {
+        if (!this.hubConnection || this.hubConnection.readyState !== WebSocket.OPEN) {
+          console.log('CCM Extension: Persistent reconnection attempt');
+          this.connectToHub();
+        } else {
+          // Clear interval if connected
+          console.log('CCM Extension: Connected, clearing persistent reconnection interval');
+          clearInterval(this.persistentReconnectInterval);
+          this.persistentReconnectInterval = null;
+        }
+      }, 5000); // Reduced from 30s to 5s for better UX
+    }
   }
 
   handleHubMessage(message) {
@@ -303,6 +354,8 @@ class CCMExtensionHub {
       case 'hub_shutdown':
         console.log('CCM Extension: Hub is shutting down');
         this.updateBadge('hub-disconnected');
+        // Immediately attempt reconnection when hub announces shutdown
+        this.scheduleReconnect();
         break;
         
       case 'server_ready':
