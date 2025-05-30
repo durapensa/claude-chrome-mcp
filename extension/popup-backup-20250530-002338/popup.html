@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      width: 350px;
+      padding: 16px;
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      background: #f8f9fa;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #e9ecef;
+    }
+
+    .title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #212529;
+      margin: 0 0 4px 0;
+    }
+
+    .subtitle {
+      color: #6c757d;
+      font-size: 12px;
+      margin: 0;
+    }
+
+    .status-section {
+      margin-bottom: 16px;
+    }
+
+    .status-item {
+      display: flex;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: 6px;
+      margin-bottom: 8px;
+      background: white;
+      border: 1px solid #e9ecef;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+
+    .status-dot.connected {
+      background: #28a745;
+    }
+
+    .status-dot.disconnected {
+      background: #dc3545;
+    }
+
+    .status-dot.connecting {
+      background: #ffc107;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.4; }
+      100% { opacity: 1; }
+    }
+
+    .status-text {
+      flex-grow: 1;
+      font-weight: 500;
+    }
+
+    .status-detail {
+      font-size: 12px;
+      color: #6c757d;
+    }
+
+    .sessions-section {
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #495057;
+    }
+
+    .session-item {
+      padding: 8px 12px;
+      background: white;
+      border: 1px solid #e9ecef;
+      border-radius: 6px;
+      margin-bottom: 6px;
+    }
+
+    .session-title {
+      font-weight: 500;
+      margin-bottom: 2px;
+      font-size: 13px;
+    }
+
+    .session-url {
+      font-size: 11px;
+      color: #6c757d;
+      word-break: break-all;
+    }
+
+    .session-badges {
+      margin-top: 4px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: 500;
+      margin-right: 4px;
+    }
+
+    .badge.active {
+      background: #e3f2fd;
+      color: #1976d2;
+    }
+
+    .badge.debugger {
+      background: #fff3e0;
+      color: #f57c00;
+    }
+
+    .empty-state {
+      text-align: center;
+      color: #6c757d;
+      font-style: italic;
+      padding: 16px;
+    }
+
+    .help-section {
+      background: #fff3cd;
+      border: 1px solid #ffeaa7;
+      border-radius: 6px;
+      padding: 12px;
+      margin-bottom: 16px;
+    }
+
+    .help-content p {
+      margin: 8px 0;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .help-content ol {
+      margin: 8px 0;
+      padding-left: 16px;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .help-content li {
+      margin-bottom: 4px;
+    }
+
+    .help-content code {
+      background: #f1f3f4;
+      padding: 2px 4px;
+      border-radius: 3px;
+      font-size: 11px;
+      word-break: break-all;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid #dee2e6;
+      border-radius: 4px;
+      background: white;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .btn:hover {
+      background: #f8f9fa;
+    }
+
+    .btn.primary {
+      background: #007bff;
+      color: white;
+      border-color: #007bff;
+    }
+
+    .btn.primary:hover {
+      background: #0056b3;
+    }
+
+    .servers-detail {
+      margin-top: 8px;
+      font-size: 12px;
+    }
+
+    .server-item {
+      display: flex;
+      align-items: center;
+      padding: 4px 8px;
+      margin-bottom: 2px;
+    }
+
+    .server-icon {
+      margin-right: 6px;
+      font-size: 10px;
+    }
+
+    .server-item.connected .server-icon { color: #28a745; }
+    .server-item.connecting .server-icon { color: #ffc107; }
+    .server-item.disconnected .server-icon { color: #dc3545; }
+    .server-item.failed .server-icon { color: #dc3545; }
+
+    .server-name {
+      font-weight: 500;
+      margin-right: 4px;
+    }
+
+    .server-port {
+      color: #6c757d;
+      margin-right: 4px;
+    }
+
+    .retry-count {
+      color: #ffc107;
+      font-size: 10px;
+      margin-right: 4px;
+    }
+
+    .error-text {
+      color: #dc3545;
+      font-size: 10px;
+    }
+    
+    .client-item {
+      padding: 8px 12px;
+      background: white;
+      border: 1px solid #e9ecef;
+      border-radius: 6px;
+      margin-bottom: 6px;
+    }
+    
+    .client-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+    
+    .client-name {
+      font-weight: 500;
+      font-size: 13px;
+    }
+    
+    .client-type {
+      font-size: 10px;
+      background: #e3f2fd;
+      color: #1976d2;
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+    
+    .client-details {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: #6c757d;
+      margin-bottom: 4px;
+    }
+    
+    .client-timing {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: #999;
+    }
+    
+    .no-clients {
+      text-align: center;
+      color: #6c757d;
+      font-style: italic;
+      padding: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1 class="title">Claude Chrome MCP</h1>
+    <p class="subtitle">Bridge between Claude Desktop and Claude.ai</p>
+  </div>
+
+  <div class="status-section">
+    <div class="status-item" id="server-status">
+      <div class="status-dot disconnected" id="server-dot"></div>
+      <div>
+        <div class="status-text">MCP Server</div>
+        <div class="status-detail" id="server-detail">Disconnected</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sessions-section">
+    <div class="section-title">Connected MCP Clients</div>
+    <div id="clients-list">
+      <div class="empty-state">No MCP clients connected</div>
+    </div>
+  </div>
+  
+  <div class="sessions-section">
+    <div class="section-title">Claude.ai Sessions</div>
+    <div id="sessions-container">
+      <div class="empty-state">No Claude.ai tabs found</div>
+    </div>
+  </div>
+
+  <div class="help-section" id="help-section" style="display: none;">
+    <div class="section-title">Setup Instructions</div>
+    <div class="help-content">
+      <p><strong>WebSocket Hub not running.</strong> To use this extension:</p>
+      <ol>
+        <li>Start the WebSocket Hub: <code>node mcp-server/src/websocket-hub.js</code></li>
+        <li>Configure MCP clients to connect to the hub</li>
+        <li>Use the new hub-client.js for MCP connections</li>
+        <li>Extension will show connected clients dynamically</li>
+      </ol>
+      <p><small>The extension will automatically reconnect when the hub is available.</small></p>
+    </div>
+  </div>
+
+
+  <script src="popup.js"></script>
+</body>
+</html>

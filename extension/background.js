@@ -84,6 +84,92 @@ class MCPClient {
   }
 }
 
+class MessageQueue {
+  constructor() {
+    this.queues = new Map(); // tabId -> queue
+    this.processing = new Map(); // tabId -> isProcessing
+  }
+  
+  async enqueue(tabId, operation) {
+    if (!this.queues.has(tabId)) {
+      this.queues.set(tabId, []);
+      this.processing.set(tabId, false);
+    }
+    
+    return new Promise((resolve, reject) => {
+      this.queues.get(tabId).push({ operation, resolve, reject });
+      this.processQueue(tabId);
+    });
+  }
+  
+  async processQueue(tabId) {
+    if (this.processing.get(tabId)) return;
+    
+    const queue = this.queues.get(tabId);
+    if (!queue || queue.length === 0) return;
+    
+    this.processing.set(tabId, true);
+    
+    while (queue.length > 0) {
+      const { operation, resolve, reject } = queue.shift();
+      try {
+        const result = await operation();
+        resolve(result);
+        // Add small delay between operations to prevent race conditions
+        if (queue.length > 0) {
+          await new Promise(r => setTimeout(r, 100));
+        }
+      } catch (error) {
+        console.error('Queue operation failed:', error);
+        reject(error);
+      }
+    }
+    
+    this.processing.set(tabId, false);
+  }
+}
+
+class TabOperationLock {
+  constructor() {
+    this.locks = new Map(); // tabId -> Set of operation types
+  }
+  
+  async acquire(tabId, operationType) {
+    if (!this.locks.has(tabId)) {
+      this.locks.set(tabId, new Set());
+    }
+    
+    const tabLocks = this.locks.get(tabId);
+    
+    // Wait if conflicting operation is in progress
+    while (this.hasConflict(tabLocks, operationType)) {
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    
+    tabLocks.add(operationType);
+  }
+  
+  release(tabId, operationType) {
+    const tabLocks = this.locks.get(tabId);
+    if (tabLocks) {
+      tabLocks.delete(operationType);
+    }
+  }
+  
+  hasConflict(tabLocks, operationType) {
+    // Define conflicting operations
+    const conflicts = {
+      'send_message': ['send_message', 'get_response'],
+      'get_response': ['send_message'],
+      'get_metadata': [],
+      'extract_elements': []
+    };
+    
+    const conflictingOps = conflicts[operationType] || [];
+    return conflictingOps.some(op => tabLocks.has(op));
+  }
+}
+
 class CCMExtensionHub {
   constructor() {
     this.connectedClients = new Map(); // clientId -> client info from hub
@@ -94,6 +180,8 @@ class CCMExtensionHub {
     this.reconnectAttempts = 0;
     this.maxReconnectDelay = 30000; // Max 30 seconds
     this.baseReconnectDelay = 1000; // Start with 1 second
+    this.messageQueue = new MessageQueue(); // Add message queue
+    this.operationLock = new TabOperationLock(); // Add operation lock
     
     this.init();
   }
@@ -644,6 +732,23 @@ class CCMExtensionHub {
   async sendMessageToClaudeTab(params) {
     const { tabId, message, waitForReady = true, maxRetries = 3 } = params;
     
+    // Use message queue to prevent concurrent sends to same tab
+    return this.messageQueue.enqueue(tabId, async () => {
+      // Acquire lock for send_message operation
+      await this.operationLock.acquire(tabId, 'send_message');
+      
+      try {
+        return await this._sendMessageToClaudeTabInternal(params);
+      } finally {
+        // Always release lock
+        this.operationLock.release(tabId, 'send_message');
+      }
+    });
+  }
+  
+  async _sendMessageToClaudeTabInternal(params) {
+    const { tabId, message, waitForReady = true, maxRetries = 3 } = params;
+    
     // Retry logic with exponential backoff
     let lastError = null;
     for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -845,6 +950,25 @@ class CCMExtensionHub {
       tabId, 
       waitForCompletion = true, 
       timeoutMs = 10000, // Lower default with guidance
+      includeMetadata = false 
+    } = params;
+    
+    // Acquire lock for get_response operation
+    await this.operationLock.acquire(tabId, 'get_response');
+    
+    try {
+      return await this._getClaudeResponseInternal(params);
+    } finally {
+      // Always release lock
+      this.operationLock.release(tabId, 'get_response');
+    }
+  }
+  
+  async _getClaudeResponseInternal(params) {
+    const { 
+      tabId, 
+      waitForCompletion = true, 
+      timeoutMs = 10000,
       includeMetadata = false 
     } = params;
     

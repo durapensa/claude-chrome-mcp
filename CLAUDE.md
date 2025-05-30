@@ -47,3 +47,4 @@ mcp__claude-chrome-mcp__get_connection_health
 - Test suite files should live in a dedicated folder
 - After a given test fails and has been investigated, take inscrutable notes
 - After a given test has succeeded unequivocally, cleanup any tabs (at your discretion, delete conversations and close tabs), files made or produced during testing
+- When running manual tests, do not insert sleeps or delays; we need to stress-test for robustness and propose fixes, rather than test-passing reward hacking, for any problems found
