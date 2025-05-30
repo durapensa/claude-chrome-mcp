@@ -35,12 +35,12 @@ mcp__claude-chrome-mcp__get_connection_health
 - Roadmap: ROADMAP.md
 
 ## Recent Updates (2025-05-30)
-- **CRITICAL**: Hub not starting - See `/development/CURRENT_STATE.md`
+- **FIXED**: MCP server shutdown issue - now exits cleanly when host terminates
 - **Completed**: Test suite refactoring with shared connections
 - **Completed**: Tab pool production implementation (v2)
 - **Completed**: TypeScript types for all APIs
 - **Completed**: Integration tests without server spawn
-- **Issue**: WebSocket hub not starting in claude-chrome-mcp server
+- **Completed**: Enhanced signal handling and process lifecycle management
 
 ## Development Guidelines
 - Commit frequently so that you can review changes
@@ -49,3 +49,10 @@ mcp__claude-chrome-mcp__get_connection_health
 - No artificial delays in tests - stress-test for robustness
 - See `/development/` for session summaries and notes
 - At the completion of each granular fix or task, if possible test just that fix or task before moving onto the rest; enhance the test suite if necessary, keeping it granular enough for this workflow
+
+## Workflow Consistency Checklist
+- Verify entire workflow launch process for Claude Code
+- Ensure proper instruction and directive chaining
+- Check workflow paths starting from CLAUDE.md
+- Validate references in chained markdown files
+- Maintain consistency in startup and continuation protocols

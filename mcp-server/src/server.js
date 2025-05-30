@@ -104,14 +104,15 @@ class ProcessLifecycleManager {
   constructor() {
     this.isShuttingDown = false;
     this.shutdownPromise = null;
-    this.shutdownTimeoutMs = 3000; // Reduced from 5000
-    this.forceExitTimeoutMs = 500; // Reduced from 1000
+    this.shutdownTimeoutMs = 2000; // Reduced for faster exit
+    this.forceExitTimeoutMs = 100; // Much faster force exit
     this.parentPid = process.ppid;
     this.parentCheckInterval = null;
     this.cleanupTasks = [];
     this.lastParentCheck = Date.now();
     this.lastActivityTime = Date.now();
     this.shutdownReason = null;
+    this.allIntervals = []; // Track all intervals for cleanup
     
     this.setupSignalHandlers();
     this.setupParentMonitoring();
@@ -120,6 +121,18 @@ class ProcessLifecycleManager {
 
   addCleanupTask(name, cleanupFn) {
     this.cleanupTasks.push({ name, cleanupFn });
+  }
+
+  addInterval(intervalId, name = 'unnamed') {
+    this.allIntervals.push({ id: intervalId, name });
+    return intervalId;
+  }
+
+  clearAllIntervals() {
+    for (const interval of this.allIntervals) {
+      clearInterval(interval.id);
+    }
+    this.allIntervals = [];
   }
 
   setupSignalHandlers() {
@@ -159,9 +172,9 @@ class ProcessLifecycleManager {
 
   setupParentMonitoring() {
     if (this.parentPid && this.parentPid !== 1) {
-      this.parentCheckInterval = setInterval(() => {
+      this.parentCheckInterval = this.addInterval(setInterval(() => {
         this.checkParentProcess();
-      }, 2000);
+      }, 1000), 'parentCheck'); // More frequent checks
     }
 
     if (process.env.CCM_PARENT_PID) {
@@ -172,25 +185,47 @@ class ProcessLifecycleManager {
       }
     }
 
-    // Handle stdin end/error
+    // Enhanced stdin monitoring for MCP protocol
     if (process.stdin.isTTY === false) {
+      let stdinClosed = false;
+      
       process.stdin.on('end', async () => {
-        console.error('CCM: stdin closed');
-        await this.gracefulShutdown('stdin_closed');
-      });
-
-      process.stdin.on('error', async (error) => {
-        if (error.code === 'EPIPE') {
-          console.error('CCM: stdin EPIPE error');
-          await this.gracefulShutdown('stdin_epipe');
-        } else {
-          console.error('CCM: stdin error:', error);
-          await this.gracefulShutdown('stdin_error');
+        if (!stdinClosed) {
+          stdinClosed = true;
+          console.error('CCM: stdin closed');
+          await this.gracefulShutdown('stdin_closed');
         }
       });
 
-      // Resume stdin to detect when it closes
+      process.stdin.on('error', async (error) => {
+        if (!stdinClosed) {
+          stdinClosed = true;
+          if (error.code === 'EPIPE') {
+            console.error('CCM: stdin EPIPE error');
+            await this.gracefulShutdown('stdin_epipe');
+          } else {
+            console.error('CCM: stdin error:', error);
+            await this.gracefulShutdown('stdin_error');
+          }
+        }
+      });
+
+      process.stdin.on('close', async () => {
+        if (!stdinClosed) {
+          stdinClosed = true;
+          console.error('CCM: stdin closed (close event)');
+          await this.gracefulShutdown('stdin_close_event');
+        }
+      });
+
+      // Keep stdin active to detect when it closes
       process.stdin.resume();
+      
+      // Add a data handler to detect actual stdin activity
+      process.stdin.on('data', (chunk) => {
+        this.updateActivity();
+        // If we receive any data, it means the parent is still active
+      });
     }
   }
 
@@ -212,7 +247,7 @@ class ProcessLifecycleManager {
       }
     };
 
-    setInterval(checkOrphanStatus, 10000);
+    this.addInterval(setInterval(checkOrphanStatus, 10000), 'orphanCheck');
   }
 
   checkParentProcess() {
@@ -257,23 +292,43 @@ class ProcessLifecycleManager {
     
     try {
       // Clear all intervals immediately
-      if (this.parentCheckInterval) {
-        clearInterval(this.parentCheckInterval);
-        this.parentCheckInterval = null;
+      console.error('CCM: Clearing all intervals...');
+      this.clearAllIntervals();
+
+      // Stop stdin monitoring to prevent keeping process alive
+      try {
+        process.stdin.pause();
+        process.stdin.removeAllListeners();
+        process.stdin.destroy();
+      } catch (e) {
+        // Ignore errors destroying stdin
       }
 
-      // Run cleanup tasks with timeout
+      // Remove all signal handlers to prevent interference
+      try {
+        process.removeAllListeners('SIGINT');
+        process.removeAllListeners('SIGTERM');
+        process.removeAllListeners('SIGQUIT');
+        process.removeAllListeners('disconnect');
+      } catch (e) {
+        // Ignore errors removing listeners
+      }
+
+      // Run cleanup tasks with aggressive timeout
       const cleanupPromises = this.cleanupTasks.map(async ({ name, cleanupFn }) => {
         try {
           console.error(`CCM: Running cleanup task: ${name}`);
-          await cleanupFn();
+          await Promise.race([
+            cleanupFn(),
+            new Promise(resolve => setTimeout(resolve, 500)) // 500ms max per task
+          ]);
           console.error(`CCM: Cleanup task completed: ${name}`);
         } catch (error) {
           console.error(`CCM: Cleanup task failed: ${name}`, error);
         }
       });
 
-      // Wait for cleanup with timeout
+      // Wait for cleanup with very short timeout
       await Promise.race([
         Promise.all(cleanupPromises),
         new Promise(resolve => setTimeout(resolve, this.shutdownTimeoutMs))
@@ -282,23 +337,38 @@ class ProcessLifecycleManager {
       const shutdownDuration = Date.now() - shutdownStart;
       console.error(`CCM: Graceful shutdown completed in ${shutdownDuration}ms (reason: ${reason})`);
       
-      // Exit immediately
-      process.exit(0);
+      // Force immediate exit
+      setImmediate(() => {
+        process.exit(0);
+      });
       
     } catch (error) {
       console.error('CCM: Error during graceful shutdown:', error);
-      this.emergencyShutdown('shutdown_error');
+      // Force exit immediately on any error
+      process.exit(1);
     }
   }
 
   emergencyShutdown(reason = 'unknown') {
     console.error(`CCM: Emergency shutdown initiated (reason: ${reason})`);
     
-    // Force exit after short delay
-    setTimeout(() => {
-      console.error('CCM: Force exit');
-      process.exit(1);
-    }, this.forceExitTimeoutMs);
+    // Clear any remaining intervals immediately
+    try {
+      this.clearAllIntervals();
+    } catch (e) {
+      // Ignore errors
+    }
+    
+    // Remove all event listeners
+    try {
+      process.removeAllListeners();
+    } catch (e) {
+      // Ignore errors
+    }
+    
+    // Force exit immediately - no delay
+    console.error('CCM: Force exit');
+    process.exit(1);
   }
 
   startHeartbeat(intervalMs = 30000) {
@@ -850,19 +920,23 @@ class WebSocketHub extends EventEmitter {
       this.sendToClient(client.ws, shutdownMessage);
     }
 
-    // Close server
+    // Close server aggressively
     if (this.server) {
-      await new Promise((resolve) => {
-        // Close all connections first
-        this.server.clients.forEach(ws => {
-          ws.terminate();
-        });
-        
-        this.server.close(() => {
-          console.error('WebSocket Hub: Server closed');
-          resolve();
-        });
+      // Terminate all connections immediately
+      this.server.clients.forEach(ws => {
+        ws.terminate();
       });
+      
+      // Close server with timeout
+      await Promise.race([
+        new Promise((resolve) => {
+          this.server.close(() => {
+            console.error('WebSocket Hub: Server closed');
+            resolve();
+          });
+        }),
+        new Promise(resolve => setTimeout(resolve, 1000)) // 1 second timeout
+      ]);
     }
 
     console.error('WebSocket Hub: Shutdown complete');
@@ -1092,8 +1166,9 @@ class AutoHubClient {
 
     this.connectionState = 'connecting';
     
-    // Force hub creation if requested
-    const forceHubCreation = process.env.CCM_FORCE_HUB_CREATION === '1';
+    // Force hub creation in Claude Code environment
+    const forceHubCreation = process.env.CCM_FORCE_HUB_CREATION === '1' || 
+                            process.env.ANTHROPIC_ENVIRONMENT === 'claude_code';
     
     if (!forceHubCreation) {
       try {
@@ -1414,24 +1489,25 @@ class AutoHubClient {
     console.error('CCM: Initiating graceful shutdown');
     this.connectionState = 'shutting_down';
     
-    // Clear intervals
+    // Clear intervals immediately
     if (this.connectionHealthInterval) {
       clearInterval(this.connectionHealthInterval);
+      this.connectionHealthInterval = null;
     }
     if (this.parentCheckInterval) {
       clearInterval(this.parentCheckInterval);
+      this.parentCheckInterval = null;
     }
     if (this.parentMonitor) {
       clearInterval(this.parentMonitor);
+      this.parentMonitor = null;
     }
     
     // Close connection
     await this.close();
     
-    // Exit process
-    setTimeout(() => {
-      process.exit(0);
-    }, 100);
+    // Force exit immediately
+    process.exit(0);
   }
 
   scheduleReconnect() {
@@ -2131,10 +2207,11 @@ class ChromeMCPServer {
       
       const transport = new StdioServerTransport();
       
-      // Enhanced transport close handler
+      // Enhanced transport close handler with immediate shutdown
       transport.onclose = () => {
-        console.error('Claude Chrome MCP: Client disconnected, initiating shutdown...');
-        this.lifecycleManager.gracefulShutdown('mcp_client_disconnect');
+        console.error('Claude Chrome MCP: Client disconnected, initiating immediate shutdown...');
+        // Use emergency shutdown for faster exit when client disconnects
+        this.lifecycleManager.emergencyShutdown('mcp_client_disconnect');
       };
       
       await this.server.connect(transport);
@@ -2172,10 +2249,23 @@ const server = new ChromeMCPServer();
 // Process lifecycle is now handled by ProcessLifecycleManager
 // which is integrated into the ChromeMCPServer class
 
-// Start the server
+// Start the server with enhanced error handling
 server.start().catch((error) => {
   console.error('Claude Chrome MCP: Fatal error:', error);
   process.exit(1);
 });
+
+// Additional safeguard: force exit if process hangs for too long
+setTimeout(() => {
+  console.error('CCM: Process timeout - forcing exit after 5 minutes of no activity');
+  process.exit(1);
+}, 300000); // 5 minute timeout
+
+// Override process.exit to ensure it actually exits
+const originalExit = process.exit;
+process.exit = function(code) {
+  console.error(`CCM: Process exiting with code ${code || 0}`);
+  originalExit.call(process, code || 0);
+};
 
 module.exports = ChromeMCPServer;

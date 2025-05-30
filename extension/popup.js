@@ -53,9 +53,12 @@ class CCMPopup {
 
   setupEventListeners() {
     // Add click handler for hub status to show more details
-    document.querySelector('.hub-status').addEventListener('click', () => {
-      this.toggleHubDetails();
-    });
+    const hubStatus = document.querySelector('.hub-status');
+    if (hubStatus) {
+      hubStatus.addEventListener('click', () => {
+        this.toggleHubDetails();
+      });
+    }
     
     // Add manual reconnect button if hub is disconnected
     const reconnectBtn = document.getElementById('reconnect-btn');
@@ -118,7 +121,7 @@ class CCMPopup {
     if (status.hubConnected) {
       serverDot.className = 'status-dot connected';
       serverDetail.innerHTML = `Connected to port <strong>${status.serverPort}</strong>`;
-      helpSection.style.display = 'none';
+      if (helpSection) helpSection.style.display = 'none';
       
       // Hide reconnect button
       const reconnectBtn = document.getElementById('reconnect-btn');
@@ -128,7 +131,7 @@ class CCMPopup {
     } else {
       serverDot.className = 'status-dot disconnected';
       serverDetail.textContent = 'Not connected';
-      helpSection.style.display = 'block';
+      if (helpSection) helpSection.style.display = 'block';
       
       // Show reconnect button
       const reconnectBtn = document.getElementById('reconnect-btn');
@@ -149,6 +152,8 @@ class CCMPopup {
   }
   
   updateClientsList(clients, container, countElement) {
+    if (!container || !countElement) return;
+    
     container.innerHTML = '';
     
     // Filter and sort clients
@@ -262,6 +267,8 @@ class CCMPopup {
       const tabs = await chrome.tabs.query({ url: 'https://claude.ai/*' });
       const container = document.getElementById('sessions-container');
       const countElement = document.getElementById('sessions-count');
+      
+      if (!container || !countElement) return;
       
       // Update count
       countElement.textContent = tabs.length;
