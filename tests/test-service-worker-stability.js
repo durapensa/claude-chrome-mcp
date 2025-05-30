@@ -21,7 +21,7 @@ async function testServiceWorkerStability() {
   // Create MCP client
   const transport = new StdioClientTransport({
     command: 'node',
-    args: ['./mcp-server/src/server.js']
+    args: ['../mcp-server/src/server.js']
   });
   
   const client = new Client({
