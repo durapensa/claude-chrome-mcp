@@ -80,3 +80,37 @@ setInterval(() => {
 - Extension is now much more responsive to hub availability
 - Reconnection happens quickly enough that users won't notice brief disconnections
 - The fix maintains backward compatibility while improving UX significantly
+
+## Session Continuation - Shutdown Issue Fix
+
+### Problem Identified
+- MCP server process wasn't exiting cleanly when Claude Code shut down
+- Orphaned processes prevented new Claude Code instances from connecting
+
+### Root Cause Analysis
+- SIGPIPE was being treated as a shutdown signal
+- Multiple shutdown paths could race
+- Shutdown timeouts were too long (5s graceful, 1s emergency)
+- Some async operations weren't properly awaited
+
+### Implemented Solutions
+1. **Signal Handling**: Separate SIGPIPE from real shutdown signals
+2. **Faster Timeouts**: Reduced to 3s graceful, 500ms emergency
+3. **Stdin Handling**: Proper detection and handling of stdin close/error
+4. **Race Prevention**: Check if shutdown already in progress
+5. **Async Cleanup**: Added await to all async operations
+
+### Testing Results
+- Created comprehensive test suite (test-shutdown-behavior.js)
+- All major scenarios pass: SIGTERM, SIGINT, multiple clients, quick restart
+- Stdin close works but is slower than ideal
+
+### Documentation
+- Created `/docs/development/shutdown-fix-summary.md`
+- Detailed problem analysis, fixes, and testing results
+
+### Key Improvements
+- Clean, fast process exit on Claude Code shutdown
+- No more orphaned processes
+- Multiple clients can connect/disconnect smoothly
+- Maintains full multi-client architecture compatibility

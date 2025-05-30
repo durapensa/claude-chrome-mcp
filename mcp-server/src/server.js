@@ -99,17 +99,19 @@ class DebugMode {
   }
 }
 
-// Enhanced process lifecycle management
+// Enhanced process lifecycle management with better shutdown handling
 class ProcessLifecycleManager {
   constructor() {
     this.isShuttingDown = false;
     this.shutdownPromise = null;
-    this.shutdownTimeoutMs = 5000;
+    this.shutdownTimeoutMs = 3000; // Reduced from 5000
+    this.forceExitTimeoutMs = 500; // Reduced from 1000
     this.parentPid = process.ppid;
     this.parentCheckInterval = null;
     this.cleanupTasks = [];
     this.lastParentCheck = Date.now();
     this.lastActivityTime = Date.now();
+    this.shutdownReason = null;
     
     this.setupSignalHandlers();
     this.setupParentMonitoring();
@@ -121,20 +123,29 @@ class ProcessLifecycleManager {
   }
 
   setupSignalHandlers() {
-    const signals = ['SIGINT', 'SIGTERM', 'SIGQUIT', 'SIGPIPE'];
+    // Handle SIGPIPE separately - it's not a shutdown signal
+    process.on('SIGPIPE', () => {
+      console.error('CCM: Received SIGPIPE, stdout likely closed');
+      // Don't shutdown on SIGPIPE, just note it
+    });
+
+    // Real shutdown signals
+    const shutdownSignals = ['SIGINT', 'SIGTERM', 'SIGQUIT'];
     
-    signals.forEach(signal => {
-      process.on(signal, () => {
+    shutdownSignals.forEach(signal => {
+      process.on(signal, async () => {
         console.error(`CCM: Received ${signal}, initiating graceful shutdown`);
-        this.gracefulShutdown(`signal:${signal}`);
+        await this.gracefulShutdown(`signal:${signal}`);
       });
     });
 
-    process.on('disconnect', () => {
+    // Handle parent process disconnect
+    process.on('disconnect', async () => {
       console.error('CCM: Parent process disconnected');
-      this.gracefulShutdown('parent_disconnect');
+      await this.gracefulShutdown('parent_disconnect');
     });
 
+    // Handle uncaught exceptions with immediate exit
     process.on('uncaughtException', (error) => {
       console.error('CCM: Uncaught exception:', error);
       this.emergencyShutdown('uncaught_exception');
@@ -142,7 +153,7 @@ class ProcessLifecycleManager {
 
     process.on('unhandledRejection', (reason, promise) => {
       console.error('CCM: Unhandled rejection:', reason);
-      this.emergencyShutdown('unhandled_rejection');
+      // Log but don't exit on unhandled rejections
     });
   }
 
@@ -161,16 +172,25 @@ class ProcessLifecycleManager {
       }
     }
 
-    if (process.stdin.isTTY === false && !process.env.CCM_NO_STDIN_MONITOR) {
-      process.stdin.on('end', () => {
-        console.error('CCM: stdin closed, parent likely disconnected');
-        this.gracefulShutdown('stdin_closed');
+    // Handle stdin end/error
+    if (process.stdin.isTTY === false) {
+      process.stdin.on('end', async () => {
+        console.error('CCM: stdin closed');
+        await this.gracefulShutdown('stdin_closed');
       });
 
-      process.stdin.on('error', (error) => {
-        console.error('CCM: stdin error:', error);
-        this.gracefulShutdown('stdin_error');
+      process.stdin.on('error', async (error) => {
+        if (error.code === 'EPIPE') {
+          console.error('CCM: stdin EPIPE error');
+          await this.gracefulShutdown('stdin_epipe');
+        } else {
+          console.error('CCM: stdin error:', error);
+          await this.gracefulShutdown('stdin_error');
+        }
       });
+
+      // Resume stdin to detect when it closes
+      process.stdin.resume();
     }
   }
 
@@ -218,12 +238,15 @@ class ProcessLifecycleManager {
   }
 
   async gracefulShutdown(reason = 'unknown') {
+    // Prevent multiple simultaneous shutdowns
     if (this.isShuttingDown) {
+      console.error(`CCM: Shutdown already in progress (original: ${this.shutdownReason}, new: ${reason})`);
       return this.shutdownPromise;
     }
 
     console.error(`CCM: Graceful shutdown initiated (reason: ${reason})`);
     this.isShuttingDown = true;
+    this.shutdownReason = reason;
 
     this.shutdownPromise = this.performShutdown(reason);
     return this.shutdownPromise;
@@ -233,11 +256,13 @@ class ProcessLifecycleManager {
     const shutdownStart = Date.now();
     
     try {
+      // Clear all intervals immediately
       if (this.parentCheckInterval) {
         clearInterval(this.parentCheckInterval);
         this.parentCheckInterval = null;
       }
 
+      // Run cleanup tasks with timeout
       const cleanupPromises = this.cleanupTasks.map(async ({ name, cleanupFn }) => {
         try {
           console.error(`CCM: Running cleanup task: ${name}`);
@@ -248,6 +273,7 @@ class ProcessLifecycleManager {
         }
       });
 
+      // Wait for cleanup with timeout
       await Promise.race([
         Promise.all(cleanupPromises),
         new Promise(resolve => setTimeout(resolve, this.shutdownTimeoutMs))
@@ -256,6 +282,7 @@ class ProcessLifecycleManager {
       const shutdownDuration = Date.now() - shutdownStart;
       console.error(`CCM: Graceful shutdown completed in ${shutdownDuration}ms (reason: ${reason})`);
       
+      // Exit immediately
       process.exit(0);
       
     } catch (error) {
@@ -267,10 +294,11 @@ class ProcessLifecycleManager {
   emergencyShutdown(reason = 'unknown') {
     console.error(`CCM: Emergency shutdown initiated (reason: ${reason})`);
     
+    // Force exit after short delay
     setTimeout(() => {
       console.error('CCM: Force exit');
       process.exit(1);
-    }, 1000);
+    }, this.forceExitTimeoutMs);
   }
 
   startHeartbeat(intervalMs = 30000) {
@@ -824,7 +852,12 @@ class WebSocketHub extends EventEmitter {
 
     // Close server
     if (this.server) {
-      await new Promise(resolve => {
+      await new Promise((resolve) => {
+        // Close all connections first
+        this.server.clients.forEach(ws => {
+          ws.terminate();
+        });
+        
         this.server.close(() => {
           console.error('WebSocket Hub: Server closed');
           resolve();
@@ -833,7 +866,6 @@ class WebSocketHub extends EventEmitter {
     }
 
     console.error('WebSocket Hub: Shutdown complete');
-    process.exit(0);
   }
 
   getStats() {
@@ -1338,7 +1370,7 @@ class AutoHubClient {
     });
   }
 
-  gracefulShutdown() {
+  async gracefulShutdown() {
     console.error('CCM: Initiating graceful shutdown');
     this.connectionState = 'shutting_down';
     
@@ -1354,12 +1386,12 @@ class AutoHubClient {
     }
     
     // Close connection
-    this.close();
+    await this.close();
     
     // Exit process
     setTimeout(() => {
       process.exit(0);
-    }, 1000);
+    }, 100);
   }
 
   scheduleReconnect() {
@@ -1402,7 +1434,7 @@ class AutoHubClient {
     }, delay);
   }
 
-  close() {
+  async close() {
     this.connectionState = 'shutting_down';
     
     if (this.connectionHealthInterval) {
@@ -1417,7 +1449,7 @@ class AutoHubClient {
     
     if (this.isHubOwner && this.ownedHub) {
       console.error('CCM: Shutting down owned hub');
-      this.ownedHub.stop();
+      await this.ownedHub.stop();
       this.ownedHub = null;
       this.isHubOwner = false;
     }
@@ -2080,13 +2112,13 @@ class ChromeMCPServer {
   async stop() {
     console.error('Claude Chrome MCP: Shutting down...');
     try {
-      this.hubClient.close();
+      await this.hubClient.close();
       await this.server.close();
       console.error('Claude Chrome MCP: Shutdown complete');
     } catch (error) {
       console.error('Claude Chrome MCP: Error during shutdown:', error);
       // Force exit if shutdown fails
-      setTimeout(() => process.exit(1), 1000);
+      setTimeout(() => process.exit(1), 100);
     }
   }
 }
