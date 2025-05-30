@@ -6,7 +6,7 @@ Developer tool suite enabling Claude Desktop, Claude Code, and other MCP hosts l
 
 - [Architecture](docs/ARCHITECTURE.md) - System design and components
 - [MCP Configuration](CLAUDE.md) - Claude Desktop setup  
-- [Development](development/) - Contributing and testing
+- [Development](docs/development/) - Contributing and testing
 - [Changelog](CHANGELOG.md) - Release history
 - [Roadmap](ROADMAP.md) - Planned features
 

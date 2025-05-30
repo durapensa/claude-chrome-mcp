@@ -52,6 +52,20 @@
 - **Workaround**: Ensure conversation has messages before exporting
 - **Testing Notes**: Confirmed exports work correctly once messages are added
 
+## Evaluation Needed
+
+### 7. Logging Infrastructure
+- **Current State**: Basic console.log statements throughout codebase
+- **Evaluation Needed**:
+  - Current logging volume and usefulness
+  - Performance impact of existing logs
+  - Which components need better observability
+- **Considerations**:
+  - Chrome extension logs go to service worker console
+  - MCP server logs to stdout
+  - No centralized log aggregation
+- **Next Steps**: Audit existing logs before implementing structured logging
+
 ## Reporting Issues
 
 To report new issues, please visit: https://github.com/anthropics/claude-chrome-mcp/issues

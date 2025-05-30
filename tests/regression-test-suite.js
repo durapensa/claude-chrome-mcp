@@ -10,6 +10,8 @@
 
 const { Client } = require('@modelcontextprotocol/sdk/client/index.js');
 const { StdioClientTransport } = require('@modelcontextprotocol/sdk/client/stdio.js');
+const SmartTestRunner = require('./helpers/smart-runner');
+const TestLifecycle = require('./helpers/lifecycle');
 
 // Test configuration
 const TEST_CONFIG = {

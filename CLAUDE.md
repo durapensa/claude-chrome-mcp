@@ -1,67 +1,42 @@
 # Claude Chrome MCP
 
-MCP (Model Context Protocol) server for Claude Desktop to interact with claude.ai through Chrome automation.
+Quick reference for Claude. See README.md for full documentation.
 
-## Quick Start
+## Current Session
+- Focus: Testing and architecture improvements
+- Active tabs: Check with `get_claude_tabs`
 
+## Quick Commands
 ```bash
-# Install dependencies
-cd mcp-server && npm install
+# Run tests
+cd tests && node regression-test-suite.js
 
-# Configure Claude Desktop (claude_desktop_config.json):
-{
-  "mcpServers": {
-    "claude-chrome-mcp": {
-      "command": "node",
-      "args": ["/path/to/claude-chrome-mcp/mcp-server/src/server.js"]
-    }
-  }
-}
+# Check system health
+mcp__claude-chrome-mcp__get_connection_health
 ```
 
-## Key Features
+## Important Tool Options
+- `send_message_to_claude_tab`: Use `waitForReady: true` (default)
+- `get_claude_response`: Keep `timeoutMs < 30000` for MCP
 
-- **Tab Management**: Create, list, open, and close Claude tabs
-- **Messaging**: Send messages with `waitForReady` (default: true)
-- **Response Handling**: Get responses with completion detection
-- **Batch Operations**: Send to multiple tabs
-- **Content Analysis**: Extract metadata, export conversations
-- **Health Monitoring**: Check connection status with `get_connection_health`
+## Project Structure
+- `extension/` - Chrome extension (WebSocket client)
+- `mcp-server/` - MCP server
+- `cli/` - Command-line tools
+- `tests/` - Test suites with lifecycle management
+- `docs/` - Documentation and development notes
 
-## Important Options
+## Key References
+- Architecture: docs/ARCHITECTURE.md
+- Testing: docs/development/TESTING.md  
+- Issues: docs/development/ISSUES.md
+- Roadmap: ROADMAP.md
 
-### Send Message with Wait
-```javascript
-send_message_to_claude_tab({
-  tabId: 123,
-  message: "Your message",
-  waitForReady: true,  // Default: true
-  maxRetries: 3        // Default: 3
-})
-```
-
-### Response with Timeout
-```javascript
-get_claude_response({
-  tabId: 123,
-  waitForCompletion: true,
-  timeoutMs: 20000  // Must be < 30000 for MCP
-})
-```
-
-## Architecture
-
-- WebSocket hub on port 54321
-- Chrome extension connects as WebSocket client  
-- MCP server forwards requests through hub
-- Automatic reconnection with exponential backoff
-
-## For Developers
-
-See `.claude/instructions.md` for session workflow and development guidelines.
-
-## Memories
-
-- Keep md files in this project structured, organized and consistent among them all, with minimal redundancies and adequate references among them, each one true to the purpose of its name, and keeping CLAUDE.md as uncluttered as possible, such that you will chain-load the necessary files upon starting up and being asked to begin work.
+## Session Notes
+- Fixed metadata extraction bug (removed incorrect retry logic)
+- Added test lifecycle helpers for automatic cleanup
+- Moved architectural enhancements to Q2 2025 roadmap
 - Commit frequently so that you can review changes.
 - Test suite files should live in a dedicated folder
+- After a given test fails and has been investigated, take inscrutable notes
+- After a given test has succeeded unequivocally, cleanup any tabs (at your discretion, delete conversations and close tabs), files made or produced during testing
