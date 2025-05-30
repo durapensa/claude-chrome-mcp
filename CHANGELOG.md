@@ -1,6 +1,52 @@
 # Changelog
 
-## 2025-01-30 - New Tools Implementation & Bug Fixes
+## 2025-01-30 - Session 2: Reliability Improvements
+
+### Added
+- **Retry logic for `send_message_to_claude_tab`**: 
+  - Added `maxRetries` parameter (default: 3, max: 5)
+  - Exponential backoff between retries (1s, 2s, 4s)
+  - Retries on both waitForReady failures and send button errors
+  - Returns retry information in response
+  
+- **`get_connection_health` tool**: Monitor system health
+  - WebSocket hub connection status and reconnect attempts
+  - Chrome alarms status for service worker persistence
+  - Connected clients list and debugger sessions
+  - Activity tracking (keepalive and hub messages)
+  - Overall health status with issue detection
+
+### Changed
+- **`waitForReady` default**: Changed to `true` for `send_message_to_claude_tab`
+- **Improved tracking**: Added timestamps for keepalive and hub messages
+
+## 2025-01-30 - Session 1: Issue Fixes & Testing Infrastructure
+
+### Fixed Issues
+
+#### Issue #2: Rapid Message Sending Failures ✅
+- Added `waitForReady` parameter to `send_message_to_claude_tab` tool
+- Changed default to `true` for safer operation
+- Created `test-rapid-messages.js` for verification
+
+#### Issue #3: Chrome Service Worker Suspension ✅ 
+- Added Chrome Alarms API (15-second interval)
+- Implemented exponential backoff reconnection
+- Added connection state persistence
+- Created `test-service-worker-stability.js`
+
+#### Issue #4: Extract Conversation Elements Timeout ✅
+- Added `batchSize` parameter (default: 50)
+- Added `maxElements` parameter (default: 1000)
+- Implemented early termination with `truncated` flag
+- Created `test-extract-elements.js`
+
+### Testing Infrastructure
+- Created comprehensive test suite with `run-all-tests.js`
+- Added individual test scripts for each fix
+- Documented testing procedures in TESTING.md
+
+## 2025-01-30 - Original Release: New Tools Implementation
 
 ### Added
 - **Enhanced `get_claude_response`**: Now waits for response completion by default

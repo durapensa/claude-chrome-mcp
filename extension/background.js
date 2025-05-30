@@ -7,11 +7,44 @@ const KEEPALIVE_INTERVAL = 20000;
 // Keep service worker alive
 chrome.runtime.onStartup.addListener(() => {
   console.log('CCM Extension: Service worker started');
+  // Set up alarm to keep service worker alive
+  chrome.alarms.create('keepAlive', { periodInMinutes: 0.25 }); // Every 15 seconds
+});
+
+// Handle installation/update
+chrome.runtime.onInstalled.addListener(() => {
+  console.log('CCM Extension: Installed/Updated');
+  // Set up alarm to keep service worker alive
+  chrome.alarms.create('keepAlive', { periodInMinutes: 0.25 }); // Every 15 seconds
 });
 
 // Ensure service worker stays active
 self.addEventListener('activate', event => {
   console.log('CCM Extension: Service worker activated');
+  // Set up alarm on activation as well
+  chrome.alarms.create('keepAlive', { periodInMinutes: 0.25 });
+});
+
+// Handle alarms to keep service worker alive and check connection
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === 'keepAlive') {
+    console.log('CCM Extension: Keep-alive alarm triggered');
+    
+    // Check WebSocket connection status
+    if (!ccmHub.hubConnection || ccmHub.hubConnection.readyState !== WebSocket.OPEN) {
+      console.log('CCM Extension: WebSocket not connected, attempting to reconnect...');
+      ccmHub.connectToHub();
+    } else {
+      console.log('CCM Extension: WebSocket connection is healthy');
+    }
+    
+    // Store connection state for recovery
+    chrome.storage.local.set({
+      lastAliveTime: Date.now(),
+      connectionState: ccmHub.hubConnection ? ccmHub.hubConnection.readyState : 'disconnected',
+      connectedClients: ccmHub.connectedClients.size
+    });
+  }
 });
 
 class MCPClient {
@@ -58,12 +91,24 @@ class CCMExtensionHub {
     this.hubConnection = null; // WebSocket connection to hub
     this.serverPort = WEBSOCKET_PORT;
     this.requestCounter = 0;
+    this.reconnectAttempts = 0;
+    this.maxReconnectDelay = 30000; // Max 30 seconds
+    this.baseReconnectDelay = 1000; // Start with 1 second
     
     this.init();
   }
 
   async init() {
     console.log('CCM Extension: Initializing...');
+    
+    // Check for previous connection state
+    const previousState = await chrome.storage.local.get(['lastAliveTime', 'connectionState']);
+    if (previousState.lastAliveTime) {
+      const timeSinceLastAlive = Date.now() - previousState.lastAliveTime;
+      console.log(`CCM Extension: Service worker was last alive ${timeSinceLastAlive}ms ago`);
+      console.log(`CCM Extension: Previous connection state: ${previousState.connectionState}`);
+    }
+    
     await this.connectToHub();
     this.setupEventListeners();
     this.startKeepalive();
@@ -82,6 +127,9 @@ class CCMExtensionHub {
       
       this.hubConnection.onopen = () => {
         console.log('CCM Extension: Connected to WebSocket Hub');
+        
+        // Reset reconnection attempts on successful connection
+        this.reconnectAttempts = 0;
         
         // Register as Chrome extension
         this.hubConnection.send(JSON.stringify({
@@ -107,8 +155,8 @@ class CCMExtensionHub {
         this.hubConnection = null;
         this.updateBadge('hub-disconnected');
         
-        // Try to reconnect after delay
-        setTimeout(() => this.connectToHub(), 5000);
+        // Try to reconnect with exponential backoff
+        this.scheduleReconnect();
       };
       
       this.hubConnection.onerror = (error) => {
@@ -124,13 +172,35 @@ class CCMExtensionHub {
     } catch (error) {
       console.error('CCM Extension: Failed to connect to hub:', error);
       this.updateBadge('hub-error');
-      // Retry connection
-      setTimeout(() => this.connectToHub(), 5000);
+      // Retry connection with exponential backoff
+      this.scheduleReconnect();
     }
+  }
+
+  scheduleReconnect() {
+    const delay = Math.min(
+      this.baseReconnectDelay * Math.pow(2, this.reconnectAttempts),
+      this.maxReconnectDelay
+    );
+    
+    // Add jitter to prevent thundering herd
+    const jitter = Math.random() * 0.3 * delay;
+    const finalDelay = delay + jitter;
+    
+    this.reconnectAttempts++;
+    
+    console.log(`CCM Extension: Scheduling reconnection attempt ${this.reconnectAttempts} in ${Math.round(finalDelay)}ms`);
+    
+    setTimeout(() => {
+      if (!this.hubConnection || this.hubConnection.readyState !== WebSocket.OPEN) {
+        this.connectToHub();
+      }
+    }, finalDelay);
   }
 
   handleHubMessage(message) {
     const { type } = message;
+    this.lastHubMessage = Date.now();
     
     switch (type) {
       case 'registration_confirmed':
@@ -285,6 +355,10 @@ class CCMExtensionHub {
         
         case 'batch_get_responses':
           result = await this.batchGetResponses(message.params);
+          break;
+          
+        case 'get_connection_health':
+          result = await this.getConnectionHealth();
           break;
           
         case 'test_simple':
@@ -568,13 +642,34 @@ class CCMExtensionHub {
   }
 
   async sendMessageToClaudeTab(params) {
-    const { tabId, message, waitForReady = false } = params;
+    const { tabId, message, waitForReady = true, maxRetries = 3 } = params;
     
-    // Wait for Claude to be ready if requested
-    if (waitForReady) {
-      const isReady = await this.waitForClaudeReady(tabId);
-      if (!isReady) {
-        return { success: false, reason: 'Claude is not ready to receive messages (timeout or still streaming)' };
+    // Retry logic with exponential backoff
+    let lastError = null;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        // Wait for Claude to be ready if requested
+        if (waitForReady) {
+          const isReady = await this.waitForClaudeReady(tabId);
+          if (!isReady) {
+            lastError = 'Claude is not ready to receive messages (timeout or still streaming)';
+            if (attempt < maxRetries - 1) {
+              console.log(`CCM Extension: Retry ${attempt + 1}/${maxRetries} after waitForReady failed`);
+              await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+              continue;
+            }
+            return { success: false, reason: lastError, retriesAttempted: attempt };
+          }
+        }
+        
+        // If we get here, proceed with sending the message
+        break;
+      } catch (error) {
+        lastError = error.message;
+        if (attempt < maxRetries - 1) {
+          console.log(`CCM Extension: Retry ${attempt + 1}/${maxRetries} after error:`, error.message);
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+        }
       }
     }
     
@@ -612,8 +707,41 @@ class CCMExtensionHub {
       })()
     `;
     
-    const result = await this.executeScript({ tabId, script });
-    return result.result?.value || { success: false, reason: 'Script execution failed' };
+    // Try sending the message with retry logic
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const result = await this.executeScript({ tabId, script });
+        const sendResult = result.result?.value || { success: false, reason: 'Script execution failed' };
+        
+        if (sendResult.success) {
+          // Success! Add retry info if there were retries
+          if (attempt > 0) {
+            sendResult.retriesNeeded = attempt;
+          }
+          return sendResult;
+        }
+        
+        // Failed, check if we should retry
+        lastError = sendResult.reason || 'Unknown error';
+        if (attempt < maxRetries - 1 && lastError !== 'Message input not found') {
+          console.log(`CCM Extension: Retry ${attempt + 1}/${maxRetries} after send failed:`, lastError);
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+        }
+      } catch (error) {
+        lastError = error.message;
+        if (attempt < maxRetries - 1) {
+          console.log(`CCM Extension: Retry ${attempt + 1}/${maxRetries} after execution error:`, error.message);
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+        }
+      }
+    }
+    
+    // All retries failed
+    return { 
+      success: false, 
+      reason: lastError || 'Failed after all retries',
+      retriesAttempted: maxRetries
+    };
   }
 
   async batchSendMessages(params) {
@@ -1005,8 +1133,41 @@ class CCMExtensionHub {
       })()
     `;
     
-    const result = await this.executeScript({ tabId, script });
-    return result.result?.value || { success: false, reason: 'Script execution failed' };
+    // Try sending the message with retry logic
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const result = await this.executeScript({ tabId, script });
+        const sendResult = result.result?.value || { success: false, reason: 'Script execution failed' };
+        
+        if (sendResult.success) {
+          // Success! Add retry info if there were retries
+          if (attempt > 0) {
+            sendResult.retriesNeeded = attempt;
+          }
+          return sendResult;
+        }
+        
+        // Failed, check if we should retry
+        lastError = sendResult.reason || 'Unknown error';
+        if (attempt < maxRetries - 1 && lastError !== 'Message input not found') {
+          console.log(`CCM Extension: Retry ${attempt + 1}/${maxRetries} after send failed:`, lastError);
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+        }
+      } catch (error) {
+        lastError = error.message;
+        if (attempt < maxRetries - 1) {
+          console.log(`CCM Extension: Retry ${attempt + 1}/${maxRetries} after execution error:`, error.message);
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+        }
+      }
+    }
+    
+    // All retries failed
+    return { 
+      success: false, 
+      reason: lastError || 'Failed after all retries',
+      retriesAttempted: maxRetries
+    };
   }
 
   async exportConversationTranscript(params) {
@@ -1516,9 +1677,11 @@ class CCMExtensionHub {
     setInterval(() => {
       // Send keepalive to hub
       if (this.hubConnection && this.hubConnection.readyState === WebSocket.OPEN) {
+        const now = Date.now();
+        this.lastKeepalive = now;
         this.hubConnection.send(JSON.stringify({ 
           type: 'keepalive', 
-          timestamp: Date.now() 
+          timestamp: now 
         }));
       } else {
         // Try to reconnect to hub
@@ -1950,7 +2113,7 @@ class CCMExtensionHub {
    * Extract conversation elements including artifacts, code blocks, and tool usage
    */
   async extractConversationElements(params) {
-    const { tabId } = params;
+    const { tabId, batchSize = 50, maxElements = 1000 } = params;
     console.log('CCM Extension: extractConversationElements called for tab:', tabId);
     
     try {
@@ -1966,6 +2129,8 @@ class CCMExtensionHub {
           const artifacts = [];
           const codeBlocks = [];
           const toolUsage = [];
+          const maxElements = ${maxElements};
+          const batchSize = ${batchSize};
           
           // Use Sets for efficient duplicate detection
           const seenArtifactIds = new Set();
@@ -1981,6 +2146,9 @@ class CCMExtensionHub {
             return hash.toString(36);
           }
           
+          // Track total elements processed
+          let totalProcessed = 0;
+          
           // Extract artifacts with optimized selector strategy
           // Only use most specific selectors to avoid overlap
           const artifactSelectors = [
@@ -1994,13 +2162,16 @@ class CCMExtensionHub {
             const allArtifacts = document.querySelectorAll(artifactSelectors.join(','));
             
             // Process artifacts with early exit and optimizations
-            for (let i = 0; i < allArtifacts.length; i++) {
+            for (let i = 0; i < Math.min(allArtifacts.length, batchSize); i++) {
+              if (totalProcessed >= maxElements) break;
+              
               const element = allArtifacts[i];
               
               // Create unique identifier
               const elementId = element.id || simpleHash(element.outerHTML);
               if (seenArtifactIds.has(elementId)) continue;
               seenArtifactIds.add(elementId);
+              totalProcessed++;
               
               let content = '';
               let type = 'unknown';
@@ -2037,7 +2208,9 @@ class CCMExtensionHub {
           try {
             const codeElements = document.querySelectorAll('pre > code');
             
-            for (let i = 0; i < codeElements.length; i++) {
+            for (let i = 0; i < Math.min(codeElements.length, batchSize); i++) {
+              if (totalProcessed >= maxElements) break;
+              
               const element = codeElements[i];
               const content = element.textContent;
               
@@ -2048,6 +2221,7 @@ class CCMExtensionHub {
               const contentHash = simpleHash(content);
               if (seenCodeHashes.has(contentHash)) continue;
               seenCodeHashes.add(contentHash);
+              totalProcessed++;
               
               codeBlocks.push({
                 id: 'code_' + i,
@@ -2065,11 +2239,14 @@ class CCMExtensionHub {
           try {
             const toolElements = document.querySelectorAll('[data-testid*="tool-use"]');
             
-            for (let i = 0; i < toolElements.length; i++) {
+            for (let i = 0; i < Math.min(toolElements.length, batchSize); i++) {
+              if (totalProcessed >= maxElements) break;
+              
               const element = toolElements[i];
               const content = element.textContent?.trim();
               
               if (content && content.length > 20) {
+                totalProcessed++;
                 toolUsage.push({
                   id: 'tool_' + i,
                   type: element.dataset.testid || 'unknown',
@@ -2086,7 +2263,9 @@ class CCMExtensionHub {
             codeBlocks,
             toolUsage,
             extractedAt: new Date().toISOString(),
-            totalElements: artifacts.length + codeBlocks.length + toolUsage.length
+            totalElements: artifacts.length + codeBlocks.length + toolUsage.length,
+            truncated: totalProcessed >= maxElements,
+            maxElementsReached: totalProcessed >= maxElements ? maxElements : null
           };
         })()
       `;
@@ -2351,6 +2530,81 @@ class CCMExtensionHub {
         }
       };
     }
+  }
+
+  async getConnectionHealth() {
+    const health = {
+      timestamp: Date.now(),
+      hub: {
+        connected: this.hubConnection && this.hubConnection.readyState === WebSocket.OPEN,
+        readyState: this.hubConnection ? this.hubConnection.readyState : null,
+        url: this.hubConnection ? this.hubConnection.url : null,
+        reconnectAttempts: this.reconnectAttempts || 0
+      },
+      clients: {
+        total: this.connectedClients.size,
+        list: Array.from(this.connectedClients.values()).map(client => ({
+          id: client.id,
+          name: client.name,
+          type: client.type,
+          connectedAt: client.connectedAt,
+          lastActivity: client.lastActivity
+        }))
+      },
+      debugger: {
+        sessionsActive: this.debuggerSessions.size,
+        attachedTabs: Array.from(this.debuggerSessions.keys())
+      },
+      chrome: {
+        runtime: {
+          id: chrome.runtime.id,
+          manifestVersion: chrome.runtime.getManifest().version
+        }
+      },
+      alarms: []
+    };
+
+    // Get Chrome alarms status
+    try {
+      const alarms = await chrome.alarms.getAll();
+      health.alarms = alarms.map(alarm => ({
+        name: alarm.name,
+        scheduledTime: alarm.scheduledTime,
+        periodInMinutes: alarm.periodInMinutes
+      }));
+    } catch (error) {
+      health.alarms = [{ error: error.message }];
+    }
+
+    // Check recent activity
+    const now = Date.now();
+    health.activity = {
+      lastKeepalive: this.lastKeepalive || null,
+      timeSinceLastKeepalive: this.lastKeepalive ? now - this.lastKeepalive : null,
+      lastHubMessage: this.lastHubMessage || null,
+      timeSinceLastHubMessage: this.lastHubMessage ? now - this.lastHubMessage : null
+    };
+
+    // Overall health status
+    health.status = health.hub.connected ? 'healthy' : 'unhealthy';
+    health.issues = [];
+    
+    if (!health.hub.connected) {
+      health.issues.push('WebSocket hub not connected');
+    }
+    
+    if (health.alarms.length === 0) {
+      health.issues.push('No Chrome alarms active');
+    }
+    
+    if (health.activity.timeSinceLastKeepalive > 30000) {
+      health.issues.push('Keepalive not sent recently');
+    }
+
+    return {
+      success: true,
+      health
+    };
   }
 }
 

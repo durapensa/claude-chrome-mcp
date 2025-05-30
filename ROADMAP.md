@@ -9,9 +9,9 @@
 - [ ] Implement connection pooling for multiple tabs
 
 ### Reliability Improvements
-- [ ] Add automatic retry logic for transient failures
-- [ ] Implement exponential backoff for rate limiting
-- [ ] Add health check endpoint for monitoring
+- [x] Add automatic retry logic for transient failures ✅ (Implemented with maxRetries parameter)
+- [x] Implement exponential backoff for rate limiting ✅ (1s, 2s, 4s backoff)
+- [x] Add health check endpoint for monitoring ✅ (get_connection_health tool)
 - [ ] Improve error messages with specific error codes
 
 ### New Features

@@ -1546,6 +1546,18 @@ class ChromeMCPServer {
                 message: {
                   type: 'string',
                   description: 'The message to send'
+                },
+                waitForReady: {
+                  type: 'boolean',
+                  description: 'Whether to wait for Claude to be ready before sending (default: true)',
+                  default: true
+                },
+                maxRetries: {
+                  type: 'number',
+                  description: 'Maximum number of retry attempts if sending fails (default: 3)',
+                  default: 3,
+                  minimum: 1,
+                  maximum: 5
                 }
               },
               required: ['tabId', 'message'],
@@ -1858,6 +1870,16 @@ class ChromeMCPServer {
                 tabId: {
                   type: 'number',
                   description: 'The tab ID of the Claude conversation'
+                },
+                batchSize: {
+                  type: 'number',
+                  description: 'Max elements to process per type (default: 50)',
+                  default: 50
+                },
+                maxElements: {
+                  type: 'number',
+                  description: 'Max total elements to extract before stopping (default: 1000)',
+                  default: 1000
                 }
               },
               required: ['tabId'],
@@ -1907,6 +1929,15 @@ class ChromeMCPServer {
                 }
               },
               required: ['tabIds'],
+              additionalProperties: false
+            }
+          },
+          {
+            name: 'get_connection_health',
+            description: 'Get detailed health status of the Chrome extension connection, WebSocket hub, and Chrome alarms',
+            inputSchema: {
+              type: 'object',
+              properties: {},
               additionalProperties: false
             }
           }
@@ -1990,6 +2021,9 @@ class ChromeMCPServer {
             break;
           case 'batch_get_responses':
             result = await this.hubClient.sendRequest('batch_get_responses', args);
+            break;
+          case 'get_connection_health':
+            result = await this.hubClient.sendRequest('get_connection_health', args);
             break;
           default:
             throw new Error(`Unknown tool: ${name}`);

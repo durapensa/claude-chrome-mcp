@@ -1,6 +1,6 @@
 # Claude Chrome MCP
 
-Production-ready MCP tools for Claude Desktop to interact with claude.ai through Chrome automation.
+MCP (Model Context Protocol) server for Claude Desktop to interact with claude.ai through Chrome automation.
 
 ## Quick Start
 
@@ -8,21 +8,25 @@ Production-ready MCP tools for Claude Desktop to interact with claude.ai through
 # Install dependencies
 cd mcp-server && npm install
 
-# Start MCP server
-npm start
-
-# Verify connection
-claude mcp list
+# Configure Claude Desktop (claude_desktop_config.json):
+{
+  "mcpServers": {
+    "claude-chrome-mcp": {
+      "command": "node",
+      "args": ["/path/to/claude-chrome-mcp/mcp-server/src/server.js"]
+    }
+  }
+}
 ```
 
 ## Key Features
 
 - **Tab Management**: Create, list, open, and close Claude tabs
-- **Messaging**: Send messages with special character support and `waitForReady` option
-- **Response Handling**: Get responses with completion detection and metadata
-- **Batch Operations**: Send to multiple tabs, get multiple responses
-- **Content Analysis**: Extract metadata, export conversations (markdown/JSON)
-- **Advanced Tools**: Execute scripts, query DOM, debug pages
+- **Messaging**: Send messages with `waitForReady` (default: true)
+- **Response Handling**: Get responses with completion detection
+- **Batch Operations**: Send to multiple tabs
+- **Content Analysis**: Extract metadata, export conversations
+- **Health Monitoring**: Check connection status with `get_connection_health`
 
 ## Important Options
 
@@ -31,7 +35,8 @@ claude mcp list
 send_message_to_claude_tab({
   tabId: 123,
   message: "Your message",
-  waitForReady: true  // Waits for Claude to finish previous response
+  waitForReady: true,  // Default: true
+  maxRetries: 3        // Default: 3
 })
 ```
 
@@ -44,28 +49,19 @@ get_claude_response({
 })
 ```
 
-## Known Issues & Roadmap
-
-- See [ISSUES.md](ISSUES.md) for current known issues
-- See [ROADMAP.md](ROADMAP.md) for planned features
-
 ## Architecture
 
 - WebSocket hub on port 54321
-- Chrome extension connects as WebSocket client
+- Chrome extension connects as WebSocket client  
 - MCP server forwards requests through hub
-- Automatic reconnection on disconnect
+- Automatic reconnection with exponential backoff
 
-## Development
+## For Developers
 
-When adding new tools:
-1. Add tool definition in MCP server
-2. Add handler in Chrome extension background.js
-3. Test thoroughly
-4. Update this documentation if needed
+See `.claude/instructions.md` for session workflow and development guidelines.
 
-## Logs & Debugging
+## Memories
 
-- Chrome extension logs: `chrome://extensions` → Claude Chrome MCP → Service Worker
-- MCP logs: `~/.claude/logs/mcp-*.log`
-- WebSocket traffic visible in Chrome DevTools
+- Keep md files in this project structured, organized and consistent among them all, with minimal redundancies and adequate references among them, each one true to the purpose of its name, and keeping CLAUDE.md as uncluttered as possible, such that you will chain-load the necessary files upon starting up and being asked to begin work.
+- Commit frequently so that you can review changes.
+- Test suite files should live in a dedicated folder

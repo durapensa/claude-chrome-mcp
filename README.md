@@ -2,6 +2,14 @@
 
 Developer tool suite enabling Claude Desktop, Claude Code, and other MCP hosts like Cursor, to interact with claude.ai in Chrome browsers.
 
+## Documentation
+
+- [Architecture](docs/ARCHITECTURE.md) - System design and components
+- [MCP Configuration](CLAUDE.md) - Claude Desktop setup  
+- [Development](development/) - Contributing and testing
+- [Changelog](CHANGELOG.md) - Release history
+- [Roadmap](ROADMAP.md) - Planned features
+
 ## Components
 
 - **Chrome Extension** - Provides chrome.debugger access via WebSocket (claude.ai only)
