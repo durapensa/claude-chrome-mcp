@@ -6,7 +6,7 @@ Developer tool suite enabling Claude Desktop, Claude Code, and other MCP hosts l
 
 - [Architecture](docs/ARCHITECTURE.md) - System design and components
 - [MCP Configuration](CLAUDE.md) - Claude Desktop setup  
-- [Development](docs/development/) - Contributing and testing
+- [Troubleshooting](docs/TROUBLESHOOTING.md) - Debug guide and common issues
 - [TypeScript Types](shared/TYPES.md) - Complete TypeScript API documentation
 - [Changelog](CHANGELOG.md) - Release history
 - [Roadmap](ROADMAP.md) - Planned features

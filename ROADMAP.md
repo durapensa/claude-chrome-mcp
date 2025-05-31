@@ -146,7 +146,7 @@
 ## Contributing
 
 We welcome contributions! Priority areas:
-1. Bug fixes for known issues (see docs/development/ISSUES.md)
+1. Bug fixes and improvements (see docs/TROUBLESHOOTING.md)
 2. Performance optimizations
 3. Documentation improvements
 4. Test coverage expansion

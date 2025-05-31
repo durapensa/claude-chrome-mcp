@@ -43,6 +43,13 @@ mcp__claude-chrome-mcp__get_claude_dot_ai_response --tabId <tab_id>
 - **Network-Level Detection**: Uses fetch interception + `/latest` endpoint for response completion
 - **Async Operations**: Full async workflow with operation registration and milestone tracking
 
+## Continuation Workflow
+When you type 'continue', the system is ready for development and testing:
+
+1. **System Health Check**: `get_connection_health`
+2. **Standard Testing**: Follow testing workflow below  
+3. **Development Tasks**: See Architecture and Troubleshooting docs for guidance
+
 ## Testing Workflow
 1. **System Health**: `get_connection_health` - verify hub and clients connected
 2. **Spawn Tab**: `spawn_claude_dot_ai_tab --injectContentScript true` 
