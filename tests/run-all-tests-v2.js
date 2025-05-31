@@ -13,6 +13,11 @@ const sharedClient = require('./helpers/shared-client');
 // Test configurations
 const tests = [
   {
+    name: 'Event-Driven Completion Detection',
+    script: 'test-event-driven-simple.js',
+    description: 'Tests new async tools: send_message_async, get_response_async, wait_for_operation'
+  },
+  {
     name: 'Rapid Message Sending (Issue #2)',
     script: 'test-rapid-messages-v2.js',
     description: 'Tests waitForReady parameter to prevent "Send button not found" errors'

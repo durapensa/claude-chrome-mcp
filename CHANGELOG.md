@@ -1,5 +1,55 @@
 # Changelog
 
+## 2025-05-31 - Version 2.4.0: Event-Driven Completion Detection
+
+### Added
+- **Event-Driven Completion Detection System**: Revolutionary replacement of timeout-based operations
+  - `send_message_async`: Returns operation ID immediately, sends message asynchronously
+  - `get_response_async`: Returns operation ID immediately, retrieves response asynchronously  
+  - `wait_for_operation`: Waits for operation completion with real-time progress updates
+  - **OperationManager**: Async operation state management with disk persistence
+  - **NotificationManager**: MCP notification system for real-time progress streaming
+  - **ConversationObserver**: DOM MutationObserver for milestone detection in real-time
+
+- **Milestone Detection**: Real-time DOM event detection
+  - `message_sent`: Detects when messages are successfully sent
+  - `response_started`: Detects when Claude begins responding
+  - `response_completed`: Detects when responses are fully rendered
+  - All milestones include timestamps and relevant data payloads
+
+- **MCP Notification Streaming**: Real-time progress updates via MCP protocol
+  - `notifications/progress` method for operation progress
+  - Live milestone notifications as they occur
+  - Operation completion notifications with full results
+
+- **State Persistence**: Operations survive server restarts
+  - Auto-created `.operations-state.json` for state recovery
+  - Operation history and milestone tracking
+  - Graceful recovery from crashes or restarts
+
+### Changed
+- **Architecture**: Complete shift from timeout-based to event-driven operations
+  - No more arbitrary timeouts waiting for completion
+  - Real-time detection of actual browser events
+  - Faster, more reliable operation completion
+  - Better resource utilization and scalability
+
+### Benefits
+- **Speed**: Operations complete as soon as events occur, not after timeouts
+- **Reliability**: Based on actual DOM events, not time estimates
+- **Real-time Feedback**: Live progress updates via MCP notifications
+- **Robustness**: State persistence and recovery capabilities
+- **Efficiency**: No polling or waiting - purely event-driven
+
+### Technical Implementation
+- **Files Modified**:
+  - `mcp-server/src/server.js`: Added OperationManager, NotificationManager, async tools
+  - `extension/content.js`: Added ConversationObserver with DOM monitoring
+  - `extension/background.js`: Added operation milestone forwarding
+- **Testing**: Comprehensive test suite for event-driven system
+  - `tests/test-event-driven-simple.js`: Core functionality verification
+  - Integrated into main test runner for continuous validation
+
 ## 2025-05-31 - Version 2.3.0: Tool Renaming & Hub Reliability
 
 ### Added
