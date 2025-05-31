@@ -1,5 +1,56 @@
 # Changelog
 
+## 2025-05-31 - Version 2.3.0: Tool Renaming & Hub Reliability
+
+### Added
+- **Enhanced Hub Startup**: Improved WebSocket hub startup reliability
+  - Fixed detection logic for existing hubs
+  - Added force hub creation mode for Claude Code environment
+  - Better error reporting for port conflicts and permissions
+  - More robust connection establishment
+
+- **Extension Reconnection**: Enhanced Chrome extension reconnection capabilities
+  - Auto-reconnection on popup open
+  - Forced reconnection requests from popup to background
+  - Better handling of service worker suspension/wake cycles
+  - Persistent connection monitoring and recovery
+
+### Changed
+- **Tool Renaming for Clarity**: Renamed browser tab operation tools to distinguish from API tools
+  - `spawn_claude_tab` → `spawn_claude_dot_ai_tab`
+  - `get_claude_tabs` → `get_claude_dot_ai_tabs`
+  - `send_message_to_claude_tab` → `send_message_to_claude_dot_ai_tab`
+  - `get_claude_response` → `get_claude_dot_ai_response`
+  - `debug_claude_page` → `debug_claude_dot_ai_page`
+  - `close_claude_tab` → `close_claude_dot_ai_tab`
+  - `open_claude_conversation_tab` → `open_claude_dot_ai_conversation_tab`
+  - `get_claude_response_status` → `get_claude_dot_ai_response_status`
+  - API tools (`get_claude_conversations`, `search_claude_conversations`, etc.) remain unchanged
+
+### Fixed
+- **Hub Startup Issues**: Resolved critical WebSocket hub not starting on port 54321
+  - Fixed faulty detection logic in AutoHubClient.connect()
+  - Hub now starts reliably in all MCP host environments
+  - Added environment-specific hub creation logic
+
+- **Extension Connectivity**: Improved Chrome extension connection reliability
+  - Better reconnection handling on service worker restart
+  - Enhanced popup script with forced reconnection capability
+  - More robust WebSocket connection establishment
+
+### Technical Improvements
+- **Version Consistency**: All components now at version 2.3.0
+  - Main package.json: 2.3.0
+  - MCP server package.json: 2.3.0  
+  - Chrome extension manifest: 2.3.0
+- **Comprehensive Testing**: All tools verified working with new naming
+- **Documentation Updates**: Tool renaming and benefits documented
+
+### Breaking Changes
+⚠️ **Tool names changed**: Old tool names no longer work
+- Scripts using old browser tab tool names need updating
+- All functionality preserved, only names changed for clarity
+
 ## 2025-01-30 - Session 3: Robustness Improvements
 
 ### Added

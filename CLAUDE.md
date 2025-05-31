@@ -56,3 +56,14 @@ mcp__claude-chrome-mcp__get_connection_health
 - Check workflow paths starting from CLAUDE.md
 - Validate references in chained markdown files
 - Maintain consistency in startup and continuation protocols
+
+## Critical Directives
+- do not overwrite or move user-added memories to CLAUDE.md
+- regularly cleanup all of project md files for summary, analysis, plans, etc. incorporating only current state into documentation md files. key and well tested changes can be placed in the changelog
+
+## Testing Guidelines
+- when testing, always attempt to test first from claude-chrome-mcp tools available to you before using tests in tests/
+
+## Development Memories
+- when developing with MCP always refer to mcp-server/node_modules/@modelcontextprotocol
+- in documentation, notes, and other places, do not add indications that features are completed until after extensive testing and Claude Code user approval

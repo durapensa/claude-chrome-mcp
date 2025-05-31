@@ -1,9 +1,51 @@
-# Known Issues
+# Known Issues & Future Enhancements
 
-## High Priority
+## Active Issues
 
-### 1. ~~`batch_get_responses` Timeout Conflict~~ ✅ RESOLVED
-- **Problem**: 30-second timeout conflicts with MCP timeout
+### 1. Artifact Detection False Positive
+- **Problem**: Empty "Untitled" artifact buttons incorrectly identified as artifacts
+- **Symptoms**: Element extraction reports artifacts when none exist
+- **Impact**: Misleading artifact counts in conversation analysis
+- **Priority**: Medium - affects data accuracy
+- **Status**: Needs investigation
+- **Tools affected**: `extract_conversation_elements`
+
+## Recently Resolved ✅
+
+### Extension Disconnect Issues (FIXED in v2.3.0)
+- **Problem**: Chrome extension lost connection between sessions
+- **Solution**: Enhanced reconnection logic with forced reconnection from popup
+- **Status**: ✅ Resolved with extension reconnection improvements
+
+### Hub Startup Issues (FIXED in v2.3.0) 
+- **Problem**: WebSocket hub not starting on port 54321
+- **Solution**: Fixed AutoHubClient detection logic and added force hub creation
+- **Status**: ✅ Resolved with hub startup fixes
+
+### Search Conversation Timeouts (FIXED in v2.3.0)
+- **Problem**: Search conversations timing out during execution
+- **Solution**: Removed aggressive timeouts, implemented proper MCP lifecycle management
+- **Status**: ✅ Resolved - search now works reliably
+
+## Future Enhancements
+
+### 1. Event-Driven Completion Detection
+- **Goal**: Replace timeout-based operations with event-driven completion detection
+- **Benefits**: More reliable, faster responses, no arbitrary timeouts
+- **Research**: See `event-driven-completion-research.md` for architecture plan
+- **Priority**: High - would improve overall system reliability
+
+### 2. Network Inspection Integration
+- **Goal**: Capture and analyze network traffic patterns for better completion indicators
+- **Plan**: See `network-inspection-session-plan.md` for detailed protocol
+- **Priority**: Medium - research to support event-driven architecture
+
+### 3. Multi-Tab Observer System
+- **Goal**: Per-tab observers for async, non-blocking operations
+- **Benefits**: Out-of-order result handling, better concurrency
+- **Status**: Architectural planning phase
+
+## Historical Issues (Resolved)
 - **Solution**: Removed the problematic tool entirely. Use individual `get_claude_response` calls or implement custom batch logic in your application
 - **Note**: The tool has been removed from the MCP server to prevent timeout issues
 
