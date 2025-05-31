@@ -1,122 +1,125 @@
-# Restart Instructions - Event-Driven Completion Detection
+# Restart Instructions - Test Suite Organization & Comprehensive Tool Testing
 
 **Date**: 2025-05-31  
-**Context**: Event-Driven Completion Detection Implementation Complete  
-**Next Task**: Test the new async tools and event-driven system
+**Context**: Event-Driven System Complete - Ready for Test Suite Organization  
+**Next Task**: Organize test suite and comprehensive testing of async tools
 
-## 🚀 Session Context
+## 🎯 Current Status
 
-### ✅ Major Achievement Completed
-Successfully implemented **Event-Driven Completion Detection System** with:
-- OperationManager: Async operation state management with persistence
-- NotificationManager: MCP notification system for progress updates  
-- ConversationObserver: DOM MutationObserver for milestone detection
-- New async tools: send_message_async, get_response_async, wait_for_operation
-- **All code committed** - Complete event-driven architecture replacing timeout-based operations
+### ✅ Major Achievements Completed
+- **Event-Driven Completion Detection System v2.4.0**: FULLY OPERATIONAL
+  - `send_message_async`, `get_response_async`, `wait_for_operation` working perfectly
+  - Real-time milestone detection via DOM MutationObserver
+  - MCP notification streaming for live progress updates
+  - Operation state persistence and recovery
+  - Live browser testing confirmed working
+- **Version 2.4.0**: All components updated and committed
+- **System Health**: All components healthy and operational
 
-### 📁 Key Files Modified
-- `mcp-server/src/server.js` - Added OperationManager, NotificationManager, async tools
-- `extension/content.js` - Added ConversationObserver with DOM monitoring
-- `extension/background.js` - Added operation milestone forwarding
-- State persistence: `mcp-server/.operations-state.json` (auto-created)
+### 📁 Key Files Status
+- All event-driven changes committed in commit c7db561
+- CHANGELOG.md updated with v2.4.0 release notes
+- Version numbers updated across all components
+- Documentation includes comprehensive architecture diagram
+- Test files created: `tests/organized/test-event-driven-system.js`
 
-### 🎯 Current Status
-- **System**: v2.3.0 with event-driven completion detection
-- **Event-Driven Framework**: Ready for testing
-- **Last Issue**: MCP server crash during testing
-- **Status**: Clean restart needed - all code committed and ready
+### 🎪 What Was Accomplished
+- Successfully demonstrated live browser testing with real Claude tab interactions
+- Event-driven milestone detection working flawlessly
+- JSON parsing error in operations state file resolved
+- Chrome extension reloaded and functioning properly
+- All MCP tools validated and operational
 
-## 🔄 Restart Checklist
+## 🔄 Session Continuation Tasks
 
-### 1. **Chrome Extension Reload**
+### 1. **Test Suite Organization** (In Progress)
 ```bash
-# In Chrome: chrome://extensions/
-# Find "Claude Chrome MCP" extension
-# Click "Reload" button
-# Verify extension loads correctly
+# Current organized test structure started in:
+tests/organized/
+├── README.md - Test categorization plan
+└── test-event-driven-system.js - Comprehensive async tools test
 ```
 
-### 2. **Verify System Health**
+**Next Steps:**
+- Consolidate duplicate test files (v1 vs v2 versions)
+- Remove debug/development test files  
+- Create organized test categories
+- Update main test runner to use organized tests
+
+### 2. **Comprehensive Tool Testing** (High Priority)
+- Test all event-driven async tools thoroughly
+- Run stress tests with multiple concurrent operations
+- Validate live browser interactions
+- Test error handling and recovery scenarios
+
+### 3. **Test Suite Cleanup** (Medium Priority)
+- Archive or remove redundant test files
+- Standardize test file naming
+- Update test documentation
+
+## 🚀 Restart Checklist
+
+### 1. **System Health Verification**
 ```bash
-# After restarting Claude Code, run:
+# Verify all systems operational
 mcp__claude-chrome-mcp__get_connection_health
 ```
 
-### 3. **Test Event-Driven Tools**
+### 2. **Chrome Extension Status**
+- Extension should be at version 2.4.0
+- No reload needed unless issues detected
+- All tools should be available
+
+### 3. **Continue Testing Work**
 ```bash
-# Test new async tools
-mcp__claude-chrome-mcp__send_message_async
-mcp__claude-chrome-mcp__get_response_async
-mcp__claude-chrome-mcp__wait_for_operation
+# Test organized event-driven system
+cd tests/organized && node test-event-driven-system.js
+
+# Run comprehensive test suite  
+cd tests && node run-all-tests-v2.js
 ```
 
-## 🎪 What to Expect
+## 🎯 Expected Actions on 'continue'
 
-### **Event-Driven Testing Process**
-1. **System Health**: Verify all components are connected
-2. **Async Tool Testing**: Test new event-driven tools
-   - send_message_async: Returns operation ID immediately
-   - get_response_async: Returns operation ID immediately
-   - wait_for_operation: Waits for completion and returns results
-3. **Milestone Detection**: ConversationObserver monitors DOM changes
-   - Message sent detection
-   - Response started detection
-   - Response completion detection
-4. **Notifications**: Real-time MCP notifications for progress
+When you restart Claude Code and type `continue`, the system should:
 
-### **Expected Benefits**
-- No more arbitrary timeouts
-- Faster, more reliable operations
-- Real-time progress notifications
-- Better error handling and recovery
+1. **Verify System Health**: Check all MCP connections and Chrome extension
+2. **Continue Test Organization**: 
+   - Consolidate duplicate test files
+   - Create clean test structure in `tests/organized/`
+   - Update main test runners
+3. **Comprehensive Testing**:
+   - Run organized test suite with live browser activity
+   - Stress test event-driven system
+   - Validate all async tools working properly
+4. **Document Results**: Update test documentation and results
 
-## 🔧 If Issues Persist
+## 📊 System State
 
-### **MCP Server Issues**
+- **Version**: 2.4.0 across all components
+- **Event-Driven System**: ✅ Fully operational
+- **Live Browser Testing**: ✅ Confirmed working
+- **Test Organization**: 🔄 In progress
+- **Chrome Extension**: ✅ Loaded and healthy
+
+## 🔧 If Issues Occur
+
+### **MCP Connection Issues**
 ```bash
-# Check for hanging processes
-ps aux | grep -E "(node.*server\.js)"
+# Check logs
+tail -20 /Users/dp/Library/Logs/Claude/mcp-server-claude-chrome-mcp.log
 
-# Kill if needed  
-pkill -f "node.*server\.js"
-
-# Check hub port
-lsof -i :54321
+# Reload extension if needed
+mcp__claude-chrome-mcp__reload_extension
 ```
 
-### **Chrome Extension Issues**
-- Reload extension in chrome://extensions/
-- Check background script console for errors
-- Verify popup loads and shows connection status
-
-### **Event-Driven System Issues**
-- All infrastructure components have been implemented
-- OperationManager handles state persistence and recovery
-- ConversationObserver provides real-time DOM monitoring
-
-## 📝 Session Continuation Command
-
-When you restart Claude Code, simply type:
-
+### **JSON Parsing Errors**
+```bash
+# Clear operations state if corrupted
+rm /Users/dp/claude-chrome-mcp/mcp-server/.operations-state.json
 ```
-continue
-```
-
-This will:
-1. Verify system health and connections
-2. Test the new event-driven completion detection tools
-3. Validate DOM milestone detection
-4. Demonstrate async operation handling with real-time notifications
-
-## 🎯 Success Criteria
-
-✅ System connects and health check passes  
-✅ Async tools return operation IDs immediately  
-✅ ConversationObserver detects milestones correctly  
-✅ MCP notifications are sent for progress updates  
-✅ wait_for_operation returns completed results  
 
 ---
 
-**Event-Driven System Status**: ✅ **Ready for Testing**  
-**Next Action**: Test async tools and validate milestone detection
+**System Status**: ✅ **Ready for Test Suite Organization**  
+**Next Action**: Continue test suite organization and comprehensive testing

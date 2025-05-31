@@ -3,18 +3,21 @@
 Quick reference for Claude. See README.md for full documentation.
 
 ## Current Session
-- Focus: Event-Driven Completion Detection - FULLY OPERATIONAL
+- Focus: Test Suite Organization & Comprehensive Tool Testing
 - Last update: 2025-05-31
 - Version: 2.4.0 
-- Status: Production ready, comprehensive testing complete
+- Status: Event-driven system operational, ready for test organization
 
 ## Quick Commands
 ```bash
-# Run tests
-cd tests && node regression-test-suite.js
-
-# Check system health
+# Check system health (ALWAYS run first)
 mcp__claude-chrome-mcp__get_connection_health
+
+# Test organized event-driven system
+cd tests/organized && node test-event-driven-system.js
+
+# Run comprehensive test suite
+cd tests && node run-all-tests-v2.js
 ```
 
 ## Important Tool Options
