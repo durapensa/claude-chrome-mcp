@@ -3062,32 +3062,40 @@ class ContentScriptManager {
         this.injectedTabs.add(tabId);
         return { success: true, method: 'manifest' };
       } else {
-        console.log(`CCM: Manifest content script not ready, forcing reload for tab ${tabId}`);
-        // Force reload the tab to ensure content script loads
-        await chrome.tabs.reload(tabId);
+        console.log(`CCM: Manifest content script not ready, injecting via chrome.scripting`);
         
-        // Wait a moment for reload
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // Check again after reload
-        const recheckResult = await chrome.scripting.executeScript({
-          target: { tabId: tabId },
-          func: () => {
-            return {
-              hasObserver: typeof window.conversationObserver !== 'undefined',
-              hasRegisterOperation: typeof window.conversationObserver?.registerOperation === 'function'
-            };
+        // Try chrome.scripting.executeScript with content script files
+        try {
+          await chrome.scripting.executeScript({
+            target: { tabId: tabId },
+            files: ['content.js']
+          });
+          
+          // Verify injection worked
+          const verifyResult = await chrome.scripting.executeScript({
+            target: { tabId: tabId },
+            func: () => {
+              return {
+                hasObserver: typeof window.conversationObserver !== 'undefined',
+                hasRegisterOperation: typeof window.conversationObserver?.registerOperation === 'function'
+              };
+            }
+          });
+          
+          const verifyStatus = verifyResult?.[0]?.result || {};
+          
+          if (verifyStatus.hasObserver && verifyStatus.hasRegisterOperation) {
+            console.log(`CCM: Content script injected successfully via chrome.scripting in tab ${tabId}`);
+            this.injectedTabs.add(tabId);
+            return { success: true, method: 'chrome_scripting' };
+          } else {
+            // Fall back to debugger injection
+            console.log(`CCM: chrome.scripting injection failed, falling back to debugger method`);
+            return await this.injectContentScriptViaDebugger(tabId);
           }
-        });
-        
-        const recheckStatus = recheckResult?.[0]?.result || {};
-        
-        if (recheckStatus.hasObserver && recheckStatus.hasRegisterOperation) {
-          console.log(`CCM: Content script working after reload in tab ${tabId}`);
-          this.injectedTabs.add(tabId);
-          return { success: true, method: 'manifest_after_reload' };
-        } else {
-          throw new Error('Content script not available even after reload');
+        } catch (scriptingError) {
+          console.log(`CCM: chrome.scripting failed: ${scriptingError.message}, falling back to debugger method`);
+          return await this.injectContentScriptViaDebugger(tabId);
         }
       }
 
