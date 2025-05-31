@@ -1812,6 +1812,10 @@ class CCMExtensionHub {
         });
         
         return true; // Keep message channel open for async response
+      } else if (request.type === 'operation_milestone') {
+        // Handle operation milestone from content script
+        this.handleOperationMilestone(request, sender);
+        return false; // Synchronous response
       }
       return true;
     });
@@ -1897,6 +1901,34 @@ class CCMExtensionHub {
         message: 'Connection error: ' + error.message,
         connected: false
       };
+    }
+  }
+
+  handleOperationMilestone(request, sender) {
+    // Forward operation milestone to MCP server
+    const { operationId, milestone, timestamp, ...data } = request;
+    
+    console.log(`[CCM] Operation milestone: ${operationId} - ${milestone}`);
+    
+    // Forward to all connected MCP clients
+    const message = {
+      type: 'operation_milestone',
+      operationId,
+      milestone,
+      timestamp,
+      tabId: sender.tab?.id,
+      ...data
+    };
+    
+    for (const [clientId, client] of this.connectedClients) {
+      try {
+        if (client.websocket && client.websocket.readyState === WebSocket.OPEN) {
+          client.websocket.send(JSON.stringify(message));
+          console.log(`[CCM] Forwarded milestone to client ${clientId}`);
+        }
+      } catch (error) {
+        console.warn(`[CCM] Failed to forward milestone to client ${clientId}:`, error);
+      }
     }
   }
 

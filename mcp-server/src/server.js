@@ -5,6 +5,8 @@ const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio
 const { CallToolRequestSchema, ListToolsRequestSchema } = require('@modelcontextprotocol/sdk/types.js');
 const WebSocket = require('ws');
 const EventEmitter = require('events');
+const fs = require('fs');
+const path = require('path');
 
 // Enhanced error handling and debugging utilities
 class ErrorTracker {
@@ -420,6 +422,187 @@ class MCPClientConnection {
     };
   }
 }
+
+// Event-driven completion detection infrastructure
+class OperationManager {
+  constructor() {
+    this.operations = new Map();
+    this.stateFile = path.join(__dirname, '../.operations-state.json');
+    this.loadState();
+  }
+
+  createOperation(type, params = {}) {
+    const operationId = `${type}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const operation = {
+      id: operationId,
+      type,
+      params,
+      status: 'pending',
+      milestones: [],
+      createdAt: Date.now(),
+      lastUpdated: Date.now()
+    };
+    
+    this.operations.set(operationId, operation);
+    this.saveState();
+    
+    console.log(`[OperationManager] Created operation ${operationId} of type ${type}`);
+    return operationId;
+  }
+
+  updateOperation(operationId, milestone, data = {}) {
+    const operation = this.operations.get(operationId);
+    if (!operation) {
+      console.warn(`[OperationManager] Operation ${operationId} not found`);
+      return false;
+    }
+
+    operation.milestones.push({
+      milestone,
+      timestamp: Date.now(),
+      data
+    });
+    operation.lastUpdated = Date.now();
+    
+    // Update status based on milestone
+    if (milestone === 'started') {
+      operation.status = 'in_progress';
+    } else if (milestone === 'completed' || milestone === 'response_completed') {
+      operation.status = 'completed';
+    } else if (milestone === 'error') {
+      operation.status = 'failed';
+    }
+    
+    this.saveState();
+    
+    console.log(`[OperationManager] Updated operation ${operationId}: ${milestone}`);
+    return true;
+  }
+
+  getOperation(operationId) {
+    return this.operations.get(operationId);
+  }
+
+  isCompleted(operationId) {
+    const operation = this.operations.get(operationId);
+    return operation ? operation.status === 'completed' : false;
+  }
+
+  waitForCompletion(operationId, timeoutMs = 30000) {
+    return new Promise((resolve, reject) => {
+      const startTime = Date.now();
+      
+      const checkCompletion = () => {
+        const operation = this.operations.get(operationId);
+        
+        if (!operation) {
+          reject(new Error(`Operation ${operationId} not found`));
+          return;
+        }
+        
+        if (operation.status === 'completed') {
+          resolve(operation);
+          return;
+        }
+        
+        if (operation.status === 'failed') {
+          reject(new Error(`Operation ${operationId} failed`));
+          return;
+        }
+        
+        if (Date.now() - startTime > timeoutMs) {
+          reject(new Error(`Operation ${operationId} timed out after ${timeoutMs}ms`));
+          return;
+        }
+        
+        setTimeout(checkCompletion, 100);
+      };
+      
+      checkCompletion();
+    });
+  }
+
+  cleanup(maxAge = 3600000) { // 1 hour
+    const cutoff = Date.now() - maxAge;
+    let cleanedCount = 0;
+    
+    for (const [id, operation] of this.operations) {
+      if (operation.lastUpdated < cutoff) {
+        this.operations.delete(id);
+        cleanedCount++;
+      }
+    }
+    
+    if (cleanedCount > 0) {
+      this.saveState();
+      console.log(`[OperationManager] Cleaned up ${cleanedCount} old operations`);
+    }
+  }
+
+  loadState() {
+    try {
+      if (fs.existsSync(this.stateFile)) {
+        const data = JSON.parse(fs.readFileSync(this.stateFile, 'utf8'));
+        this.operations = new Map(data.operations || []);
+        console.log(`[OperationManager] Loaded ${this.operations.size} operations from state`);
+      }
+    } catch (error) {
+      console.warn('[OperationManager] Failed to load state:', error.message);
+    }
+  }
+
+  saveState() {
+    try {
+      const data = {
+        operations: Array.from(this.operations.entries()),
+        lastSaved: Date.now()
+      };
+      fs.writeFileSync(this.stateFile, JSON.stringify(data, null, 2));
+    } catch (error) {
+      console.warn('[OperationManager] Failed to save state:', error.message);
+    }
+  }
+}
+
+class NotificationManager {
+  constructor(server) {
+    this.server = server;
+  }
+
+  sendProgress(operationId, milestone, data = {}) {
+    const notification = {
+      method: 'notifications/operation/progress',
+      params: {
+        operationId,
+        milestone,
+        timestamp: Date.now(),
+        ...data
+      }
+    };
+    
+    console.log(`[NotificationManager] Sending progress: ${operationId} - ${milestone}`);
+    
+    try {
+      this.server.sendNotification('operation/progress', notification.params);
+    } catch (error) {
+      console.warn('[NotificationManager] Failed to send notification:', error.message);
+    }
+  }
+
+  sendCompletion(operationId, result = {}) {
+    this.sendProgress(operationId, 'completed', { result });
+  }
+
+  sendError(operationId, error) {
+    this.sendProgress(operationId, 'error', { 
+      error: error.message || error.toString() 
+    });
+  }
+}
+
+// Global instances
+let operationManager;
+let notificationManager;
 
 class WebSocketHub extends EventEmitter {
   constructor() {
@@ -1422,6 +1605,10 @@ class AutoHubClient {
         this.connected = false;
         break;
 
+      case 'operation_milestone':
+        this.handleOperationMilestone(message);
+        break;
+
       default:
         console.error('CCM: Unknown message type:', type);
     }
@@ -1444,6 +1631,22 @@ class AutoHubClient {
       } else {
         pendingRequest.resolve(result);
       }
+    }
+  }
+
+  handleOperationMilestone(message) {
+    const { operationId, milestone, timestamp, tabId, ...data } = message;
+    
+    console.log(`[AutoHubClient] Received milestone: ${operationId} - ${milestone}`);
+    
+    // Update operation manager
+    if (operationManager) {
+      operationManager.updateOperation(operationId, milestone, { tabId, ...data });
+    }
+    
+    // Send MCP notification
+    if (notificationManager) {
+      notificationManager.sendProgress(operationId, milestone, { tabId, ...data });
     }
   }
 
@@ -1614,12 +1817,23 @@ class ChromeMCPServer {
 
     this.hubClient = new AutoHubClient();
     this.lifecycleManager = new ProcessLifecycleManager();
+    
+    // Initialize event-driven completion detection
+    operationManager = new OperationManager();
+    notificationManager = new NotificationManager(this.server);
     this.setupLifecycleIntegration();
     this.setupToolHandlers();
   }
 
   setupLifecycleIntegration() {
     // Register cleanup tasks
+    this.lifecycleManager.addCleanupTask('operation-manager', async () => {
+      if (operationManager) {
+        operationManager.cleanup();
+        operationManager.saveState();
+      }
+    });
+
     this.lifecycleManager.addCleanupTask('hub-client', async () => {
       if (this.hubClient) {
         this.hubClient.close();
@@ -1929,6 +2143,72 @@ class ChromeMCPServer {
                 }
               },
               required: ['tabId'],
+              additionalProperties: false
+            }
+          },
+          {
+            name: 'send_message_async',
+            description: 'Send a message to a Claude tab with event-driven completion detection (returns immediately with operation ID)',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                tabId: {
+                  type: 'number',
+                  description: 'The tab ID of the Claude session'
+                },
+                message: {
+                  type: 'string',
+                  description: 'The message to send'
+                },
+                waitForReady: {
+                  type: 'boolean',
+                  description: 'Whether to wait for Claude to be ready before sending (default: true)',
+                  default: true
+                }
+              },
+              required: ['tabId', 'message'],
+              additionalProperties: false
+            }
+          },
+          {
+            name: 'get_response_async',
+            description: 'Get response from a Claude tab with event-driven completion detection (returns immediately with operation ID)',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                tabId: {
+                  type: 'number',
+                  description: 'The tab ID of the Claude session'
+                },
+                waitForCompletion: {
+                  type: 'boolean',
+                  description: 'Whether to wait for response completion before returning',
+                  default: true
+                }
+              },
+              required: ['tabId'],
+              additionalProperties: false
+            }
+          },
+          {
+            name: 'wait_for_operation',
+            description: 'Wait for an async operation to complete and return the result',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                operationId: {
+                  type: 'string',
+                  description: 'The operation ID returned by an async tool'
+                },
+                timeoutMs: {
+                  type: 'number',
+                  description: 'Maximum time to wait in milliseconds (default: 30000)',
+                  default: 30000,
+                  minimum: 1000,
+                  maximum: 120000
+                }
+              },
+              required: ['operationId'],
               additionalProperties: false
             }
           },
@@ -2248,6 +2528,15 @@ class ChromeMCPServer {
             break;
           case 'export_conversation_transcript':
             result = await this.hubClient.sendRequest('export_conversation_transcript', args);
+            break;
+          case 'send_message_async':
+            result = await this.handleSendMessageAsync(args);
+            break;
+          case 'get_response_async':
+            result = await this.handleGetResponseAsync(args);
+            break;
+          case 'wait_for_operation':
+            result = await this.handleWaitForOperation(args);
             break;
           case 'debug_attach':
             result = await this.hubClient.sendRequest('debug_attach', args);
@@ -2772,6 +3061,131 @@ class ChromeMCPServer {
       console.error('Claude Chrome MCP: Error during shutdown:', error);
       // Force exit if shutdown fails
       setTimeout(() => process.exit(1), 100);
+    }
+  }
+
+  async handleSendMessageAsync(args) {
+    const { tabId, message, waitForReady = true } = args;
+    
+    // Create operation
+    const operationId = operationManager.createOperation('send_message', { tabId, message, waitForReady });
+    
+    // Register operation with content script observer
+    try {
+      await this.hubClient.sendRequest('execute_script', {
+        tabId,
+        script: `
+          if (window.conversationObserver) {
+            window.conversationObserver.registerOperation('${operationId}', 'send_message', ${JSON.stringify({ message, waitForReady })});
+          }
+        `
+      });
+    } catch (error) {
+      console.warn('[handleSendMessageAsync] Failed to register operation with observer:', error);
+    }
+    
+    // Start the send message operation
+    setTimeout(async () => {
+      try {
+        // Send the message using existing tool
+        await this.hubClient.sendRequest('send_message_to_claude_dot_ai_tab', { 
+          tabId, 
+          message, 
+          waitForReady 
+        });
+        
+        // If registration failed, simulate milestones
+        if (!global.observerRegistered) {
+          operationManager.updateOperation(operationId, 'message_sent');
+          notificationManager.sendProgress(operationId, 'message_sent', { tabId });
+        }
+      } catch (error) {
+        operationManager.updateOperation(operationId, 'error', { error: error.message });
+        notificationManager.sendError(operationId, error);
+      }
+    }, 100);
+    
+    return {
+      operationId,
+      status: 'started',
+      type: 'send_message',
+      timestamp: Date.now()
+    };
+  }
+
+  async handleGetResponseAsync(args) {
+    const { tabId, waitForCompletion = true } = args;
+    
+    // Create operation
+    const operationId = operationManager.createOperation('get_response', { tabId, waitForCompletion });
+    
+    // Register operation with content script observer
+    try {
+      await this.hubClient.sendRequest('execute_script', {
+        tabId,
+        script: `
+          if (window.conversationObserver) {
+            window.conversationObserver.registerOperation('${operationId}', 'get_response', ${JSON.stringify({ waitForCompletion })});
+          }
+        `
+      });
+    } catch (error) {
+      console.warn('[handleGetResponseAsync] Failed to register operation with observer:', error);
+    }
+    
+    // Start monitoring for response
+    setTimeout(async () => {
+      try {
+        // Get current response using existing tool
+        const response = await this.hubClient.sendRequest('get_claude_dot_ai_response', { 
+          tabId,
+          waitForCompletion 
+        });
+        
+        // If registration failed, simulate completion
+        if (!global.observerRegistered) {
+          operationManager.updateOperation(operationId, 'response_completed', { response });
+          notificationManager.sendCompletion(operationId, response);
+        }
+      } catch (error) {
+        operationManager.updateOperation(operationId, 'error', { error: error.message });
+        notificationManager.sendError(operationId, error);
+      }
+    }, 100);
+    
+    return {
+      operationId,
+      status: 'started',
+      type: 'get_response',
+      timestamp: Date.now()
+    };
+  }
+
+  async handleWaitForOperation(args) {
+    const { operationId, timeoutMs = 30000 } = args;
+    
+    try {
+      // Wait for operation completion
+      const operation = await operationManager.waitForCompletion(operationId, timeoutMs);
+      
+      return {
+        operationId,
+        status: operation.status,
+        milestones: operation.milestones,
+        result: operation.milestones.find(m => m.milestone === 'completed')?.data || {},
+        completedAt: operation.lastUpdated
+      };
+    } catch (error) {
+      // Return current operation state even if timeout/error
+      const operation = operationManager.getOperation(operationId);
+      
+      return {
+        operationId,
+        status: operation ? operation.status : 'not_found',
+        error: error.message,
+        milestones: operation ? operation.milestones : [],
+        failedAt: Date.now()
+      };
     }
   }
 }

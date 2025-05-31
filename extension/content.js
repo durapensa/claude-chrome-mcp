@@ -1,6 +1,278 @@
 // Content Script for claude.ai pages
 // Handles session detection and page-level interactions
 
+// Event-driven completion detection
+class ConversationObserver {
+  constructor() {
+    this.activeOperations = new Map();
+    this.observer = null;
+    this.responseObserver = null;
+    this.setupObservers();
+  }
+
+  trackOperation(operationId, type, params = {}) {
+    const operation = {
+      id: operationId,
+      type,
+      params,
+      startTime: Date.now(),
+      milestones: []
+    };
+    
+    this.activeOperations.set(operationId, operation);
+    console.log(`[ConversationObserver] Tracking operation ${operationId} (${type})`);
+    
+    // Send initial notification
+    this.notifyMilestone(operationId, 'started', { type, params });
+    
+    return operation;
+  }
+
+  setupObservers() {
+    // Observe DOM changes for conversation milestones
+    this.observer = new MutationObserver((mutations) => {
+      this.handleMutations(mutations);
+    });
+    
+    // Observe the conversation area for response changes
+    this.startObserving();
+    
+    // Monitor for new send buttons and response areas
+    this.setupPeriodicChecks();
+  }
+
+  startObserving() {
+    const targetNode = document.body;
+    if (targetNode) {
+      this.observer.observe(targetNode, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['class', 'data-testid', 'aria-busy']
+      });
+      console.log('[ConversationObserver] Started observing DOM changes');
+    }
+  }
+
+  handleMutations(mutations) {
+    for (const mutation of mutations) {
+      // Check for message sending milestones
+      this.checkMessageSendingMilestones(mutation);
+      
+      // Check for response generation milestones  
+      this.checkResponseMilestones(mutation);
+      
+      // Check for conversation state changes
+      this.checkConversationMilestones(mutation);
+    }
+  }
+
+  checkMessageSendingMilestones(mutation) {
+    // Detect message sent milestone
+    if (mutation.type === 'childList') {
+      mutation.addedNodes.forEach(node => {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          // Look for new user messages
+          const userMessage = node.querySelector && node.querySelector('[data-is-author-user="true"]');
+          if (userMessage) {
+            this.handleMessageSent();
+          }
+          
+          // Look for disabled send button (indicating message was sent)
+          const disabledSendButton = node.querySelector && node.querySelector('button[disabled][data-testid="send-button"]');
+          if (disabledSendButton) {
+            this.handleMessageSent();
+          }
+        }
+      });
+    }
+    
+    // Check for send button state changes
+    if (mutation.type === 'attributes' && mutation.attributeName === 'disabled') {
+      const target = mutation.target;
+      if (target.matches && target.matches('button[data-testid="send-button"]')) {
+        if (target.disabled) {
+          this.handleMessageSent();
+        }
+      }
+    }
+  }
+
+  checkResponseMilestones(mutation) {
+    // Detect response started milestone
+    if (mutation.type === 'childList') {
+      mutation.addedNodes.forEach(node => {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          // Look for new assistant messages or response containers
+          const assistantMessage = node.querySelector && node.querySelector('[data-is-author-user="false"]');
+          if (assistantMessage) {
+            this.handleResponseStarted();
+          }
+          
+          // Look for streaming indicators
+          const streamingIndicator = node.querySelector && node.querySelector('[aria-busy="true"]');
+          if (streamingIndicator) {
+            this.handleResponseStarted();
+          }
+        }
+      });
+    }
+    
+    // Check for aria-busy changes (response completion)
+    if (mutation.type === 'attributes' && mutation.attributeName === 'aria-busy') {
+      const target = mutation.target;
+      if (target.getAttribute('aria-busy') === 'false') {
+        this.handleResponseCompleted();
+      }
+    }
+  }
+
+  checkConversationMilestones(mutation) {
+    // Detect stop button appearance/disappearance
+    if (mutation.type === 'childList') {
+      mutation.addedNodes.forEach(node => {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const stopButton = node.querySelector && node.querySelector('[data-testid="stop-button"]');
+          if (stopButton) {
+            this.handleResponseStarted();
+          }
+        }
+      });
+      
+      mutation.removedNodes.forEach(node => {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const stopButton = node.querySelector && node.querySelector('[data-testid="stop-button"]');
+          if (stopButton) {
+            this.handleResponseCompleted();
+          }
+        }
+      });
+    }
+  }
+
+  handleMessageSent() {
+    for (const [operationId, operation] of this.activeOperations) {
+      if (operation.type === 'send_message' && !operation.milestones.find(m => m.milestone === 'message_sent')) {
+        this.notifyMilestone(operationId, 'message_sent');
+      }
+    }
+  }
+
+  handleResponseStarted() {
+    for (const [operationId, operation] of this.activeOperations) {
+      if ((operation.type === 'send_message' || operation.type === 'get_response') && 
+          !operation.milestones.find(m => m.milestone === 'response_started')) {
+        this.notifyMilestone(operationId, 'response_started');
+      }
+    }
+  }
+
+  handleResponseCompleted() {
+    for (const [operationId, operation] of this.activeOperations) {
+      if ((operation.type === 'send_message' || operation.type === 'get_response') && 
+          !operation.milestones.find(m => m.milestone === 'response_completed')) {
+        this.notifyMilestone(operationId, 'response_completed');
+        
+        // Clean up completed operations after a short delay
+        setTimeout(() => {
+          this.activeOperations.delete(operationId);
+        }, 5000);
+      }
+    }
+  }
+
+  setupPeriodicChecks() {
+    // Periodic fallback checks for milestone detection
+    setInterval(() => {
+      this.checkActiveOperations();
+    }, 1000);
+  }
+
+  checkActiveOperations() {
+    const now = Date.now();
+    
+    for (const [operationId, operation] of this.activeOperations) {
+      const elapsed = now - operation.startTime;
+      
+      // Timeout operations after 60 seconds
+      if (elapsed > 60000) {
+        this.notifyMilestone(operationId, 'timeout', { elapsed });
+        this.activeOperations.delete(operationId);
+        continue;
+      }
+      
+      // Check for specific state indicators
+      this.checkOperationState(operationId, operation);
+    }
+  }
+
+  checkOperationState(operationId, operation) {
+    // Check for send button state
+    const sendButton = document.querySelector('button[data-testid="send-button"]');
+    if (sendButton && operation.type === 'send_message') {
+      if (sendButton.disabled && !operation.milestones.find(m => m.milestone === 'message_sent')) {
+        this.notifyMilestone(operationId, 'message_sent');
+      }
+    }
+    
+    // Check for stop button (indicates active response)
+    const stopButton = document.querySelector('[data-testid="stop-button"]');
+    if (stopButton && !operation.milestones.find(m => m.milestone === 'response_started')) {
+      this.notifyMilestone(operationId, 'response_started');
+    } else if (!stopButton && operation.milestones.find(m => m.milestone === 'response_started') && 
+               !operation.milestones.find(m => m.milestone === 'response_completed')) {
+      this.notifyMilestone(operationId, 'response_completed');
+    }
+  }
+
+  notifyMilestone(operationId, milestone, data = {}) {
+    const operation = this.activeOperations.get(operationId);
+    if (operation) {
+      operation.milestones.push({
+        milestone,
+        timestamp: Date.now(),
+        data
+      });
+      
+      console.log(`[ConversationObserver] Milestone: ${operationId} - ${milestone}`);
+      
+      // Send to background script
+      chrome.runtime.sendMessage({
+        type: 'operation_milestone',
+        operationId,
+        milestone,
+        timestamp: Date.now(),
+        ...data
+      }).catch(err => {
+        console.warn('[ConversationObserver] Failed to send milestone:', err);
+      });
+    }
+  }
+
+  // Public API for scripts to register operations
+  registerOperation(operationId, type, params = {}) {
+    return this.trackOperation(operationId, type, params);
+  }
+
+  unregisterOperation(operationId) {
+    this.activeOperations.delete(operationId);
+  }
+
+  getActiveOperations() {
+    return Array.from(this.activeOperations.entries());
+  }
+
+  destroy() {
+    if (this.observer) {
+      this.observer.disconnect();
+    }
+    this.activeOperations.clear();
+  }
+}
+
+// Global conversation observer instance
+let conversationObserver;
+
 class ClaudeSessionDetector {
   constructor() {
     this.sessionInfo = null;
@@ -224,7 +496,11 @@ let claudeSession;
 if (window.location.hostname === 'claude.ai') {
   claudeSession = new ClaudeSessionDetector();
   
+  // Initialize conversation observer for event-driven completion detection
+  conversationObserver = new ConversationObserver();
+  
   // Make utilities available globally for debugging
   window.ClaudePageUtils = ClaudePageUtils;
   window.claudeSession = claudeSession;
+  window.conversationObserver = conversationObserver;
 }
