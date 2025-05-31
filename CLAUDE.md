@@ -3,10 +3,10 @@
 Quick reference for Claude. See README.md for full documentation.
 
 ## Current Session  
-- Focus: MCP JSON Parsing Error Resolution & Server Stability
+- Focus: CustomEvent Bridge Implementation for Async System
 - Last update: 2025-05-31
 - Version: 2.4.1
-- Status: COMPLETED - Fixed JSON parsing errors, server stability confirmed, system operational
+- Status: READY FOR TESTING - CustomEvent bridge implemented, awaiting verification
 
 ## Quick Commands - After Restart
 ```bash
@@ -42,59 +42,60 @@ mcp__claude-chrome-mcp__get_claude_dot_ai_response --tabId <tab_id> --waitForCom
 ## Recent Updates (2025-05-31)
 - **COMPLETED**: MCP JSON Parsing Error Resolution
   - Fixed console.log statements in OperationManager corrupting stdout JSON-RPC stream
-  - Changed all console.log to console.error to preserve MCP protocol integrity
-  - Resolved "Unexpected token 'O', '[OperationM'..." parsing errors in Claude Desktop
   - Server now starts cleanly without JSON corruption
-- **COMPLETED**: Enhanced MCP Server Stability
-  - Replaced server.js with robust enhanced version (server-enhanced.js)
+- **COMPLETED**: Enhanced MCP Server Stability  
+  - Replaced server.js with robust enhanced version
   - Added comprehensive error tracking and lifecycle management
-  - Implemented proper signal handling (SIGTERM, SIGINT) with graceful shutdown
-  - Added connection state management and health monitoring
-  - Robust error boundaries preventing crashes and early exits
-  - Timeout protection for all operations
-- **COMPLETED**: Optimized Network Detection
-  - Created content-network.js - clean, performant content script
-  - Fixed milestone notification message type mismatch
-  - Removed redundant DOM-based detection methods
-  - Network-level completion detection now working reliably
-- **COMPLETED**: System Integration & Testing
-  - Verified enhanced server handles MCP protocol correctly
-  - Tested graceful shutdown and health monitoring
-  - Updated extension to use optimized content script
-  - All components working together seamlessly
-- **KEY INSIGHT**: Clean JSON-RPC + enhanced server stability = reliable MCP system
-- **STATUS**: System is production-ready and stable
+  - Implemented proper signal handling with graceful shutdown
+- **COMPLETED**: Content Script Injection Fixes
+  - Fixed manifest.json to use content-network.js consistently
+  - Implemented hybrid MAIN/ISOLATED world content script injection
+  - Network detection working, detecting responses reliably
+- **COMPLETED**: CustomEvent Bridge Implementation
+  - Research confirmed: Scripts in MAIN world don't have chrome.runtime access
+  - Replaced window.postMessage with CustomEvent for cross-world communication
+  - More reliable bridge pattern following Chrome extension best practices
+  - Both milestone reporting and operation registration updated
+- **CURRENT ISSUE**: Bridge communication needs testing
+  - Network detection works (responses detected: "81", "9*9=81")
+  - message_sent milestones working, response_completed milestones missing
+  - CustomEvent bridge should fix the communication gap
+- **STATUS**: Ready for testing - extension reload and async workflow verification needed
 
 ## Continuation Instructions for Next Session
 When you type 'continue', the system is ready for:
 
-1. **PRIORITY ITEM**: Fix Bridge Communication Issue
-   - Content script injection now working correctly
-   - Network detection working (operations cleaned up properly)
-   - Bridge between MAIN/ISOLATED worlds not sending milestones to MCP server
-   - Need to debug chrome.runtime.sendMessage communication
+1. **PRIORITY ITEM**: Test CustomEvent Bridge Implementation
+   - CustomEvent bridge implemented to fix MAIN/ISOLATED world communication
+   - Need to reload extension and test async workflow end-to-end
+   - Verify response_completed milestones now reach MCP server operations state
 
 2. **System Health Status**:
    - ✅ JSON parsing errors RESOLVED - MCP communication clean
    - ✅ Enhanced server with stability features operational  
-   - ✅ Content script injection fixed (hybrid MAIN/ISOLATED approach)
-   - ✅ Network detection working (operations removed correctly)
-   - ❌ Milestone notifications not reaching MCP server
+   - ✅ Content script injection FIXED - hybrid MAIN/ISOLATED worlds loading
+   - ✅ Network detection WORKING - responses detected reliably
+   - ✅ CustomEvent bridge IMPLEMENTED - awaiting verification
 
 3. **Current State**:
-   - Fixed content script injection using hybrid approach (MAIN + ISOLATED worlds)
-   - Updated DOM selectors from `[data-message-author-role="assistant"]` to `div[class*="message"]`
-   - Removed manifest content_scripts declaration to avoid conflicts
-   - Network-based detection working but bridge communication failing
+   - CustomEvent bridge replaces postMessage (extension/background.js)
+   - manifest.json fixed to use content-network.js consistently
+   - Network detection working: detects "81", "9*9=81" responses
+   - message_sent milestones working, response_completed pending bridge test
+   - All changes committed: git commits af13148, 06905c6
 
 4. **Files Changed in This Session**:
-   - `extension/background.js` (implemented hybrid content script injection)
-   - `extension/manifest.json` (removed content_scripts declaration)
+   - `extension/background.js` (CustomEvent bridge implementation)
+   - `extension/manifest.json` (fixed content script path)
    - `CLAUDE.md` (updated with session results)
+   - `tests/test-bridge-communication.js` (added for testing)
 
 5. **Next Priorities**:
-   - Debug bridge communication between MAIN/ISOLATED worlds
-   - Verify chrome.runtime.sendMessage reaching background script
+   - Reload Chrome extension to apply CustomEvent bridge changes
+   - Test: mcp__claude-chrome-mcp__spawn_claude_dot_ai_tab --injectContentScript true
+   - Test: mcp__claude-chrome-mcp__send_message_async with wait_for_operation
+   - Verify response_completed milestones reach operations state
+   - Validate complete async workflow functionality
    - Test milestone reception in background script message handlers
    - Implement fallback detection if bridge communication fails
    - Validate end-to-end async workflow completion
