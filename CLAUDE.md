@@ -3,10 +3,10 @@
 Quick reference for Claude. See README.md for full documentation.
 
 ## Current Session
-- Focus: Testing Fixed ContentScriptManager Auto-Injection & Complete Async Workflow
+- Focus: Fast and Reliable Async Functionality - Optimized ContentScriptManager & ConversationObserver
 - Last update: 2025-05-31
 - Version: 2.4.0 
-- Status: ContentScriptManager auto-injection fixed for Manifest V3, ready for end-to-end testing
+- Status: Removed tab reloading kludge, created fast content script, simplified injection - ready for testing optimized async workflow
 
 ## Quick Commands
 ```bash
@@ -40,18 +40,14 @@ mcp__claude-chrome-mcp__wait_for_operation --operationId <operation_id>
 - Roadmap: ROADMAP.md
 
 ## Recent Updates (2025-05-31)
-- **FIXED**: ContentScriptManager auto-injection for Manifest V3
-  - Event listeners moved to top of background.js for service worker persistence
-  - Chrome.scripting.executeScript with chrome.debugger fallback
-  - Proper global variable handling for contentScriptManager reference
-- **ENHANCED**: ConversationObserver completion detection
-  - Added monitorResponseElement() for real-time response tracking
-  - Added checkResponseContentCompletion() with 2-second delay detection
-  - Enhanced mutation observers for text changes and completion states
-- **COMPLETED**: Async spawn_claude_dot_ai_tab with injection options
-  - waitForLoad, injectContentScript, waitForReady options added
-  - Content script injection verification and tab preparation
-- **READY**: Complete async workflow from spawn → inject → send → detect → notify
+- **OPTIMIZED**: Fast and reliable async functionality (COMPLETED)
+  - Removed tab reloading kludge from ContentScriptManager  
+  - Created content-fast.js with streamlined ConversationObserver
+  - Simplified injection: direct chrome.scripting without verification steps
+  - Removed complex debugger fallback methods for speed
+  - ContentScriptManager now uses single-path injection for reliability
+- **READY**: Test optimized async workflow with fast content script
+- **NEXT**: Test new optimized tools after Claude Code restart
 
 ## Development Guidelines
 - Commit frequently so that you can review changes
