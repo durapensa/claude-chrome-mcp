@@ -1,163 +1,133 @@
 #!/usr/bin/env node
 
 /**
- * Test script for extract_conversation_elements improvements
- * 
- * This script tests the fix for Issue #4: extract_conversation_elements MCP Timeout
- * 
- * Usage: node test-extract-elements.js
+ * Test extract_conversation_elements improvements with batching
+ * Version 2: Uses shared MCP client
  */
 
-const { Client } = require('@modelcontextprotocol/sdk/client/index.js');
-const { StdioClientTransport } = require('@modelcontextprotocol/sdk/client/stdio.js');
-
-async function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
+const sharedClient = require('./helpers/shared-client');
+const TestLifecycle = require('./helpers/lifecycle');
 
 async function testExtractElements() {
   console.log('🧪 Testing extract_conversation_elements improvements...\n');
   
-  // Create MCP client
-  const transport = new StdioClientTransport({
-    command: 'node',
-    args: ['../mcp-server/src/server.js']
-  });
-  
-  const client = new Client({
-    name: 'test-extract-elements',
-    version: '1.0.0'
-  }, {
-    capabilities: {}
-  });
-  
-  await client.connect(transport);
-  console.log('✅ Connected to MCP server\n');
+  const lifecycle = new TestLifecycle();
+  let tabId = null;
   
   try {
-    // Step 1: Create a test tab with rich content
+    // Step 1: Create test tab
     console.log('1️⃣ Creating test Claude tab...');
-    const spawnResult = await client.callTool('spawn_claude_tab', {});
-    const tabId = spawnResult.content[0].text.match(/Tab ID: (\d+)/)?.[1];
-    
-    if (!tabId) {
-      throw new Error('Failed to extract tab ID from spawn result');
-    }
-    
-    console.log(`✅ Created tab with ID: ${tabId}\n`);
+    const spawnResult = await sharedClient.callTool('spawn_claude_tab', {});
+    const tabInfo = JSON.parse(spawnResult.content[0].text);
+    tabId = tabInfo.id;
+    lifecycle.addTab(tabId);
+    console.log(`✅ Created tab: ${tabId}\n`);
     
     // Wait for tab to load
-    await sleep(5000);
+    await new Promise(resolve => setTimeout(resolve, 5000));
     
-    // Step 2: Send messages that will create artifacts and code blocks
-    console.log('2️⃣ Creating conversation with rich content...');
+    // Step 2: Send messages with various elements
+    console.log('2️⃣ Sending messages with code blocks and artifacts...');
     
-    await client.callTool('send_message_to_claude_tab', {
-      tabId: parseInt(tabId),
-      message: 'Create a simple HTML file with CSS and JavaScript that shows a counter',
-      waitForReady: true
-    });
+    const messages = [
+      'Can you show me a Python function to calculate fibonacci numbers?',
+      'Now show me the same in JavaScript with proper error handling',
+      'Create a React component that displays a counter'
+    ];
     
-    console.log('⏳ Waiting for response with artifacts...');
-    await sleep(15000);
-    
-    await client.callTool('send_message_to_claude_tab', {
-      tabId: parseInt(tabId),
-      message: 'Now add 5 more features to the counter with code examples',
-      waitForReady: true
-    });
-    
-    console.log('⏳ Waiting for more content...');
-    await sleep(15000);
-    
-    // Step 3: Test extraction with default parameters
-    console.log('\n3️⃣ Testing extraction with default parameters...');
-    const startTime = Date.now();
-    
-    try {
-      const defaultResult = await client.callTool('extract_conversation_elements', {
-        tabId: parseInt(tabId)
+    for (let i = 0; i < messages.length; i++) {
+      console.log(`   Sending message ${i + 1}/${messages.length}...`);
+      await sharedClient.callTool('send_message_to_claude_tab', {
+        tabId: tabId,
+        message: messages[i],
+        waitForReady: true
       });
       
-      const elapsed = Date.now() - startTime;
-      console.log(`✅ Default extraction completed in ${elapsed}ms`);
+      // Wait for response
+      await new Promise(resolve => setTimeout(resolve, 5000));
       
-      const data = JSON.parse(defaultResult.content[0].text);
-      console.log(`   Found: ${data.artifacts.length} artifacts, ${data.codeBlocks.length} code blocks, ${data.toolUsage.length} tool usage`);
-      console.log(`   Total elements: ${data.totalElements}`);
-      if (data.truncated) {
-        console.log(`   ⚠️  Extraction was truncated at ${data.maxElementsReached} elements`);
-      }
-    } catch (error) {
-      console.log(`❌ Default extraction failed: ${error.message}`);
-    }
-    
-    // Step 4: Test with small batch size
-    console.log('\n4️⃣ Testing extraction with small batch size...');
-    const startTime2 = Date.now();
-    
-    try {
-      const batchResult = await client.callTool('extract_conversation_elements', {
-        tabId: parseInt(tabId),
-        batchSize: 10,
-        maxElements: 50
+      // Get response to ensure it completed
+      await sharedClient.callTool('get_claude_response', {
+        tabId: tabId,
+        waitForCompletion: true,
+        timeoutMs: 15000
       });
       
-      const elapsed = Date.now() - startTime2;
-      console.log(`✅ Batch extraction completed in ${elapsed}ms`);
-      
-      const data = JSON.parse(batchResult.content[0].text);
-      console.log(`   Found: ${data.artifacts.length} artifacts, ${data.codeBlocks.length} code blocks`);
-      console.log(`   Total elements: ${data.totalElements}`);
-      if (data.truncated) {
-        console.log(`   ⚠️  Extraction was truncated at ${data.maxElementsReached} elements`);
-      }
-    } catch (error) {
-      console.log(`❌ Batch extraction failed: ${error.message}`);
+      console.log(`   ✅ Response ${i + 1} received`);
     }
     
-    // Step 5: Test execute_script workaround for comparison
-    console.log('\n5️⃣ Testing execute_script workaround...');
-    const startTime3 = Date.now();
-    
-    try {
-      const scriptResult = await client.callTool('execute_script', {
-        tabId: parseInt(tabId),
-        script: `
-          const elements = document.querySelectorAll('pre > code').length;
-          const artifacts = document.querySelectorAll('[data-testid*="artifact"]').length;
-          ({ codeBlocks: elements, artifacts: artifacts })
-        `
-      });
-      
-      const elapsed = Date.now() - startTime3;
-      console.log(`✅ Execute script completed in ${elapsed}ms`);
-      console.log(`   Result: ${scriptResult.content[0].text}`);
-    } catch (error) {
-      console.log(`❌ Execute script failed: ${error.message}`);
-    }
-    
-    // Clean up
-    console.log('\n🧹 Cleaning up...');
-    await client.callTool('close_claude_tab', {
-      tabId: parseInt(tabId),
-      force: true
+    console.log('\n3️⃣ Testing element extraction with default parameters...');
+    const extractDefault = await sharedClient.callTool('extract_conversation_elements', {
+      tabId: tabId
     });
-    console.log('✅ Closed test tab');
     
-  } catch (error) {
-    console.error('❌ Test failed:', error);
-  } finally {
-    await client.close();
+    const defaultData = JSON.parse(extractDefault.content[0].text);
+    console.log('Default extraction results:');
+    console.log(`  - Success: ${defaultData.success}`);
+    console.log(`  - Code blocks: ${defaultData.data.codeBlocks.length}`);
+    console.log(`  - Artifacts: ${defaultData.data.artifacts.length}`);
+    console.log(`  - Tool uses: ${defaultData.data.toolUses.length}`);
+    console.log(`  - Truncated: ${defaultData.truncated || false}`);
+    
+    // Step 4: Test with custom batch parameters
+    console.log('\n4️⃣ Testing extraction with custom batch parameters...');
+    const extractCustom = await sharedClient.callTool('extract_conversation_elements', {
+      tabId: tabId,
+      batchSize: 2,
+      maxElements: 3
+    });
+    
+    const customData = JSON.parse(extractCustom.content[0].text);
+    console.log('Custom extraction results (batchSize: 2, maxElements: 3):');
+    console.log(`  - Success: ${customData.success}`);
+    console.log(`  - Code blocks: ${customData.data.codeBlocks.length}`);
+    console.log(`  - Artifacts: ${customData.data.artifacts.length}`);
+    console.log(`  - Tool uses: ${customData.data.toolUses.length}`);
+    console.log(`  - Truncated: ${customData.truncated}`);
+    console.log(`  - Max elements reached: ${customData.maxElementsReached || 'N/A'}`);
+    
+    // Step 5: Verify extracted content
+    console.log('\n5️⃣ Verifying extracted content...');
+    if (defaultData.data.codeBlocks.length > 0) {
+      const firstBlock = defaultData.data.codeBlocks[0];
+      console.log('First code block:');
+      console.log(`  - Language: ${firstBlock.language || 'plain'}`);
+      console.log(`  - Length: ${firstBlock.content.length} characters`);
+      console.log(`  - Preview: ${firstBlock.content.substring(0, 50)}...`);
+    }
+    
+    // Summary
+    console.log('\n📊 Summary:');
+    console.log('  - Added batchSize and maxElements parameters to prevent timeouts');
+    console.log('  - Extraction now processes elements in batches');
+    console.log('  - Early termination when maxElements is reached');
+    console.log('  - Improved performance for large conversations');
+    
     console.log('\n✅ Test completed');
     
-    console.log('\n📊 Summary:');
-    console.log('- Added batchSize and maxElements parameters to prevent timeouts');
-    console.log('- Extraction now processes elements in batches');
-    console.log('- Early termination when maxElements is reached');
-    console.log('- Improved performance for large conversations');
+    return {
+      success: defaultData.success && customData.success,
+      elementsCaptured: defaultData.data.codeBlocks.length > 0
+    };
+    
+  } catch (error) {
+    console.error('❌ Test failed:', error.message);
+    return { success: false, error: error.message };
+  } finally {
+    await lifecycle.teardown();
   }
 }
 
 // Run the test
-testExtractElements().catch(console.error);
+if (require.main === module) {
+  testExtractElements()
+    .then(result => {
+      process.exit(result.success ? 0 : 1);
+    })
+    .catch(error => {
+      console.error('Fatal error:', error);
+      process.exit(1);
+    });
+}
+
+module.exports = testExtractElements;

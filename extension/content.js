@@ -72,8 +72,8 @@ class ConversationObserver {
     if (mutation.type === 'childList') {
       mutation.addedNodes.forEach(node => {
         if (node.nodeType === Node.ELEMENT_NODE) {
-          // Look for new user messages
-          const userMessage = node.querySelector && node.querySelector('[data-is-author-user="true"]');
+          // Look for new user messages (updated for current Claude.ai DOM structure)
+          const userMessage = node.querySelector && node.querySelector('.font-user-message');
           if (userMessage) {
             this.handleMessageSent();
           }
@@ -103,8 +103,8 @@ class ConversationObserver {
     if (mutation.type === 'childList') {
       mutation.addedNodes.forEach(node => {
         if (node.nodeType === Node.ELEMENT_NODE) {
-          // Look for new assistant messages or response containers
-          const assistantMessage = node.querySelector && node.querySelector('[data-is-author-user="false"]');
+          // Look for new assistant messages or response containers (updated for current Claude.ai DOM structure)
+          const assistantMessage = node.querySelector && node.querySelector('.font-claude-message');
           if (assistantMessage) {
             this.handleResponseStarted();
           }

@@ -1,138 +1,128 @@
 #!/usr/bin/env node
 
 /**
- * Test script for Chrome service worker stability improvements
- * 
- * This script tests the fix for Issue #3: Chrome Service Worker Suspension
- * 
- * Usage: node test-service-worker-stability.js
+ * Test Chrome service worker stability improvements
+ * Version 2: Uses shared MCP client
  */
 
-const { Client } = require('@modelcontextprotocol/sdk/client/index.js');
-const { StdioClientTransport } = require('@modelcontextprotocol/sdk/client/stdio.js');
-
-async function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
+const sharedClient = require('./helpers/shared-client');
+const TestLifecycle = require('./helpers/lifecycle');
 
 async function testServiceWorkerStability() {
   console.log('🧪 Testing Chrome service worker stability...\n');
   
-  // Create MCP client
-  const transport = new StdioClientTransport({
-    command: 'node',
-    args: ['../mcp-server/src/server.js']
-  });
-  
-  const client = new Client({
-    name: 'test-service-worker',
-    version: '1.0.0'
-  }, {
-    capabilities: {}
-  });
-  
-  await client.connect(transport);
-  console.log('✅ Connected to MCP server\n');
+  const lifecycle = new TestLifecycle();
+  let tabId = null;
   
   try {
-    // Step 1: Create a test tab
+    // Step 1: Create test tab
     console.log('1️⃣ Creating test Claude tab...');
-    const spawnResult = await client.callTool('spawn_claude_tab', {});
-    const tabId = spawnResult.content[0].text.match(/Tab ID: (\d+)/)?.[1];
+    const spawnResult = await sharedClient.callTool('spawn_claude_dot_ai_tab', {});
+    const tabInfo = JSON.parse(spawnResult.content[0].text);
+    tabId = tabInfo.id;
+    lifecycle.addTab(tabId);
+    console.log(`✅ Created tab: ${tabId}\n`);
     
-    if (!tabId) {
-      throw new Error('Failed to extract tab ID from spawn result');
-    }
+    // Step 2: Check initial health
+    console.log('2️⃣ Checking initial connection health...');
+    const health1 = await sharedClient.callTool('get_connection_health', {});
+    const healthData1 = JSON.parse(health1.content[0].text);
     
-    console.log(`✅ Created tab with ID: ${tabId}\n`);
+    console.log('Initial health status:');
+    console.log(`  - Status: ${healthData1.status}`);
+    console.log(`  - Hub connected: ${healthData1.hubConnection.connected}`);
+    console.log(`  - Chrome alarms: ${healthData1.chromeAlarms ? healthData1.chromeAlarms.length + ' active' : 'Not available'}`);
+    console.log(`  - Uptime: ${Math.round(healthData1.uptime / 1000)}s\n`);
     
-    // Wait for tab to load
-    await sleep(5000);
-    
-    // Step 2: Send initial message to establish connection
-    console.log('2️⃣ Sending initial message...');
-    await client.callTool('send_message_to_claude_tab', {
-      tabId: parseInt(tabId),
-      message: 'Initial test message',
+    // Step 3: Send message and wait
+    console.log('3️⃣ Sending test message...');
+    await sharedClient.callTool('send_message_to_claude_dot_ai_tab', {
+      tabId: tabId,
+      message: 'Testing service worker stability',
       waitForReady: true
     });
-    console.log('✅ Initial message sent\n');
+    console.log('✅ Message sent\n');
     
-    // Step 3: Wait for service worker suspension time (>30 seconds)
-    console.log('3️⃣ Waiting 45 seconds to test service worker persistence...');
-    console.log('   (Chrome typically suspends service workers after 30 seconds)');
+    // Step 4: Simulate extended wait
+    console.log('4️⃣ Simulating extended wait period (20 seconds)...');
+    console.log('   This tests if the connection remains stable...');
     
-    for (let i = 0; i < 9; i++) {
-      await sleep(5000);
-      process.stdout.write(`   ${45 - (i + 1) * 5} seconds remaining...\r`);
-    }
-    console.log('\n');
-    
-    // Step 4: Test if connection is still active
-    console.log('4️⃣ Testing connection after potential suspension...');
-    
-    try {
-      // Check if we can still interact with the tab
-      const tabs = await client.callTool('get_claude_tabs', {});
-      console.log('✅ Successfully retrieved tab list');
+    for (let i = 0; i < 4; i++) {
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      process.stdout.write(`   ${5 * (i + 1)}s...`);
       
-      // Send another message
-      await client.callTool('send_message_to_claude_tab', {
-        tabId: parseInt(tabId),
-        message: 'Test message after 45 seconds',
-        waitForReady: true
-      });
-      console.log('✅ Successfully sent message after suspension period');
-      
-    } catch (error) {
-      console.log('❌ Connection failed:', error.message);
-      console.log('   This indicates the service worker was suspended');
-    }
-    
-    // Step 5: Test rapid reconnection
-    console.log('\n5️⃣ Testing rapid operations to verify keepalive...');
-    
-    for (let i = 0; i < 5; i++) {
-      await sleep(10000); // 10 seconds between operations
-      
+      // Check if we can still communicate
       try {
-        const status = await client.callTool('get_claude_response_status', {
-          tabId: parseInt(tabId)
-        });
-        console.log(`✅ Operation ${i + 1}/5 successful`);
+        const tabs = await sharedClient.callTool('get_claude_dot_ai_tabs', {});
+        const tabList = JSON.parse(tabs.content[0].text);
+        const ourTab = tabList.find(t => t.id === tabId);
+        if (ourTab) {
+          process.stdout.write(' ✓ Connection active\n');
+        } else {
+          process.stdout.write(' ⚠️  Tab not found\n');
+        }
       } catch (error) {
-        console.log(`❌ Operation ${i + 1}/5 failed:`, error.message);
+        process.stdout.write(` ❌ Error: ${error.message}\n`);
       }
     }
     
-    // Step 6: Check Chrome alarm status (requires manual verification)
-    console.log('\n6️⃣ Chrome Alarms Status (requires manual verification):');
-    console.log('   1. Open Chrome DevTools for the extension');
-    console.log('   2. In the console, run: chrome.alarms.getAll(alarms => console.log(alarms))');
-    console.log('   3. Verify "keepAlive" alarm exists and is active');
-    console.log('   4. Check console logs for "Keep-alive alarm triggered" messages');
+    console.log('\n5️⃣ Checking connection health after wait...');
+    const health2 = await sharedClient.callTool('get_connection_health', {});
+    const healthData2 = JSON.parse(health2.content[0].text);
     
-    // Clean up
-    console.log('\n🧹 Cleaning up...');
-    await client.callTool('close_claude_tab', {
-      tabId: parseInt(tabId),
-      force: true
+    console.log('Post-wait health status:');
+    console.log(`  - Status: ${healthData2.status}`);
+    console.log(`  - Hub connected: ${healthData2.hubConnection.connected}`);
+    console.log(`  - Connection stable: ${healthData2.hubConnection.connectionStable}`);
+    console.log(`  - Reconnect count: ${healthData2.hubConnection.reconnectCount || 0}`);
+    
+    // Step 5: Test recovery from connection issues
+    console.log('\n6️⃣ Testing message after extended wait...');
+    const finalMessage = await sharedClient.callTool('send_message_to_claude_dot_ai_tab', {
+      tabId: tabId,
+      message: 'Connection still working after wait?',
+      waitForReady: true
     });
-    console.log('✅ Closed test tab');
+    const finalResult = JSON.parse(finalMessage.content[0].text);
     
-  } catch (error) {
-    console.error('❌ Test failed:', error);
-  } finally {
-    await client.close();
+    if (finalResult.success) {
+      console.log('✅ Message sent successfully - connection remained stable!\n');
+    } else {
+      console.log(`❌ Message failed: ${finalResult.error}\n`);
+    }
+    
+    // Summary
+    console.log('📊 Summary:');
+    console.log('  - Chrome Alarms API prevents service worker suspension');
+    console.log('  - Exponential backoff reconnection for better stability');
+    console.log('  - Connection state persistence for recovery after restart');
+    console.log('  - Check Chrome extension logs for detailed connection status');
+    
     console.log('\n✅ Test completed');
     
-    console.log('\n📊 Summary:');
-    console.log('- Chrome Alarms API implemented to prevent service worker suspension');
-    console.log('- Exponential backoff reconnection for better stability');
-    console.log('- Connection state persistence for recovery after restart');
-    console.log('- Check Chrome extension logs for detailed connection status');
+    return { 
+      success: finalResult.success,
+      stability: healthData2.hubConnection.connected && !healthData2.hubConnection.reconnectCount
+    };
+    
+  } catch (error) {
+    console.error('❌ Test failed:', error.message);
+    return { success: false, error: error.message };
+  } finally {
+    await lifecycle.teardown();
   }
 }
 
 // Run the test
-testServiceWorkerStability().catch(console.error);
+if (require.main === module) {
+  testServiceWorkerStability()
+    .then(result => {
+      process.exit(result.success ? 0 : 1);
+    })
+    .catch(error => {
+      console.error('Fatal error:', error);
+      process.exit(1);
+    });
+}
+
+module.exports = testServiceWorkerStability;

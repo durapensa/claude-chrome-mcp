@@ -1,0 +1,314 @@
+{
+  "operations": [
+    [
+      "send_message_1748713220690_kni3vviw3",
+      {
+        "id": "send_message_1748713220690_kni3vviw3",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570636,
+          "message": "Hello! This is a test of the new event-driven completion detection system. Please respond with a simple confirmation that you received this message.",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748713221013,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748713220690,
+        "lastUpdated": 1748713221013
+      }
+    ],
+    [
+      "get_response_1748713248603_eyrxkad9a",
+      {
+        "id": "get_response_1748713248603_eyrxkad9a",
+        "type": "get_response",
+        "params": {
+          "tabId": 948570636,
+          "waitForCompletion": true
+        },
+        "status": "completed",
+        "milestones": [
+          {
+            "milestone": "response_completed",
+            "timestamp": 1748713249218,
+            "data": {
+              "response": {
+                "isAssistant": true,
+                "isComplete": true,
+                "isUser": false,
+                "success": true,
+                "text": "Hello! I received your message. This is my confirmation that the event-driven completion detection system test is working.",
+                "timestamp": 1748713249216,
+                "totalMessages": 2
+              }
+            }
+          }
+        ],
+        "createdAt": 1748713248603,
+        "lastUpdated": 1748713249218
+      }
+    ],
+    [
+      "send_message_1748713255922_ltxavx91g",
+      {
+        "id": "send_message_1748713255922_ltxavx91g",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570636,
+          "message": "Please write a short Python function that calculates the factorial of a number. Take your time to think through it and provide a complete solution with comments.",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748713256256,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748713255922,
+        "lastUpdated": 1748713256256
+      }
+    ],
+    [
+      "get_response_1748713280726_n90ccgq7z",
+      {
+        "id": "get_response_1748713280726_n90ccgq7z",
+        "type": "get_response",
+        "params": {
+          "tabId": 948570636,
+          "waitForCompletion": true
+        },
+        "status": "completed",
+        "milestones": [
+          {
+            "milestone": "response_completed",
+            "timestamp": 1748713281345,
+            "data": {
+              "response": {
+                "isAssistant": true,
+                "isComplete": true,
+                "isUser": false,
+                "success": true,
+                "text": "Here's a Python function to calculate the factorial of a number:\npythondef factorial(n):\n    \"\"\"\n    Calculate the factorial of a non-negative integer.\n    \n    Args:\n        n (int): A non-negative integer\n        \n    Returns:\n        int: The factorial of n (n!)\n        \n    Raises:\n        ValueError: If n is negative\n        TypeError: If n is not an integer\n    \"\"\"\n    # Input validation\n    if not isinstance(n, int):\n        raise TypeError(\"Input must be an integer\")\n    \n    if n < 0:\n        raise ValueError(\"Factorial is not defined for negative numbers\")\n    \n    # Base cases: 0! = 1 and 1! = 1\n    if n == 0 or n == 1:\n        return 1\n    \n    # Calculate factorial iteratively\n    result = 1\n    for i in range(2, n + 1):\n        result *= i\n    \n    return result\n\n# Example usage\nif __name__ == \"__main__\":\n    # Test the function with some examples\n    test_values = [0, 1, 5, 10]\n    \n    for value in test_values:\n        result = factorial(value)\n        print(f\"{value}! = {result}\")\nThis implementation uses an iterative approach which is more memory-efficient than recursion for large numbers. The function includes proper error handling for invalid inputs and clear documentation explaining its behavior.",
+                "timestamp": 1748713281343,
+                "totalMessages": 4
+              }
+            }
+          }
+        ],
+        "createdAt": 1748713280726,
+        "lastUpdated": 1748713281345
+      }
+    ],
+    [
+      "send_message_1748713910219_obeoq16mk",
+      {
+        "id": "send_message_1748713910219_obeoq16mk",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570638,
+          "message": "Hello! This is a live test from Claude Code. You should see this message appear in your browser in real-time. Please respond with \"Live test confirmed!\" to demonstrate the event-driven completion detection.",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748713910548,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748713910219,
+        "lastUpdated": 1748713910548
+      }
+    ],
+    [
+      "get_response_1748713935262_em52reupg",
+      {
+        "id": "get_response_1748713935262_em52reupg",
+        "type": "get_response",
+        "params": {
+          "tabId": 948570638,
+          "waitForCompletion": true
+        },
+        "status": "completed",
+        "milestones": [
+          {
+            "milestone": "response_completed",
+            "timestamp": 1748713936890,
+            "data": {
+              "response": {
+                "isAssistant": true,
+                "isComplete": true,
+                "isUser": false,
+                "success": true,
+                "text": "Great! It looks like the live test is working perfectly. The real-time communication between Claude Code and the browser interface is functioning as expected. Is there anything specific you'd like to test or work on now that we've confirmed the connection?",
+                "timestamp": 1748713936889,
+                "totalMessages": 4
+              }
+            }
+          }
+        ],
+        "createdAt": 1748713935262,
+        "lastUpdated": 1748713936890
+      }
+    ],
+    [
+      "send_message_1748714915521_dkwlkhxva",
+      {
+        "id": "send_message_1748714915521_dkwlkhxva",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570642,
+          "message": "Hello, this is a test of the async message system",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748714915851,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748714915521,
+        "lastUpdated": 1748714915851
+      }
+    ],
+    [
+      "get_response_1748714936477_xsz0bivii",
+      {
+        "id": "get_response_1748714936477_xsz0bivii",
+        "type": "get_response",
+        "params": {
+          "tabId": 948570642,
+          "waitForCompletion": true
+        },
+        "status": "completed",
+        "milestones": [
+          {
+            "milestone": "response_completed",
+            "timestamp": 1748714937105,
+            "data": {
+              "response": {
+                "isAssistant": true,
+                "isComplete": true,
+                "isUser": false,
+                "success": true,
+                "text": "Hello! I can see your message came through clearly. The async message system appears to be working fine from my end. Is there anything specific you'd like to test or discuss while you're here?",
+                "timestamp": 1748714937103,
+                "totalMessages": 2
+              }
+            }
+          }
+        ],
+        "createdAt": 1748714936477,
+        "lastUpdated": 1748714937105
+      }
+    ],
+    [
+      "send_message_1748715429232_jcsbxlavt",
+      {
+        "id": "send_message_1748715429232_jcsbxlavt",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570646,
+          "message": "Testing async completion detection with manually injected observer",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748715429557,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748715429232,
+        "lastUpdated": 1748715429557
+      }
+    ],
+    [
+      "send_message_1748715591887_txtxtytcy",
+      {
+        "id": "send_message_1748715591887_txtxtytcy",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570648,
+          "message": "Testing updated ConversationObserver with new Claude.ai DOM structure!",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748715592214,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748715591887,
+        "lastUpdated": 1748715592214
+      }
+    ],
+    [
+      "send_message_1748716092989_ua485vt84",
+      {
+        "id": "send_message_1748716092989_ua485vt84",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570648,
+          "message": "Final async test - please respond with \"Async flow working correctly\"",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748716093321,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748716092989,
+        "lastUpdated": 1748716093321
+      }
+    ],
+    [
+      "get_response_1748716143448_6l2xdtm6m",
+      {
+        "id": "get_response_1748716143448_6l2xdtm6m",
+        "type": "get_response",
+        "params": {
+          "tabId": 948570648,
+          "waitForCompletion": true
+        },
+        "status": "completed",
+        "milestones": [
+          {
+            "milestone": "response_completed",
+            "timestamp": 1748716144071,
+            "data": {
+              "response": {
+                "isAssistant": true,
+                "isComplete": true,
+                "isUser": false,
+                "success": true,
+                "text": "Async flow working correctly",
+                "timestamp": 1748716144069,
+                "totalMessages": 10
+              }
+            }
+          }
+        ],
+        "createdAt": 1748716143448,
+        "lastUpdated": 1748716144071
+      }
+    ]
+  ],
+  "lastSaved": 1748716144071
+}
