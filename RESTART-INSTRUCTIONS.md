@@ -1,32 +1,30 @@
-# Restart Instructions - Discovery Framework Session
+# Restart Instructions - Event-Driven Completion Detection
 
 **Date**: 2025-05-31  
-**Context**: Automated API/UI Discovery Framework Implementation Complete  
-**Next Task**: Run production discovery against live Claude.ai
+**Context**: Event-Driven Completion Detection Implementation Complete  
+**Next Task**: Test the new async tools and event-driven system
 
 ## 🚀 Session Context
 
 ### ✅ Major Achievement Completed
-Successfully implemented **Automated API and UI Discovery Framework** with:
-- Complete API discovery with network capture automation
-- UI element discovery with selector reliability testing  
-- Knowledge base management with versioning and change detection
-- Production-ready scenarios and comprehensive testing
-- **All code committed** (8 commits, 13,000+ lines of functionality)
+Successfully implemented **Event-Driven Completion Detection System** with:
+- OperationManager: Async operation state management with persistence
+- NotificationManager: MCP notification system for progress updates  
+- ConversationObserver: DOM MutationObserver for milestone detection
+- New async tools: send_message_async, get_response_async, wait_for_operation
+- **All code committed** - Complete event-driven architecture replacing timeout-based operations
 
-### 📁 Key Files Created
-- `shared/discovery-framework.js` - Core API discovery system
-- `shared/ui-discovery-framework.js` - UI element discovery system
-- `shared/discovery-scenarios.js` - Predefined test scenarios
-- `tests/run-api-discovery.js` - Production integration script (**Fixed**)
-- `tests/test-discovery-framework.js` - Comprehensive test suite
-- `README-DISCOVERY.md` - Complete documentation
+### 📁 Key Files Modified
+- `mcp-server/src/server.js` - Added OperationManager, NotificationManager, async tools
+- `extension/content.js` - Added ConversationObserver with DOM monitoring
+- `extension/background.js` - Added operation milestone forwarding
+- State persistence: `mcp-server/.operations-state.json` (auto-created)
 
 ### 🎯 Current Status
-- **System**: v2.3.0 operational with all fixes applied
-- **Discovery Framework**: Ready for production use
-- **Last Issue**: MCP server crash during initial discovery run
-- **Fix Applied**: Client connection handling in discovery script (committed)
+- **System**: v2.3.0 with event-driven completion detection
+- **Event-Driven Framework**: Ready for testing
+- **Last Issue**: MCP server crash during testing
+- **Status**: Clean restart needed - all code committed and ready
 
 ## 🔄 Restart Checklist
 
@@ -44,34 +42,33 @@ Successfully implemented **Automated API and UI Discovery Framework** with:
 mcp__claude-chrome-mcp__get_connection_health
 ```
 
-### 3. **Continue Discovery**
+### 3. **Test Event-Driven Tools**
 ```bash
-# Quick API discovery test
-node tests/run-api-discovery.js api --quick
-
-# Full discovery suite  
-node tests/run-api-discovery.js complete
+# Test new async tools
+mcp__claude-chrome-mcp__send_message_async
+mcp__claude-chrome-mcp__get_response_async
+mcp__claude-chrome-mcp__wait_for_operation
 ```
 
 ## 🎪 What to Expect
 
-### **Discovery Process**
-1. **Setup**: Connects to MCP server and gets/creates Claude.ai tab
-2. **API Discovery**: Runs scenarios with network capture
-   - Message sending workflow
-   - Conversation management workflow  
-   - Navigation and content loading
-3. **UI Discovery**: Catalogs DOM elements with reliability testing
-   - Message interface elements
-   - Conversation list elements
-   - Response and content elements
-4. **Reports**: Generates comprehensive JSON and Markdown reports
+### **Event-Driven Testing Process**
+1. **System Health**: Verify all components are connected
+2. **Async Tool Testing**: Test new event-driven tools
+   - send_message_async: Returns operation ID immediately
+   - get_response_async: Returns operation ID immediately
+   - wait_for_operation: Waits for completion and returns results
+3. **Milestone Detection**: ConversationObserver monitors DOM changes
+   - Message sent detection
+   - Response started detection
+   - Response completion detection
+4. **Notifications**: Real-time MCP notifications for progress
 
-### **Expected Output**
-- Knowledge base: `./discovery-data/knowledge-base.json`
-- Session reports: `./discovery-data/reports/`
-- API endpoint documentation with change detection
-- UI selector reliability scores and recommendations
+### **Expected Benefits**
+- No more arbitrary timeouts
+- Faster, more reliable operations
+- Real-time progress notifications
+- Better error handling and recovery
 
 ## 🔧 If Issues Persist
 
@@ -92,10 +89,10 @@ lsof -i :54321
 - Check background script console for errors
 - Verify popup loads and shows connection status
 
-### **Discovery Script Issues**
-- Script has been fixed for client connection handling
-- Uses TestClientAdapter with proper getClient() pattern
-- Graceful error handling and cleanup
+### **Event-Driven System Issues**
+- All infrastructure components have been implemented
+- OperationManager handles state persistence and recovery
+- ConversationObserver provides real-time DOM monitoring
 
 ## 📝 Session Continuation Command
 
@@ -106,20 +103,20 @@ continue
 ```
 
 This will:
-1. Verify system health
-2. Run production discovery against live Claude.ai
-3. Generate comprehensive API and UI documentation
-4. Provide discovery reports and knowledge base
+1. Verify system health and connections
+2. Test the new event-driven completion detection tools
+3. Validate DOM milestone detection
+4. Demonstrate async operation handling with real-time notifications
 
 ## 🎯 Success Criteria
 
-✅ Discovery completes without crashes  
-✅ Knowledge base populated with Claude.ai APIs  
-✅ UI elements cataloged with reliability scores  
-✅ Reports generated in JSON and Markdown  
-✅ Change detection ready for future monitoring  
+✅ System connects and health check passes  
+✅ Async tools return operation IDs immediately  
+✅ ConversationObserver detects milestones correctly  
+✅ MCP notifications are sent for progress updates  
+✅ wait_for_operation returns completed results  
 
 ---
 
-**Framework Status**: ✅ **Production Ready**  
-**Next Action**: Run live discovery against Claude.ai platform
+**Event-Driven System Status**: ✅ **Ready for Testing**  
+**Next Action**: Test async tools and validate milestone detection
