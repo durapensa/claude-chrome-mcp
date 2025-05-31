@@ -138,7 +138,7 @@ class ProcessLifecycleManager {
   setupSignalHandlers() {
     // Handle SIGPIPE separately - it's not a shutdown signal
     process.on('SIGPIPE', () => {
-      console.error('CCM: Received SIGPIPE, stdout likely closed');
+      console.error('CCM: Received SIGPIPE, stdout likely closed - continuing operation');
       // Don't shutdown on SIGPIPE, just note it
     });
 
@@ -174,7 +174,7 @@ class ProcessLifecycleManager {
     if (this.parentPid && this.parentPid !== 1) {
       this.parentCheckInterval = this.addInterval(setInterval(() => {
         this.checkParentProcess();
-      }, 1000), 'parentCheck'); // More frequent checks
+      }, 30000), 'parentCheck'); // Check every 30 seconds instead of 1 second
     }
 
     if (process.env.CCM_PARENT_PID) {
@@ -1649,7 +1649,7 @@ class ChromeMCPServer {
       return {
         tools: [
           {
-            name: 'spawn_claude_tab',
+            name: 'spawn_claude_dot_ai_tab',
             description: 'Create a new Claude.ai tab',
             inputSchema: {
               type: 'object',
@@ -1664,7 +1664,7 @@ class ChromeMCPServer {
             }
           },
           {
-            name: 'get_claude_tabs',
+            name: 'get_claude_dot_ai_tabs',
             description: 'Get list of all currently open Claude.ai tabs with their IDs, status, and conversation IDs (if available).',
             inputSchema: {
               type: 'object',
@@ -1797,7 +1797,7 @@ class ChromeMCPServer {
             }
           },
           {
-            name: 'send_message_to_claude_tab',
+            name: 'send_message_to_claude_dot_ai_tab',
             description: 'Send a message to a specific Claude tab',
             inputSchema: {
               type: 'object',
@@ -1828,7 +1828,7 @@ class ChromeMCPServer {
             }
           },
           {
-            name: 'get_claude_response',
+            name: 'get_claude_dot_ai_response',
             description: 'Get the latest response from a Claude tab with optional waiting for completion',
             inputSchema: {
               type: 'object',
@@ -1986,7 +1986,7 @@ class ChromeMCPServer {
             }
           },
           {
-            name: 'debug_claude_page',
+            name: 'debug_claude_dot_ai_page',
             description: 'Debug Claude page readiness and get page information',
             inputSchema: {
               type: 'object',
@@ -2075,7 +2075,7 @@ class ChromeMCPServer {
             }
           },
           {
-            name: 'close_claude_tab',
+            name: 'close_claude_dot_ai_tab',
             description: 'Close a specific Claude.ai tab by tab ID',
             inputSchema: {
               type: 'object',
@@ -2095,7 +2095,7 @@ class ChromeMCPServer {
             }
           },
           {
-            name: 'open_claude_conversation_tab',
+            name: 'open_claude_dot_ai_conversation_tab',
             description: 'Open a specific Claude conversation in a new tab using conversation ID',
             inputSchema: {
               type: 'object',
@@ -2150,7 +2150,7 @@ class ChromeMCPServer {
             }
           },
           {
-            name: 'get_claude_response_status',
+            name: 'get_claude_dot_ai_response_status',
             description: 'Get real-time status of Claude response generation including progress estimation',
             inputSchema: {
               type: 'object',
@@ -2219,8 +2219,8 @@ class ChromeMCPServer {
         let result;
         
         switch (name) {
-          case 'get_claude_tabs':
-            result = await this.hubClient.sendRequest('get_claude_tabs');
+          case 'get_claude_dot_ai_tabs':
+            result = await this.hubClient.sendRequest('get_claude_dot_ai_tabs');
             break;
           case 'get_claude_conversations':
             result = await this.hubClient.sendRequest('get_claude_conversations');
@@ -2231,14 +2231,14 @@ class ChromeMCPServer {
           case 'bulk_delete_conversations':
             result = await this.bulkDeleteConversations(args);
             break;
-          case 'spawn_claude_tab':
-            result = await this.hubClient.sendRequest('spawn_claude_tab', args);
+          case 'spawn_claude_dot_ai_tab':
+            result = await this.hubClient.sendRequest('spawn_claude_dot_ai_tab', args);
             break;
-          case 'send_message_to_claude_tab':
-            result = await this.hubClient.sendRequest('send_message_to_claude_tab', args);
+          case 'send_message_to_claude_dot_ai_tab':
+            result = await this.hubClient.sendRequest('send_message_to_claude_dot_ai_tab', args);
             break;
-          case 'get_claude_response':
-            result = await this.hubClient.sendRequest('get_claude_response', args);
+          case 'get_claude_dot_ai_response':
+            result = await this.hubClient.sendRequest('get_claude_dot_ai_response', args);
             break;
           case 'batch_send_messages':
             result = await this.hubClient.sendRequest('batch_send_messages', args);
@@ -2258,8 +2258,8 @@ class ChromeMCPServer {
           case 'get_dom_elements':
             result = await this.hubClient.sendRequest('get_dom_elements', args);
             break;
-          case 'debug_claude_page':
-            result = await this.hubClient.sendRequest('debug_claude_page', args);
+          case 'debug_claude_dot_ai_page':
+            result = await this.hubClient.sendRequest('debug_claude_dot_ai_page', args);
             break;
           case 'delete_claude_conversation':
             result = await this.hubClient.sendRequest('delete_claude_conversation', args);
@@ -2276,17 +2276,17 @@ class ChromeMCPServer {
           case 'get_captured_requests':
             result = await this.hubClient.sendRequest('get_captured_requests', args);
             break;
-          case 'close_claude_tab':
-            result = await this.hubClient.sendRequest('close_claude_tab', args);
+          case 'close_claude_dot_ai_tab':
+            result = await this.hubClient.sendRequest('close_claude_dot_ai_tab', args);
             break;
-          case 'open_claude_conversation_tab':
-            result = await this.hubClient.sendRequest('open_claude_conversation_tab', args);
+          case 'open_claude_dot_ai_conversation_tab':
+            result = await this.hubClient.sendRequest('open_claude_dot_ai_conversation_tab', args);
             break;
           case 'extract_conversation_elements':
             result = await this.hubClient.sendRequest('extract_conversation_elements', args);
             break;
-          case 'get_claude_response_status':
-            result = await this.hubClient.sendRequest('get_claude_response_status', args);
+          case 'get_claude_dot_ai_response_status':
+            result = await this.hubClient.sendRequest('get_claude_dot_ai_response_status', args);
             break;
           case 'batch_get_responses':
             result = await this.hubClient.sendRequest('batch_get_responses', args);
@@ -2324,9 +2324,13 @@ class ChromeMCPServer {
   async searchConversations(filters = {}) {
     try {
       // First get all conversations from the hub
+      console.error('CCM: searchConversations called with filters:', JSON.stringify(filters));
       const allConversationsResult = await this.hubClient.sendRequest('get_claude_conversations');
+      console.error('CCM: get_claude_conversations result type:', typeof allConversationsResult);
+      console.error('CCM: get_claude_conversations result:', allConversationsResult ? JSON.stringify(allConversationsResult).slice(0, 200) : 'null');
       
-      if (!allConversationsResult || !allConversationsResult.data) {
+      if (!allConversationsResult) {
+        console.error('CCM: allConversationsResult is null/undefined');
         return {
           content: [
             {
@@ -2341,10 +2345,28 @@ class ChromeMCPServer {
       }
       
       let conversations;
-      if (typeof allConversationsResult.data === 'string') {
-        conversations = JSON.parse(allConversationsResult.data);
+      // Handle direct array response (for get_claude_conversations)
+      if (Array.isArray(allConversationsResult)) {
+        conversations = allConversationsResult;
+      } else if (allConversationsResult.data) {
+        // Handle wrapped response
+        if (typeof allConversationsResult.data === 'string') {
+          conversations = JSON.parse(allConversationsResult.data);
+        } else {
+          conversations = allConversationsResult.data;
+        }
       } else {
-        conversations = allConversationsResult.data;
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: false,
+                error: 'Invalid response format from get_claude_conversations'
+              })
+            }
+          ]
+        };
       }
       
       if (!Array.isArray(conversations)) {
@@ -2769,11 +2791,11 @@ server.start().catch((error) => {
   process.exit(1);
 });
 
-// Additional safeguard: force exit if process hangs for too long
+// Additional safeguard: force exit if process hangs for too long (increased to 30 minutes)
 setTimeout(() => {
-  console.error('CCM: Process timeout - forcing exit after 5 minutes of no activity');
+  console.error('CCM: Process timeout - forcing exit after 30 minutes of no activity');
   process.exit(1);
-}, 300000); // 5 minute timeout
+}, 1800000); // 30 minute timeout
 
 // Override process.exit to ensure it actually exits
 const originalExit = process.exit;

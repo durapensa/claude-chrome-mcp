@@ -8,9 +8,7 @@
  * Usage: node regression-test-suite.js
  */
 
-const { Client } = require('@modelcontextprotocol/sdk/client/index.js');
-const { StdioClientTransport } = require('@modelcontextprotocol/sdk/client/stdio.js');
-const SmartTestRunner = require('./helpers/smart-runner');
+const sharedClient = require('./helpers/shared-client');
 const TestLifecycle = require('./helpers/lifecycle');
 
 // Test configuration
@@ -74,27 +72,16 @@ async function runTest(name, testFn) {
 }
 
 async function createTestClient() {
-  const transport = new StdioClientTransport({
-    command: 'node',
-    args: ['../mcp-server/src/server.js']
-  });
-  
-  const client = new Client({
-    name: 'regression-test',
-    version: '1.0.0'
-  }, {
-    capabilities: {}
-  });
-  
-  await client.connect(transport);
-  return client;
+  // Use shared client to avoid timeout issues
+  await sharedClient.connect();
+  return sharedClient;
 }
 
 // Test Functions
 const tests = {
   // 1. Connection Health
-  async testConnectionHealth(client) {
-    const result = await client.callTool('get_connection_health', {});
+  async testConnectionHealth() {
+    const result = await sharedClient.callTool('get_connection_health', {});
     const health = result.content[0].text;
     
     // Parse the health response
@@ -108,12 +95,12 @@ const tests = {
   },
 
   // 2. Tab Management
-  async testTabManagement(client) {
+  async testTabManagement() {
     // List tabs
-    const listResult = await client.callTool('get_claude_tabs', {});
+    const listResult = await sharedClient.callTool('get_claude_tabs', {});
     
     // Create tab
-    const spawnResult = await client.callTool('spawn_claude_tab', {});
+    const spawnResult = await sharedClient.callTool('spawn_claude_tab', {});
     const tabIdMatch = spawnResult.content[0].text.match(/Tab ID: (\d+)/);
     const tabId = tabIdMatch ? parseInt(tabIdMatch[1]) : null;
     
@@ -124,7 +111,7 @@ const tests = {
     await sleep(5000); // Wait for tab to load
     
     // Close tab
-    const closeResult = await client.callTool('close_claude_tab', {
+    const closeResult = await sharedClient.callTool('close_claude_tab', {
       tabId: tabId,
       force: false
     });
@@ -138,9 +125,9 @@ const tests = {
   },
 
   // 3. Message Sending with Retry
-  async testMessageSendingWithRetry(client) {
+  async testMessageSendingWithRetry() {
     // Create a test tab
-    const spawnResult = await client.callTool('spawn_claude_tab', {});
+    const spawnResult = await sharedClient.callTool('spawn_claude_tab', {});
     const tabIdMatch = spawnResult.content[0].text.match(/Tab ID: (\d+)/);
     const tabId = tabIdMatch ? parseInt(tabIdMatch[1]) : null;
     
@@ -152,7 +139,7 @@ const tests = {
     
     try {
       // Send message with retry
-      const sendResult = await client.callTool('send_message_to_claude_tab', {
+      const sendResult = await sharedClient.callTool('send_message_to_claude_tab', {
         tabId: tabId,
         message: 'Hello! Please respond with just "OK"',
         waitForReady: true,
@@ -164,7 +151,7 @@ const tests = {
       if (sendSuccess) {
         // Get response
         await sleep(3000);
-        const responseResult = await client.callTool('get_claude_response', {
+        const responseResult = await sharedClient.callTool('get_claude_response', {
           tabId: tabId,
           waitForCompletion: true,
           timeoutMs: 10000
@@ -173,7 +160,7 @@ const tests = {
         const hasResponse = responseResult.content[0].text.includes('"text":');
         
         // Clean up
-        await client.callTool('close_claude_tab', { tabId: tabId, force: true });
+        await sharedClient.callTool('close_claude_tab', { tabId: tabId, force: true });
         
         return {
           success: hasResponse,
@@ -182,23 +169,23 @@ const tests = {
       }
       
       // Clean up on failure
-      await client.callTool('close_claude_tab', { tabId: tabId, force: true });
+      await sharedClient.callTool('close_claude_tab', { tabId: tabId, force: true });
       
       return { success: false, message: 'Failed to send message' };
       
     } catch (error) {
       // Clean up on error
       try {
-        await client.callTool('close_claude_tab', { tabId: tabId, force: true });
+        await sharedClient.callTool('close_claude_tab', { tabId: tabId, force: true });
       } catch (e) {}
       throw error;
     }
   },
 
   // 4. Metadata Extraction
-  async testMetadataExtraction(client) {
+  async testMetadataExtraction() {
     // Use an existing tab or create one
-    const tabsResult = await client.callTool('get_claude_tabs', {});
+    const tabsResult = await sharedClient.callTool('get_claude_tabs', {});
     const tabs = JSON.parse(tabsResult.content[0].text);
     
     if (tabs.length === 0) {
@@ -207,7 +194,7 @@ const tests = {
     
     const tabId = tabs[0].id;
     
-    const metadataResult = await client.callTool('get_conversation_metadata', {
+    const metadataResult = await sharedClient.callTool('get_conversation_metadata', {
       tabId: tabId,
       includeMessages: false
     });
@@ -223,8 +210,8 @@ const tests = {
   },
 
   // 5. Export Functionality
-  async testExportFunctionality(client) {
-    const tabsResult = await client.callTool('get_claude_tabs', {});
+  async testExportFunctionality() {
+    const tabsResult = await sharedClient.callTool('get_claude_tabs', {});
     const tabs = JSON.parse(tabsResult.content[0].text);
     
     if (tabs.length === 0) {
@@ -234,7 +221,7 @@ const tests = {
     const tabId = tabs[0].id;
     
     // Test markdown export
-    const exportResult = await client.callTool('export_conversation_transcript', {
+    const exportResult = await sharedClient.callTool('export_conversation_transcript', {
       tabId: tabId,
       format: 'markdown'
     });
@@ -250,8 +237,8 @@ const tests = {
   },
 
   // 6. Batch Operations
-  async testBatchOperations(client) {
-    const tabsResult = await client.callTool('get_claude_tabs', {});
+  async testBatchOperations() {
+    const tabsResult = await sharedClient.callTool('get_claude_tabs', {});
     const tabs = JSON.parse(tabsResult.content[0].text);
     
     if (tabs.length < 2) {
@@ -264,7 +251,7 @@ const tests = {
       message: `Batch test message ${i + 1}`
     }));
     
-    const batchResult = await client.callTool('batch_send_messages', {
+    const batchResult = await sharedClient.callTool('batch_send_messages', {
       messages: messages,
       sequential: false
     });
@@ -279,8 +266,8 @@ const tests = {
   },
 
   // 7. Element Extraction
-  async testElementExtraction(client) {
-    const tabsResult = await client.callTool('get_claude_tabs', {});
+  async testElementExtraction() {
+    const tabsResult = await sharedClient.callTool('get_claude_tabs', {});
     const tabs = JSON.parse(tabsResult.content[0].text);
     
     if (tabs.length === 0) {
@@ -289,7 +276,7 @@ const tests = {
     
     const tabId = tabs[0].id;
     
-    const extractResult = await client.callTool('extract_conversation_elements', {
+    const extractResult = await sharedClient.callTool('extract_conversation_elements', {
       tabId: tabId,
       batchSize: 10,
       maxElements: 50
@@ -306,8 +293,8 @@ const tests = {
   },
 
   // 8. Response Status Monitoring
-  async testResponseStatus(client) {
-    const tabsResult = await client.callTool('get_claude_tabs', {});
+  async testResponseStatus() {
+    const tabsResult = await sharedClient.callTool('get_claude_tabs', {});
     const tabs = JSON.parse(tabsResult.content[0].text);
     
     if (tabs.length === 0) {
@@ -316,7 +303,7 @@ const tests = {
     
     const tabId = tabs[0].id;
     
-    const statusResult = await client.callTool('get_claude_response_status', {
+    const statusResult = await sharedClient.callTool('get_claude_response_status', {
       tabId: tabId
     });
     
@@ -331,8 +318,8 @@ const tests = {
   },
 
   // 9. Conversation List
-  async testConversationList(client) {
-    const convResult = await client.callTool('get_claude_conversations', {});
+  async testConversationList() {
+    const convResult = await sharedClient.callTool('get_claude_conversations', {});
     const convText = convResult.content[0].text;
     
     // Check if it's an array (even if empty)
@@ -347,35 +334,36 @@ const tests = {
 
 // Main test runner
 async function runRegressionTests() {
-  console.log(`${colors.blue}🔧 Claude Chrome MCP - Regression Test Suite${colors.reset}`);
+  console.log(`${colors.blue}🔧 Claude Chrome MCP - Regression Test Suite (v2 - Shared Client)${colors.reset}`);
   console.log(`${colors.cyan}═══════════════════════════════════════════════${colors.reset}\n`);
   
-  let client;
+  // Initialize lifecycle manager with shared client
+  const lifecycle = new TestLifecycle(sharedClient);
   
   try {
-    // Create test client
-    log('Creating MCP client...', 'yellow');
-    client = await createTestClient();
-    log('✅ Connected to MCP server\n', 'green');
+    // Connect to shared MCP client
+    log('Connecting to shared MCP client...', 'yellow');
+    await sharedClient.connect();
+    log('✅ Connected to shared MCP server\n', 'green');
     
-    // Run all tests
-    await runTest('Connection Health Check', () => tests.testConnectionHealth(client));
-    await runTest('Tab Management', () => tests.testTabManagement(client));
-    await runTest('Message Sending with Retry', () => tests.testMessageSendingWithRetry(client));
-    await runTest('Metadata Extraction', () => tests.testMetadataExtraction(client));
-    await runTest('Export Functionality', () => tests.testExportFunctionality(client));
-    await runTest('Batch Operations', () => tests.testBatchOperations(client));
-    await runTest('Element Extraction', () => tests.testElementExtraction(client));
-    await runTest('Response Status Monitoring', () => tests.testResponseStatus(client));
-    await runTest('Conversation List', () => tests.testConversationList(client));
+    // Run all tests (no need to pass client parameter)
+    await runTest('Connection Health Check', () => tests.testConnectionHealth());
+    await runTest('Tab Management', () => tests.testTabManagement());
+    await runTest('Message Sending with Retry', () => tests.testMessageSendingWithRetry());
+    await runTest('Metadata Extraction', () => tests.testMetadataExtraction());
+    await runTest('Export Functionality', () => tests.testExportFunctionality());
+    await runTest('Batch Operations', () => tests.testBatchOperations());
+    await runTest('Element Extraction', () => tests.testElementExtraction());
+    await runTest('Response Status Monitoring', () => tests.testResponseStatus());
+    await runTest('Conversation List', () => tests.testConversationList());
     
   } catch (error) {
     console.error(`${colors.red}Fatal error: ${error.message}${colors.reset}`);
     testResults.failed++;
   } finally {
-    if (client) {
-      await client.close();
-    }
+    // Clean up any test tabs
+    log('Cleaning up test resources...', 'yellow');
+    await lifecycle.cleanup();
   }
   
   // Print summary

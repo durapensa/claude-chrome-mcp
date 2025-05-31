@@ -45,8 +45,15 @@ class CCMPopup {
         if (!response) {
           console.log('Popup: No response from background, triggering reconnection...');
           this.forceHubReconnection();
+          resolve({ 
+            hubConnected: false, 
+            serverProcessRunning: false,
+            lastConnectionAttempt: Date.now(),
+            connectedClients: []
+          });
+        } else {
+          resolve(response || {});
         }
-        resolve(response || {});
       });
     });
   }
@@ -130,7 +137,16 @@ class CCMPopup {
       }
     } else {
       serverDot.className = 'status-dot disconnected';
-      serverDetail.textContent = 'Not connected';
+      
+      // Enhanced disconnection messaging
+      let detailMessage = 'Not connected';
+      if (status.serverProcessRunning === false) {
+        detailMessage = 'MCP server not running';
+      } else if (status.hubPort && !status.hubConnected) {
+        detailMessage = `Hub on port ${status.hubPort} unreachable`;
+      }
+      
+      serverDetail.textContent = detailMessage;
       if (helpSection) helpSection.style.display = 'block';
       
       // Show reconnect button

@@ -17,7 +17,7 @@ async function testServiceWorkerStability() {
   try {
     // Step 1: Create test tab
     console.log('1️⃣ Creating test Claude tab...');
-    const spawnResult = await sharedClient.callTool('spawn_claude_tab', {});
+    const spawnResult = await sharedClient.callTool('spawn_claude_dot_ai_tab', {});
     const tabInfo = JSON.parse(spawnResult.content[0].text);
     tabId = tabInfo.id;
     lifecycle.addTab(tabId);
@@ -36,7 +36,7 @@ async function testServiceWorkerStability() {
     
     // Step 3: Send message and wait
     console.log('3️⃣ Sending test message...');
-    await sharedClient.callTool('send_message_to_claude_tab', {
+    await sharedClient.callTool('send_message_to_claude_dot_ai_tab', {
       tabId: tabId,
       message: 'Testing service worker stability',
       waitForReady: true
@@ -53,7 +53,7 @@ async function testServiceWorkerStability() {
       
       // Check if we can still communicate
       try {
-        const tabs = await sharedClient.callTool('get_claude_tabs', {});
+        const tabs = await sharedClient.callTool('get_claude_dot_ai_tabs', {});
         const tabList = JSON.parse(tabs.content[0].text);
         const ourTab = tabList.find(t => t.id === tabId);
         if (ourTab) {
@@ -78,7 +78,7 @@ async function testServiceWorkerStability() {
     
     // Step 5: Test recovery from connection issues
     console.log('\n6️⃣ Testing message after extended wait...');
-    const finalMessage = await sharedClient.callTool('send_message_to_claude_tab', {
+    const finalMessage = await sharedClient.callTool('send_message_to_claude_dot_ai_tab', {
       tabId: tabId,
       message: 'Connection still working after wait?',
       waitForReady: true

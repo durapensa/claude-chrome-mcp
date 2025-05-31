@@ -73,7 +73,7 @@ async function debugMcpSpawn() {
     
     // Try a simple tool call
     console.log('\n3️⃣ Testing tool call...');
-    const result = await client.callTool('get_claude_tabs', {});
+    const result = await client.callTool('get_claude_dot_ai_tabs', {});
     console.log('Tool result:', result.content[0].text);
     
     await client.close();

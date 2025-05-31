@@ -402,7 +402,7 @@ class CCMExtensionHub {
       let result;
       
       switch (type) {
-        case 'get_claude_tabs':
+        case 'get_claude_dot_ai_tabs':
           console.log('CCM Extension: Getting Claude tabs...');
           result = await this.getClaudeTabs();
           console.log('CCM Extension: Found', result.length, 'Claude tabs');
@@ -414,13 +414,13 @@ class CCMExtensionHub {
           console.log('CCM Extension: Found', result.length, 'conversations');
           break;
           
-        case 'spawn_claude_tab':
+        case 'spawn_claude_dot_ai_tab':
           console.log('CCM Extension: Creating Claude tab with URL:', message.params?.url);
           result = await this.createClaudeTab(message.params?.url);
           console.log('CCM Extension: Created tab:', result);
           break;
           
-        case 'send_message_to_claude_tab':
+        case 'send_message_to_claude_dot_ai_tab':
           result = await this.sendMessageToClaudeTab(message.params);
           break;
         
@@ -428,7 +428,7 @@ class CCMExtensionHub {
           result = await this.batchSendMessages(message.params);
           break;
           
-        case 'get_claude_response':
+        case 'get_claude_dot_ai_response':
           result = await this.getClaudeResponse(message.params);
           break;
         
@@ -452,7 +452,7 @@ class CCMExtensionHub {
           result = await this.getDomElements(message.params);
           break;
           
-        case 'debug_claude_page':
+        case 'debug_claude_dot_ai_page':
           result = await this.debugClaudePage(message.params?.tabId);
           break;
           
@@ -476,11 +476,11 @@ class CCMExtensionHub {
           result = await this.getCapturedRequests(message.params?.tabId);
           break;
           
-        case 'close_claude_tab':
+        case 'close_claude_dot_ai_tab':
           result = await this.closeClaudeTab(message.params);
           break;
           
-        case 'open_claude_conversation_tab':
+        case 'open_claude_dot_ai_conversation_tab':
           result = await this.openClaudeConversationTab(message.params);
           break;
         
@@ -490,7 +490,7 @@ class CCMExtensionHub {
           console.log('CCM Extension: Extraction completed');
           break;
         
-        case 'get_claude_response_status':
+        case 'get_claude_dot_ai_response_status':
           result = await this.getClaudeResponseStatus(message.params);
           break;
         
@@ -618,7 +618,7 @@ class CCMExtensionHub {
       // Attach debugger to execute script
       await this.ensureDebuggerAttached(claudeTab.id);
 
-      // Execute script to fetch conversations from Claude API
+      // Execute script to fetch conversations from Claude API with timeout handling
       const conversationsScript = `
         (async function() {
           try {
@@ -2377,11 +2377,13 @@ class CCMExtensionHub {
               
               const element = allArtifacts[i];
               
+              // Skip interactive elements that are likely UI controls (buttons, etc.)
+              if (element.tagName === 'BUTTON' || element.role === 'button') continue;
+              
               // Create unique identifier
               const elementId = element.id || simpleHash(element.outerHTML);
               if (seenArtifactIds.has(elementId)) continue;
               seenArtifactIds.add(elementId);
-              totalProcessed++;
               
               let content = '';
               let type = 'unknown';
@@ -2395,6 +2397,11 @@ class CCMExtensionHub {
                 content = element.textContent || '';
                 type = element.dataset.type || 'element';
               }
+              
+              // Skip empty or very small content artifacts (likely UI elements)
+              if (!content || content.trim().length < 20) continue;
+              
+              totalProcessed++;
               
               artifacts.push({
                 id: element.id || 'artifact_' + i,

@@ -94,7 +94,7 @@ async function runTest() {
     client = new Client({...});
     await client.connect(transport);
     
-    const result = await client.callTool('get_claude_tabs', {});
+    const result = await client.callTool('get_claude_dot_ai_tabs', {});
     
   } finally {
     if (client) await client.close();
@@ -105,7 +105,7 @@ async function runTest() {
 async function runTest() {
   const client = await getTestClient();
   try {
-    const result = await client.callTool('get_claude_tabs', {});
+    const result = await client.callTool('get_claude_dot_ai_tabs', {});
   } finally {
     await client.close(); // Safe no-op
   }
@@ -215,7 +215,7 @@ The shared client includes automatic reconnection:
 ```javascript
 // This is handled automatically
 try {
-  await sharedClient.callTool('get_claude_tabs', {});
+  await sharedClient.callTool('get_claude_dot_ai_tabs', {});
 } catch (error) {
   // Shared client will attempt reconnection
   // Error only thrown after max attempts

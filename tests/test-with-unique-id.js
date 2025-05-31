@@ -39,7 +39,7 @@ async function testWithUniqueId() {
     
     // Test 1: List tabs
     console.log('1️⃣ Testing tab list...');
-    const tabsResult = await client.callTool('get_claude_tabs', {});
+    const tabsResult = await client.callTool('get_claude_dot_ai_tabs', {});
     console.log('Tabs:', tabsResult.content[0].text);
     
     // Test 2: Get health
@@ -51,7 +51,7 @@ async function testWithUniqueId() {
     
     // Test 3: Create and close a tab
     console.log('\n3️⃣ Testing tab creation...');
-    const spawnResult = await client.callTool('spawn_claude_tab', {});
+    const spawnResult = await client.callTool('spawn_claude_dot_ai_tab', {});
     const tabInfo = JSON.parse(spawnResult.content[0].text);
     console.log('Created tab:', tabInfo);
     

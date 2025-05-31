@@ -9,12 +9,12 @@
 // Tool Parameter Types
 // ============================================================================
 
-export interface SpawnClaudeTabParams {
+export interface SpawnClaudeDotAiTabParams {
   url?: string;
   usePool?: boolean;
 }
 
-export interface GetClaudeTabsParams {
+export interface GetClaudeDotAiTabsParams {
   // No parameters
 }
 
@@ -22,14 +22,14 @@ export interface GetClaudeConversationsParams {
   // No parameters
 }
 
-export interface SendMessageToClaudeTabParams {
+export interface SendMessageToClaudeDotAiTabParams {
   tabId: number;
   message: string;
   waitForReady?: boolean;
   maxRetries?: number;
 }
 
-export interface GetClaudeResponseParams {
+export interface GetClaudeDotAiResponseParams {
   tabId: number;
   waitForCompletion?: boolean;
   timeoutMs?: number;
@@ -68,7 +68,7 @@ export interface GetDomElementsParams {
   selector: string;
 }
 
-export interface DebugClaudePageParams {
+export interface DebugClaudeDotAiPageParams {
   tabId: number;
 }
 
@@ -93,12 +93,12 @@ export interface GetCapturedRequestsParams {
   tabId: number;
 }
 
-export interface CloseClaudeTabParams {
+export interface CloseClaudeDotAiTabParams {
   tabId: number;
   force?: boolean;
 }
 
-export interface OpenClaudeConversationTabParams {
+export interface OpenClaudeDotAiConversationTabParams {
   conversationId: string;
   activate?: boolean;
   waitForLoad?: boolean;
@@ -111,7 +111,7 @@ export interface ExtractConversationElementsParams {
   batchSize?: number;
 }
 
-export interface GetClaudeResponseStatusParams {
+export interface GetClaudeDotAiResponseStatusParams {
   tabId: number;
 }
 
@@ -145,7 +145,7 @@ export interface ConfigureTabPoolParams {
 // Response Types
 // ============================================================================
 
-export interface SpawnClaudeTabResponse {
+export interface SpawnClaudeDotAiTabResponse {
   success: boolean;
   id: number;
   source?: 'pool' | 'fresh';
@@ -154,7 +154,7 @@ export interface SpawnClaudeTabResponse {
   poolError?: string;
 }
 
-export interface ClaudeTab {
+export interface ClaudeDotAiTab {
   id: number;
   url: string;
   title: string;
@@ -422,27 +422,27 @@ export interface TabPoolStats {
 // ============================================================================
 
 export type ToolParams = 
-  | { tool: 'spawn_claude_tab'; params: SpawnClaudeTabParams }
-  | { tool: 'get_claude_tabs'; params: GetClaudeTabsParams }
+  | { tool: 'spawn_claude_dot_ai_tab'; params: SpawnClaudeDotAiTabParams }
+  | { tool: 'get_claude_dot_ai_tabs'; params: GetClaudeDotAiTabsParams }
   | { tool: 'get_claude_conversations'; params: GetClaudeConversationsParams }
-  | { tool: 'send_message_to_claude_tab'; params: SendMessageToClaudeTabParams }
-  | { tool: 'get_claude_response'; params: GetClaudeResponseParams }
+  | { tool: 'send_message_to_claude_dot_ai_tab'; params: SendMessageToClaudeDotAiTabParams }
+  | { tool: 'get_claude_dot_ai_response'; params: GetClaudeDotAiResponseParams }
   | { tool: 'batch_send_messages'; params: BatchSendMessagesParams }
   | { tool: 'get_conversation_metadata'; params: GetConversationMetadataParams }
   | { tool: 'export_conversation_transcript'; params: ExportConversationTranscriptParams }
   | { tool: 'debug_attach'; params: DebugAttachParams }
   | { tool: 'execute_script'; params: ExecuteScriptParams }
   | { tool: 'get_dom_elements'; params: GetDomElementsParams }
-  | { tool: 'debug_claude_page'; params: DebugClaudePageParams }
+  | { tool: 'debug_claude_dot_ai_page'; params: DebugClaudeDotAiPageParams }
   | { tool: 'delete_claude_conversation'; params: DeleteClaudeConversationParams }
   | { tool: 'reload_extension'; params: ReloadExtensionParams }
   | { tool: 'start_network_inspection'; params: StartNetworkInspectionParams }
   | { tool: 'stop_network_inspection'; params: StopNetworkInspectionParams }
   | { tool: 'get_captured_requests'; params: GetCapturedRequestsParams }
-  | { tool: 'close_claude_tab'; params: CloseClaudeTabParams }
-  | { tool: 'open_claude_conversation_tab'; params: OpenClaudeConversationTabParams }
+  | { tool: 'close_claude_dot_ai_tab'; params: CloseClaudeDotAiTabParams }
+  | { tool: 'open_claude_dot_ai_conversation_tab'; params: OpenClaudeDotAiConversationTabParams }
   | { tool: 'extract_conversation_elements'; params: ExtractConversationElementsParams }
-  | { tool: 'get_claude_response_status'; params: GetClaudeResponseStatusParams }
+  | { tool: 'get_claude_dot_ai_response_status'; params: GetClaudeDotAiResponseStatusParams }
   | { tool: 'batch_get_responses'; params: BatchGetResponsesParams }
   | { tool: 'get_connection_health'; params: GetConnectionHealthParams }
   | { tool: 'get_tab_pool_stats'; params: GetTabPoolStatsParams }
@@ -450,27 +450,27 @@ export type ToolParams =
   | { tool: 'configure_tab_pool'; params: ConfigureTabPoolParams };
 
 export type ToolResponse =
-  | { tool: 'spawn_claude_tab'; result: SpawnClaudeTabResponse }
-  | { tool: 'get_claude_tabs'; result: ClaudeTab[] }
+  | { tool: 'spawn_claude_dot_ai_tab'; result: SpawnClaudeDotAiTabResponse }
+  | { tool: 'get_claude_dot_ai_tabs'; result: ClaudeDotAiTab[] }
   | { tool: 'get_claude_conversations'; result: ClaudeConversation[] }
-  | { tool: 'send_message_to_claude_tab'; result: SendMessageResponse }
-  | { tool: 'get_claude_response'; result: ClaudeResponseData }
+  | { tool: 'send_message_to_claude_dot_ai_tab'; result: SendMessageResponse }
+  | { tool: 'get_claude_dot_ai_response'; result: ClaudeResponseData }
   | { tool: 'batch_send_messages'; result: BatchSendResponse }
   | { tool: 'get_conversation_metadata'; result: ConversationMetadata }
   | { tool: 'export_conversation_transcript'; result: ConversationTranscript }
   | { tool: 'debug_attach'; result: { success: boolean } }
   | { tool: 'execute_script'; result: any }
   | { tool: 'get_dom_elements'; result: any[] }
-  | { tool: 'debug_claude_page'; result: any }
+  | { tool: 'debug_claude_dot_ai_page'; result: any }
   | { tool: 'delete_claude_conversation'; result: { success: boolean } }
   | { tool: 'reload_extension'; result: { success: boolean } }
   | { tool: 'start_network_inspection'; result: { success: boolean } }
   | { tool: 'stop_network_inspection'; result: { success: boolean } }
   | { tool: 'get_captured_requests'; result: NetworkRequest[] }
-  | { tool: 'close_claude_tab'; result: { success: boolean } }
-  | { tool: 'open_claude_conversation_tab'; result: { tabId: number } }
+  | { tool: 'close_claude_dot_ai_tab'; result: { success: boolean } }
+  | { tool: 'open_claude_dot_ai_conversation_tab'; result: { tabId: number } }
   | { tool: 'extract_conversation_elements'; result: { elements: ConversationElement[] } }
-  | { tool: 'get_claude_response_status'; result: ResponseStatus }
+  | { tool: 'get_claude_dot_ai_response_status'; result: ResponseStatus }
   | { tool: 'batch_get_responses'; result: BatchResponseResult }
   | { tool: 'get_connection_health'; result: ConnectionHealth }
   | { tool: 'get_tab_pool_stats'; result: TabPoolStats }
