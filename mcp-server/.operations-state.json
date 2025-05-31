@@ -109,7 +109,227 @@
         "createdAt": 1748731140259,
         "lastUpdated": 1748731140587
       }
+    ],
+    [
+      "send_message_1748732422879_mg33rbk2v",
+      {
+        "id": "send_message_1748732422879_mg33rbk2v",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570973,
+          "message": "Test network stream detection: what's 7*8?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748732423203,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748732422879,
+        "lastUpdated": 1748732423203
+      }
+    ],
+    [
+      "send_message_1748732882214_k2khoz74e",
+      {
+        "id": "send_message_1748732882214_k2khoz74e",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570992,
+          "message": "Test webRequest detection: what's 9*7?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748732882998,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748732882214,
+        "lastUpdated": 1748732882998
+      }
+    ],
+    [
+      "send_message_1748732947980_v0eebieah",
+      {
+        "id": "send_message_1748732947980_v0eebieah",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570992,
+          "message": "webRequest test: 12*4=?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748732949027,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748732947980,
+        "lastUpdated": 1748732949027
+      }
+    ],
+    [
+      "send_message_1748733087689_s603imc55",
+      {
+        "id": "send_message_1748733087689_s603imc55",
+        "type": "send_message",
+        "params": {
+          "tabId": 948571002,
+          "message": "Bridge debug test: 6*6=?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748733088018,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748733087689,
+        "lastUpdated": 1748733088018
+      }
+    ],
+    [
+      "send_message_1748733281324_os4tsbg2q",
+      {
+        "id": "send_message_1748733281324_os4tsbg2q",
+        "type": "send_message",
+        "params": {
+          "tabId": 948571004,
+          "message": "Test fixed selectors: 8*7=?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748733281650,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748733281324,
+        "lastUpdated": 1748733281650
+      }
+    ],
+    [
+      "send_message_1748733335116_p37bzvbp1",
+      {
+        "id": "send_message_1748733335116_p37bzvbp1",
+        "type": "send_message",
+        "params": {
+          "tabId": 948571005,
+          "message": "Standard content script test: 9*9=?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748733335440,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748733335116,
+        "lastUpdated": 1748733335440
+      }
+    ],
+    [
+      "send_message_1748733508524_sharv6b1v",
+      {
+        "id": "send_message_1748733508524_sharv6b1v",
+        "type": "send_message",
+        "params": {
+          "tabId": 948571007,
+          "message": "Test /latest endpoint detection: 11*11=?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748733508849,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748733508524,
+        "lastUpdated": 1748733508849
+      }
+    ],
+    [
+      "send_message_1748733635448_8l4vq64st",
+      {
+        "id": "send_message_1748733635448_8l4vq64st",
+        "type": "send_message",
+        "params": {
+          "tabId": 948571010,
+          "message": "Fixed interception test: 15*3=?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748733635775,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748733635448,
+        "lastUpdated": 1748733635775
+      }
+    ],
+    [
+      "send_message_1748733670728_dthvbkut5",
+      {
+        "id": "send_message_1748733670728_dthvbkut5",
+        "type": "send_message",
+        "params": {
+          "tabId": 948571010,
+          "message": "Manual trigger test: 6*8=?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748733671066,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748733670728,
+        "lastUpdated": 1748733671066
+      }
+    ],
+    [
+      "send_message_1748733859035_2bv31q44b",
+      {
+        "id": "send_message_1748733859035_2bv31q44b",
+        "type": "send_message",
+        "params": {
+          "tabId": 948571012,
+          "message": "FINAL TEST: Complete async workflow with fixed registration: 17*3=?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748733859363,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748733859035,
+        "lastUpdated": 1748733859363
+      }
     ]
   ],
-  "lastSaved": 1748732029934
+  "lastSaved": 1748733859363
 }

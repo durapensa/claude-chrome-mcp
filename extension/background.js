@@ -568,6 +568,10 @@ class CCMExtensionHub {
           result = await this.sendContentScriptMessage(message.params);
           break;
           
+        case 'send_message_async':
+          result = await this.sendMessageAsync(message.params);
+          break;
+          
         case 'test_simple':
           console.log('CCM Extension: Test simple message received');
           result = { success: true, message: 'Test successful', timestamp: Date.now() };
@@ -2982,6 +2986,49 @@ class CCMExtensionHub {
       return { success: false, error: error.message };
     }
   }
+  
+  async sendMessageAsync(params) {
+    const { operationId, tabId, message } = params;
+    
+    try {
+      console.log(`CCM: Starting async message operation ${operationId} for tab ${tabId}`);
+      
+      // First register the operation with the content script
+      const registerResponse = await chrome.tabs.sendMessage(tabId, {
+        type: 'register_operation',
+        operationId,
+        operationType: 'send_message',
+        params: { tabId, message }
+      });
+      
+      console.log(`CCM: Operation ${operationId} registered:`, registerResponse);
+      
+      // Then send the actual message
+      const result = await this.sendMessageToClaudeTab({
+        tabId,
+        message,
+        waitForReady: true
+      });
+      
+      console.log(`CCM: Message sent for operation ${operationId}:`, result);
+      
+      return {
+        success: true,
+        operationId,
+        messageSent: result.success,
+        timestamp: Date.now()
+      };
+      
+    } catch (error) {
+      console.error(`CCM: sendMessageAsync failed for operation ${operationId}:`, error);
+      return {
+        success: false,
+        operationId,
+        error: error.message,
+        timestamp: Date.now()
+      };
+    }
+  }
 
   async getConnectionHealth() {
     const health = {
@@ -3109,8 +3156,8 @@ class ContentScriptManager {
               window.fetch = async (...args) => {
                 const url = args[0];
                 
-                // Only monitor Claude API requests
-                if (typeof url === 'string' && (url.includes('conversation') || url.includes('message') || url.includes('claude.ai/api'))) {
+                // Only monitor Claude API requests - broader matching to ensure we catch all endpoints
+                if (typeof url === 'string' && url.includes('claude.ai')) {
                   console.log('[NetworkObserver] Claude API request detected:', url);
                   
                   const response = await originalFetch.apply(window, args);
@@ -3120,8 +3167,13 @@ class ContentScriptManager {
                     this.handleMessageSent();
                   }
                   
-                  // Monitor response completion
-                  if (response.ok) {
+                  // Monitor response completion via /latest endpoint (most reliable signal)
+                  if (response.ok && url.includes('/latest')) {
+                    console.log('[NetworkObserver] Response completion detected via /latest endpoint');
+                    // Give DOM time to update after /latest response
+                    setTimeout(() => this.checkResponseCompletion(), 500);
+                    setTimeout(() => this.checkResponseCompletion(), 1000);
+                  } else if (response.ok) {
                     // For streaming responses, monitor completion
                     if (response.headers.get('content-type')?.includes('stream')) {
                       this.monitorStreamResponse(response);
@@ -3137,7 +3189,41 @@ class ContentScriptManager {
                 return originalFetch.apply(window, args);
               };
               
-              console.log('[NetworkObserver] Network interception active');
+              // Also intercept XMLHttpRequest for complete coverage
+              const originalXHROpen = XMLHttpRequest.prototype.open;
+              const originalXHRSend = XMLHttpRequest.prototype.send;
+              
+              XMLHttpRequest.prototype.open = function(method, url, ...args) {
+                this._url = url;
+                this._method = method;
+                return originalXHROpen.apply(this, [method, url, ...args]);
+              };
+              
+              XMLHttpRequest.prototype.send = function(...args) {
+                const xhr = this;
+                
+                if (xhr._url && xhr._url.includes('claude.ai')) {
+                  console.log(`[NetworkObserver] XHR ${xhr._method} request detected:`, xhr._url);
+                  
+                  xhr.addEventListener('load', () => {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                      // Check for /latest endpoint completion
+                      if (xhr._url.includes('/latest')) {
+                        console.log('[NetworkObserver] Response completion detected via XHR /latest endpoint');
+                        // Access the NetworkObserver instance from the global scope
+                        if (window.conversationObserver) {
+                          setTimeout(() => window.conversationObserver.checkResponseCompletion(), 500);
+                          setTimeout(() => window.conversationObserver.checkResponseCompletion(), 1000);
+                        }
+                      }
+                    }
+                  });
+                }
+                
+                return originalXHRSend.apply(xhr, args);
+              };
+              
+              console.log('[NetworkObserver] Network interception active (fetch + XHR)');
             }
 
             monitorStreamResponse(response) {
@@ -3176,30 +3262,21 @@ class ContentScriptManager {
             }
 
             getLastResponse() {
-              // Get all message elements (including ones without specific testids)
-              const allMessages = document.querySelectorAll('div[class*="message"]');
+              // Use the reliable assistant message selector (same as working content scripts)
+              const assistantMessages = Array.from(document.querySelectorAll('[data-message-author-role="assistant"]'));
+              const lastAssistantMessage = assistantMessages[assistantMessages.length - 1];
               
-              if (allMessages.length >= 2) {
-                // The last message should be the assistant response
-                const lastMessage = allMessages[allMessages.length - 1];
-                const secondToLast = allMessages[allMessages.length - 2];
-                
-                // Check if the last message is different from the user message
-                const userText = secondToLast.textContent?.trim() || '';
-                const assistantText = lastMessage.textContent?.trim() || '';
-                
-                // If we have an assistant response that's different from user input
-                if (assistantText && assistantText !== userText && !lastMessage.getAttribute('data-testid')?.includes('user')) {
-                  return {
-                    text: assistantText,
-                    isAssistant: true,
-                    isComplete: true,
-                    isUser: false,
-                    success: true,
-                    timestamp: Date.now(),
-                    totalMessages: allMessages.length
-                  };
-                }
+              if (lastAssistantMessage && lastAssistantMessage.textContent?.trim()) {
+                const text = lastAssistantMessage.textContent.trim();
+                return {
+                  text: text,
+                  isAssistant: true,
+                  isComplete: true,
+                  isUser: false,
+                  success: true,
+                  timestamp: Date.now(),
+                  totalMessages: document.querySelectorAll('[data-message-author-role]').length
+                };
               }
               return null;
             }
