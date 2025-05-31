@@ -137,4 +137,26 @@ class ConversationObserver {
 
 // Initialize immediately
 window.conversationObserver = new ConversationObserver();
+
+// Listen for messages from background script
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log('[ContentScript] Received message:', message);
+  
+  if (message.type === 'register_operation') {
+    const { operationId, operationType, params } = message;
+    console.log(`[ContentScript] Registering operation ${operationId} (${operationType})`);
+    
+    if (window.conversationObserver) {
+      const operation = window.conversationObserver.registerOperation(operationId, operationType, params);
+      sendResponse({ success: true, operation });
+    } else {
+      console.error('[ContentScript] ConversationObserver not available');
+      sendResponse({ success: false, error: 'ConversationObserver not available' });
+    }
+    return true; // Keep sendResponse active for async response
+  }
+  
+  return false; // Don't handle other message types
+});
+
 console.log('CCM: Fast ConversationObserver initialized and ready');

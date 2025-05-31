@@ -10,41 +10,41 @@ console.log('CCM: Registering critical event listeners at startup...');
 // Content script auto-injection - register immediately
 let contentScriptManager; // Will be initialized later
 
-// Tab update listener for content script injection
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  console.log(`CCM: Tab ${tabId} updated (immediate):`, { status: changeInfo.status, url: tab.url });
-  if (changeInfo.status === 'complete' && tab.url && tab.url.includes('claude.ai')) {
-    console.log(`CCM: Triggering immediate injection for tab ${tabId} via onUpdated`);
-    if (contentScriptManager) {
-      contentScriptManager.injectContentScript(tabId);
-    } else {
-      console.warn('CCM: ContentScriptManager not yet initialized, retrying...');
-      setTimeout(() => {
-        if (contentScriptManager) {
-          contentScriptManager.injectContentScript(tabId);
-        }
-      }, 1000);
-    }
-  }
-});
+// DISABLED: Tab update listener for content script injection (causing race conditions)
+// chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+//   console.log(`CCM: Tab ${tabId} updated (immediate):`, { status: changeInfo.status, url: tab.url });
+//   if (changeInfo.status === 'complete' && tab.url && tab.url.includes('claude.ai')) {
+//     console.log(`CCM: Triggering immediate injection for tab ${tabId} via onUpdated`);
+//     if (contentScriptManager) {
+//       contentScriptManager.injectContentScript(tabId);
+//     } else {
+//       console.warn('CCM: ContentScriptManager not yet initialized, retrying...');
+//       setTimeout(() => {
+//         if (contentScriptManager) {
+//           contentScriptManager.injectContentScript(tabId);
+//         }
+//       }, 1000);
+//     }
+//   }
+// });
 
-// Navigation completion listener for content script injection
-chrome.webNavigation.onCompleted.addListener((details) => {
-  console.log(`CCM: Navigation completed (immediate) for tab ${details.tabId}:`, { frameId: details.frameId, url: details.url });
-  if (details.frameId === 0 && details.url.includes('claude.ai')) {
-    console.log(`CCM: Triggering immediate injection for tab ${details.tabId} via webNavigation`);
-    if (contentScriptManager) {
-      contentScriptManager.injectContentScript(details.tabId);
-    } else {
-      console.warn('CCM: ContentScriptManager not yet initialized, retrying...');
-      setTimeout(() => {
-        if (contentScriptManager) {
-          contentScriptManager.injectContentScript(details.tabId);
-        }
-      }, 1000);
-    }
-  }
-});
+// DISABLED: Navigation completion listener for content script injection (causing race conditions)
+// chrome.webNavigation.onCompleted.addListener((details) => {
+//   console.log(`CCM: Navigation completed (immediate) for tab ${details.tabId}:`, { frameId: details.frameId, url: details.url });
+//   if (details.frameId === 0 && details.url.includes('claude.ai')) {
+//     console.log(`CCM: Triggering immediate injection for tab ${details.tabId} via webNavigation`);
+//     if (contentScriptManager) {
+//       contentScriptManager.injectContentScript(details.tabId);
+//     } else {
+//       console.warn('CCM: ContentScriptManager not yet initialized, retrying...');
+//       setTimeout(() => {
+//         if (contentScriptManager) {
+//           contentScriptManager.injectContentScript(details.tabId);
+//         }
+//       }, 1000);
+//     }
+//   }
+// });
 
 console.log('CCM: Critical event listeners registered successfully');
 
@@ -564,6 +564,10 @@ class CCMExtensionHub {
           result = await this.getConnectionHealth();
           break;
           
+        case 'send_content_script_message':
+          result = await this.sendContentScriptMessage(message.params);
+          break;
+          
         case 'test_simple':
           console.log('CCM Extension: Test simple message received');
           result = { success: true, message: 'Test successful', timestamp: Date.now() };
@@ -665,8 +669,16 @@ class CCMExtensionHub {
             // Inject content script if requested
             if (options.injectContentScript) {
               console.log(`CCM: Injecting content script into tab ${tab.id}...`);
-              await contentScriptManager.injectContentScript(tab.id);
-              tabInfo.contentScriptInjected = true;
+              try {
+                const injectionResult = await contentScriptManager.injectContentScript(tab.id);
+                console.log(`CCM: Content script injection result:`, injectionResult);
+                tabInfo.contentScriptInjected = injectionResult.success;
+                tabInfo.injectionResult = injectionResult;
+              } catch (injectionError) {
+                console.error(`CCM: Content script injection failed:`, injectionError);
+                tabInfo.contentScriptInjected = false;
+                tabInfo.injectionError = injectionError.message;
+              }
             }
             
             // Additional wait for page readiness if requested
@@ -2945,6 +2957,32 @@ class CCMExtensionHub {
     }
   }
 
+  async sendContentScriptMessage(params) {
+    const { tabId, message } = params;
+    
+    try {
+      console.log(`CCM: Sending message to content script in tab ${tabId}:`, message);
+      
+      // Send message to content script using tabs.sendMessage
+      const response = await new Promise((resolve, reject) => {
+        chrome.tabs.sendMessage(tabId, message, (response) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+          } else {
+            resolve(response);
+          }
+        });
+      });
+      
+      console.log(`CCM: Content script response from tab ${tabId}:`, response);
+      return { success: true, response };
+      
+    } catch (error) {
+      console.error(`CCM: Failed to send message to content script in tab ${tabId}:`, error);
+      return { success: false, error: error.message };
+    }
+  }
+
   async getConnectionHealth() {
     const health = {
       timestamp: Date.now(),
@@ -3035,21 +3073,25 @@ class ContentScriptManager {
         return { success: true, alreadyInjected: true };
       }
 
-      console.log(`CCM: Fast injection for tab ${tabId}`);
+      console.log(`CCM: Starting fast injection for tab ${tabId}`);
       
-      // Direct injection of fast content script
-      await chrome.scripting.executeScript({
+      // Use the real content-fast.js file with proper isolation
+      console.log(`CCM: Attempting content-fast.js injection for tab ${tabId}`);
+      const result = await chrome.scripting.executeScript({
         target: { tabId: tabId },
         files: ['content-fast.js']
       });
       
+      console.log(`CCM: Script execution result for tab ${tabId}:`, result);
+      
       this.injectedTabs.add(tabId);
       console.log(`CCM: Content script injected successfully in tab ${tabId}`);
-      return { success: true, method: 'direct_injection' };
+      return { success: true, method: 'inline_isolated_injection', result };
 
     } catch (error) {
-      console.error(`CCM: Failed to verify/inject content script into tab ${tabId}:`, error);
-      return { success: false, error: error.message };
+      console.error(`CCM: Failed to inject content script into tab ${tabId}:`, error);
+      console.error(`CCM: Error details:`, error.stack);
+      return { success: false, error: error.message, stack: error.stack };
     }
   }
 

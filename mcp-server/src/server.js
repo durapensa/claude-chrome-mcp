@@ -3085,15 +3085,16 @@ class ChromeMCPServer {
     // Create operation
     const operationId = operationManager.createOperation('send_message', { tabId, message, waitForReady });
     
-    // Register operation with content script observer
+    // Register operation with content script observer via message passing
     try {
-      await this.hubClient.sendRequest('execute_script', {
+      await this.hubClient.sendRequest('send_content_script_message', {
         tabId,
-        script: `
-          if (window.conversationObserver) {
-            window.conversationObserver.registerOperation('${operationId}', 'send_message', ${JSON.stringify({ message, waitForReady })});
-          }
-        `
+        message: {
+          type: 'register_operation',
+          operationId,
+          operationType: 'send_message',
+          params: { message, waitForReady }
+        }
       });
     } catch (error) {
       console.warn('[handleSendMessageAsync] Failed to register operation with observer:', error);
@@ -3134,15 +3135,16 @@ class ChromeMCPServer {
     // Create operation
     const operationId = operationManager.createOperation('get_response', { tabId, waitForCompletion });
     
-    // Register operation with content script observer
+    // Register operation with content script observer via message passing
     try {
-      await this.hubClient.sendRequest('execute_script', {
+      await this.hubClient.sendRequest('send_content_script_message', {
         tabId,
-        script: `
-          if (window.conversationObserver) {
-            window.conversationObserver.registerOperation('${operationId}', 'get_response', ${JSON.stringify({ waitForCompletion })});
-          }
-        `
+        message: {
+          type: 'register_operation',
+          operationId,
+          operationType: 'get_response',
+          params: { waitForCompletion }
+        }
       });
     } catch (error) {
       console.warn('[handleGetResponseAsync] Failed to register operation with observer:', error);

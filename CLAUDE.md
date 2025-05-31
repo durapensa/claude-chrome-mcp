@@ -8,18 +8,18 @@ Quick reference for Claude. See README.md for full documentation.
 - Version: 2.4.0 
 - Status: Removed tab reloading kludge, created fast content script, simplified injection - ready for testing optimized async workflow
 
-## Quick Commands
+## Quick Commands - After Restart
 ```bash
-# FIRST: Reload extension to activate fixed ContentScriptManager
-mcp__claude-chrome-mcp__reload_extension
-
-# Check system health 
+# 1. Check system health after restart
 mcp__claude-chrome-mcp__get_connection_health
 
-# Test complete async system with auto-injection
+# 2. Test complete optimized async workflow
 mcp__claude-chrome-mcp__spawn_claude_dot_ai_tab --waitForLoad true --injectContentScript true
-mcp__claude-chrome-mcp__send_message_async --message "Test auto-injection - what's 9*7?"
-mcp__claude-chrome-mcp__wait_for_operation --operationId <operation_id>
+mcp__claude-chrome-mcp__send_message_async --message "Test complete async system - what's 7*8?"
+# Should receive INSTANT MCP notification when response completes (no need to poll)
+
+# 3. If successful, test get_response_async as well
+mcp__claude-chrome-mcp__get_response_async --tabId <tab_id>
 ```
 
 ## Important Tool Options
@@ -40,14 +40,18 @@ mcp__claude-chrome-mcp__wait_for_operation --operationId <operation_id>
 - Roadmap: ROADMAP.md
 
 ## Recent Updates (2025-05-31)
-- **OPTIMIZED**: Fast and reliable async functionality (COMPLETED)
-  - Removed tab reloading kludge from ContentScriptManager  
-  - Created content-fast.js with streamlined ConversationObserver
-  - Simplified injection: direct chrome.scripting without verification steps
-  - Removed complex debugger fallback methods for speed
-  - ContentScriptManager now uses single-path injection for reliability
-- **READY**: Test optimized async workflow with fast content script
-- **NEXT**: Test new optimized tools after Claude Code restart
+- **COMPLETED**: ContentScriptManager auto-injection mechanism 
+  - Fixed injection using chrome.scripting.executeScript with files approach
+  - Disabled conflicting automatic injection listeners to prevent race conditions
+  - Added detailed error handling and logging for injection debugging
+  - Verified injection working with `contentScriptInjected: true` response
+- **COMPLETED**: Async operation registration system
+  - Added `send_content_script_message` method to background script using chrome.tabs.sendMessage
+  - Updated handleSendMessageAsync/handleGetResponseAsync to use message passing instead of execute_script
+  - Added chrome.runtime.onMessage listener to content-fast.js for operation registration
+  - Fixed execution context issue (ISOLATED world vs MAIN world) for proper chrome.runtime access
+- **READY**: Test complete optimized async workflow after MCP server restart
+- **NEXT**: Verify instant MCP notifications on response completion
 
 ## Development Guidelines
 - Commit frequently so that you can review changes

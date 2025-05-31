@@ -330,7 +330,73 @@
         "createdAt": 1748716270677,
         "lastUpdated": 1748716271004
       }
+    ],
+    [
+      "send_message_1748720940532_24rarzayc",
+      {
+        "id": "send_message_1748720940532_24rarzayc",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570829,
+          "message": "Test auto-injection - what's 9*7?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748720940861,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748720940532,
+        "lastUpdated": 1748720940861
+      }
+    ],
+    [
+      "send_message_1748721170903_wapzecyq7",
+      {
+        "id": "send_message_1748721170903_wapzecyq7",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570831,
+          "message": "Test the optimized async system - what's 12*8?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748721171231,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748721170903,
+        "lastUpdated": 1748721171231
+      }
+    ],
+    [
+      "send_message_1748721825682_g619waabb",
+      {
+        "id": "send_message_1748721825682_g619waabb",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570847,
+          "message": "Test optimized async system - what's 15*4?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748721826009,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748721825682,
+        "lastUpdated": 1748721826009
+      }
     ]
   ],
-  "lastSaved": 1748716271004
+  "lastSaved": 1748721826009
 }
