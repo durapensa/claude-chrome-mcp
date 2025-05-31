@@ -1,917 +1,335 @@
 {
   "operations": [
     [
-      "send_message_1748713220690_kni3vviw3",
+      "send_message_1748726886117_ap30c83xf",
       {
-        "id": "send_message_1748713220690_kni3vviw3",
+        "id": "send_message_1748726886117_ap30c83xf",
         "type": "send_message",
         "params": {
-          "tabId": 948570636,
-          "message": "Hello! This is a test of the new event-driven completion detection system. Please respond with a simple confirmation that you received this message.",
+          "tabId": 948570892,
+          "message": "Test network stream detection: what's 7*8?",
           "waitForReady": true
         },
         "status": "pending",
         "milestones": [
           {
             "milestone": "message_sent",
-            "timestamp": 1748713221013,
+            "timestamp": 1748726886443,
             "data": {}
           }
         ],
-        "createdAt": 1748713220690,
-        "lastUpdated": 1748713221013
+        "createdAt": 1748726886117,
+        "lastUpdated": 1748726886443
       }
     ],
     [
-      "get_response_1748713248603_eyrxkad9a",
+      "send_message_1748727071020_50n22gcg4",
       {
-        "id": "get_response_1748713248603_eyrxkad9a",
-        "type": "get_response",
-        "params": {
-          "tabId": 948570636,
-          "waitForCompletion": true
-        },
-        "status": "completed",
-        "milestones": [
-          {
-            "milestone": "response_completed",
-            "timestamp": 1748713249218,
-            "data": {
-              "response": {
-                "isAssistant": true,
-                "isComplete": true,
-                "isUser": false,
-                "success": true,
-                "text": "Hello! I received your message. This is my confirmation that the event-driven completion detection system test is working.",
-                "timestamp": 1748713249216,
-                "totalMessages": 2
-              }
-            }
-          }
-        ],
-        "createdAt": 1748713248603,
-        "lastUpdated": 1748713249218
-      }
-    ],
-    [
-      "send_message_1748713255922_ltxavx91g",
-      {
-        "id": "send_message_1748713255922_ltxavx91g",
+        "id": "send_message_1748727071020_50n22gcg4",
         "type": "send_message",
         "params": {
-          "tabId": 948570636,
-          "message": "Please write a short Python function that calculates the factorial of a number. Take your time to think through it and provide a complete solution with comments.",
-          "waitForReady": true
-        },
-        "status": "pending",
-        "milestones": [
-          {
-            "milestone": "message_sent",
-            "timestamp": 1748713256256,
-            "data": {}
-          }
-        ],
-        "createdAt": 1748713255922,
-        "lastUpdated": 1748713256256
-      }
-    ],
-    [
-      "get_response_1748713280726_n90ccgq7z",
-      {
-        "id": "get_response_1748713280726_n90ccgq7z",
-        "type": "get_response",
-        "params": {
-          "tabId": 948570636,
-          "waitForCompletion": true
-        },
-        "status": "completed",
-        "milestones": [
-          {
-            "milestone": "response_completed",
-            "timestamp": 1748713281345,
-            "data": {
-              "response": {
-                "isAssistant": true,
-                "isComplete": true,
-                "isUser": false,
-                "success": true,
-                "text": "Here's a Python function to calculate the factorial of a number:\npythondef factorial(n):\n    \"\"\"\n    Calculate the factorial of a non-negative integer.\n    \n    Args:\n        n (int): A non-negative integer\n        \n    Returns:\n        int: The factorial of n (n!)\n        \n    Raises:\n        ValueError: If n is negative\n        TypeError: If n is not an integer\n    \"\"\"\n    # Input validation\n    if not isinstance(n, int):\n        raise TypeError(\"Input must be an integer\")\n    \n    if n < 0:\n        raise ValueError(\"Factorial is not defined for negative numbers\")\n    \n    # Base cases: 0! = 1 and 1! = 1\n    if n == 0 or n == 1:\n        return 1\n    \n    # Calculate factorial iteratively\n    result = 1\n    for i in range(2, n + 1):\n        result *= i\n    \n    return result\n\n# Example usage\nif __name__ == \"__main__\":\n    # Test the function with some examples\n    test_values = [0, 1, 5, 10]\n    \n    for value in test_values:\n        result = factorial(value)\n        print(f\"{value}! = {result}\")\nThis implementation uses an iterative approach which is more memory-efficient than recursion for large numbers. The function includes proper error handling for invalid inputs and clear documentation explaining its behavior.",
-                "timestamp": 1748713281343,
-                "totalMessages": 4
-              }
-            }
-          }
-        ],
-        "createdAt": 1748713280726,
-        "lastUpdated": 1748713281345
-      }
-    ],
-    [
-      "send_message_1748713910219_obeoq16mk",
-      {
-        "id": "send_message_1748713910219_obeoq16mk",
-        "type": "send_message",
-        "params": {
-          "tabId": 948570638,
-          "message": "Hello! This is a live test from Claude Code. You should see this message appear in your browser in real-time. Please respond with \"Live test confirmed!\" to demonstrate the event-driven completion detection.",
-          "waitForReady": true
-        },
-        "status": "pending",
-        "milestones": [
-          {
-            "milestone": "message_sent",
-            "timestamp": 1748713910548,
-            "data": {}
-          }
-        ],
-        "createdAt": 1748713910219,
-        "lastUpdated": 1748713910548
-      }
-    ],
-    [
-      "get_response_1748713935262_em52reupg",
-      {
-        "id": "get_response_1748713935262_em52reupg",
-        "type": "get_response",
-        "params": {
-          "tabId": 948570638,
-          "waitForCompletion": true
-        },
-        "status": "completed",
-        "milestones": [
-          {
-            "milestone": "response_completed",
-            "timestamp": 1748713936890,
-            "data": {
-              "response": {
-                "isAssistant": true,
-                "isComplete": true,
-                "isUser": false,
-                "success": true,
-                "text": "Great! It looks like the live test is working perfectly. The real-time communication between Claude Code and the browser interface is functioning as expected. Is there anything specific you'd like to test or work on now that we've confirmed the connection?",
-                "timestamp": 1748713936889,
-                "totalMessages": 4
-              }
-            }
-          }
-        ],
-        "createdAt": 1748713935262,
-        "lastUpdated": 1748713936890
-      }
-    ],
-    [
-      "send_message_1748714915521_dkwlkhxva",
-      {
-        "id": "send_message_1748714915521_dkwlkhxva",
-        "type": "send_message",
-        "params": {
-          "tabId": 948570642,
-          "message": "Hello, this is a test of the async message system",
-          "waitForReady": true
-        },
-        "status": "pending",
-        "milestones": [
-          {
-            "milestone": "message_sent",
-            "timestamp": 1748714915851,
-            "data": {}
-          }
-        ],
-        "createdAt": 1748714915521,
-        "lastUpdated": 1748714915851
-      }
-    ],
-    [
-      "get_response_1748714936477_xsz0bivii",
-      {
-        "id": "get_response_1748714936477_xsz0bivii",
-        "type": "get_response",
-        "params": {
-          "tabId": 948570642,
-          "waitForCompletion": true
-        },
-        "status": "completed",
-        "milestones": [
-          {
-            "milestone": "response_completed",
-            "timestamp": 1748714937105,
-            "data": {
-              "response": {
-                "isAssistant": true,
-                "isComplete": true,
-                "isUser": false,
-                "success": true,
-                "text": "Hello! I can see your message came through clearly. The async message system appears to be working fine from my end. Is there anything specific you'd like to test or discuss while you're here?",
-                "timestamp": 1748714937103,
-                "totalMessages": 2
-              }
-            }
-          }
-        ],
-        "createdAt": 1748714936477,
-        "lastUpdated": 1748714937105
-      }
-    ],
-    [
-      "send_message_1748715429232_jcsbxlavt",
-      {
-        "id": "send_message_1748715429232_jcsbxlavt",
-        "type": "send_message",
-        "params": {
-          "tabId": 948570646,
-          "message": "Testing async completion detection with manually injected observer",
-          "waitForReady": true
-        },
-        "status": "pending",
-        "milestones": [
-          {
-            "milestone": "message_sent",
-            "timestamp": 1748715429557,
-            "data": {}
-          }
-        ],
-        "createdAt": 1748715429232,
-        "lastUpdated": 1748715429557
-      }
-    ],
-    [
-      "send_message_1748715591887_txtxtytcy",
-      {
-        "id": "send_message_1748715591887_txtxtytcy",
-        "type": "send_message",
-        "params": {
-          "tabId": 948570648,
-          "message": "Testing updated ConversationObserver with new Claude.ai DOM structure!",
-          "waitForReady": true
-        },
-        "status": "pending",
-        "milestones": [
-          {
-            "milestone": "message_sent",
-            "timestamp": 1748715592214,
-            "data": {}
-          }
-        ],
-        "createdAt": 1748715591887,
-        "lastUpdated": 1748715592214
-      }
-    ],
-    [
-      "send_message_1748716092989_ua485vt84",
-      {
-        "id": "send_message_1748716092989_ua485vt84",
-        "type": "send_message",
-        "params": {
-          "tabId": 948570648,
-          "message": "Final async test - please respond with \"Async flow working correctly\"",
-          "waitForReady": true
-        },
-        "status": "pending",
-        "milestones": [
-          {
-            "milestone": "message_sent",
-            "timestamp": 1748716093321,
-            "data": {}
-          }
-        ],
-        "createdAt": 1748716092989,
-        "lastUpdated": 1748716093321
-      }
-    ],
-    [
-      "get_response_1748716143448_6l2xdtm6m",
-      {
-        "id": "get_response_1748716143448_6l2xdtm6m",
-        "type": "get_response",
-        "params": {
-          "tabId": 948570648,
-          "waitForCompletion": true
-        },
-        "status": "completed",
-        "milestones": [
-          {
-            "milestone": "response_completed",
-            "timestamp": 1748716144071,
-            "data": {
-              "response": {
-                "isAssistant": true,
-                "isComplete": true,
-                "isUser": false,
-                "success": true,
-                "text": "Async flow working correctly",
-                "timestamp": 1748716144069,
-                "totalMessages": 10
-              }
-            }
-          }
-        ],
-        "createdAt": 1748716143448,
-        "lastUpdated": 1748716144071
-      }
-    ],
-    [
-      "send_message_1748716270677_dgqv3hypf",
-      {
-        "id": "send_message_1748716270677_dgqv3hypf",
-        "type": "send_message",
-        "params": {
-          "tabId": 948570650,
-          "message": "Final test of complete async system with all fixes applied!",
-          "waitForReady": true
-        },
-        "status": "pending",
-        "milestones": [
-          {
-            "milestone": "message_sent",
-            "timestamp": 1748716271004,
-            "data": {}
-          }
-        ],
-        "createdAt": 1748716270677,
-        "lastUpdated": 1748716271004
-      }
-    ],
-    [
-      "send_message_1748720940532_24rarzayc",
-      {
-        "id": "send_message_1748720940532_24rarzayc",
-        "type": "send_message",
-        "params": {
-          "tabId": 948570829,
-          "message": "Test auto-injection - what's 9*7?",
-          "waitForReady": true
-        },
-        "status": "pending",
-        "milestones": [
-          {
-            "milestone": "message_sent",
-            "timestamp": 1748720940861,
-            "data": {}
-          }
-        ],
-        "createdAt": 1748720940532,
-        "lastUpdated": 1748720940861
-      }
-    ],
-    [
-      "send_message_1748721170903_wapzecyq7",
-      {
-        "id": "send_message_1748721170903_wapzecyq7",
-        "type": "send_message",
-        "params": {
-          "tabId": 948570831,
-          "message": "Test the optimized async system - what's 12*8?",
-          "waitForReady": true
-        },
-        "status": "pending",
-        "milestones": [
-          {
-            "milestone": "message_sent",
-            "timestamp": 1748721171231,
-            "data": {}
-          }
-        ],
-        "createdAt": 1748721170903,
-        "lastUpdated": 1748721171231
-      }
-    ],
-    [
-      "send_message_1748721825682_g619waabb",
-      {
-        "id": "send_message_1748721825682_g619waabb",
-        "type": "send_message",
-        "params": {
-          "tabId": 948570847,
-          "message": "Test optimized async system - what's 15*4?",
-          "waitForReady": true
-        },
-        "status": "pending",
-        "milestones": [
-          {
-            "milestone": "message_sent",
-            "timestamp": 1748721826009,
-            "data": {}
-          }
-        ],
-        "createdAt": 1748721825682,
-        "lastUpdated": 1748721826009
-      }
-    ],
-    [
-      "send_message_1748722357725_dubnbhro3",
-      {
-        "id": "send_message_1748722357725_dubnbhro3",
-        "type": "send_message",
-        "params": {
-          "tabId": 948570850,
-          "message": "Test complete async system - what's 7*8?",
-          "waitForReady": true
-        },
-        "status": "pending",
-        "milestones": [
-          {
-            "milestone": "message_sent",
-            "timestamp": 1748722358048,
-            "data": {}
-          }
-        ],
-        "createdAt": 1748722357725,
-        "lastUpdated": 1748722358048
-      }
-    ],
-    [
-      "get_response_1748722361042_xn00qweoo",
-      {
-        "id": "get_response_1748722361042_xn00qweoo",
-        "type": "get_response",
-        "params": {
-          "tabId": 948570850,
-          "waitForCompletion": true
-        },
-        "status": "completed",
-        "milestones": [
-          {
-            "milestone": "response_completed",
-            "timestamp": 1748722361661,
-            "data": {
-              "response": {
-                "isAssistant": true,
-                "isComplete": true,
-                "isUser": false,
-                "success": true,
-                "text": "56",
-                "timestamp": 1748722361661,
-                "totalMessages": 2
-              }
-            }
-          }
-        ],
-        "createdAt": 1748722361042,
-        "lastUpdated": 1748722361661
-      }
-    ],
-    [
-      "send_message_1748722559709_rqvzyku4m",
-      {
-        "id": "send_message_1748722559709_rqvzyku4m",
-        "type": "send_message",
-        "params": {
-          "tabId": 0,
-          "message": "What's 15*12?",
-          "waitForReady": true
-        },
-        "status": "pending",
-        "milestones": [
-          {
-            "milestone": "message_sent",
-            "timestamp": 1748722562824,
-            "data": {}
-          }
-        ],
-        "createdAt": 1748722559709,
-        "lastUpdated": 1748722562824
-      }
-    ],
-    [
-      "send_message_1748722563927_ibk6fgy03",
-      {
-        "id": "send_message_1748722563927_ibk6fgy03",
-        "type": "send_message",
-        "params": {
-          "tabId": 948570852,
-          "message": "What's 15*12?",
-          "waitForReady": true
-        },
-        "status": "pending",
-        "milestones": [
-          {
-            "milestone": "message_sent",
-            "timestamp": 1748722564251,
-            "data": {}
-          }
-        ],
-        "createdAt": 1748722563927,
-        "lastUpdated": 1748722564251
-      }
-    ],
-    [
-      "send_message_1748722818332_jgh5o0drh",
-      {
-        "id": "send_message_1748722818332_jgh5o0drh",
-        "type": "send_message",
-        "params": {
-          "tabId": 948570854,
-          "message": "Test math: what is 23 * 17?",
-          "waitForReady": true
-        },
-        "status": "pending",
-        "milestones": [
-          {
-            "milestone": "message_sent",
-            "timestamp": 1748722818649,
-            "data": {}
-          }
-        ],
-        "createdAt": 1748722818332,
-        "lastUpdated": 1748722818649
-      }
-    ],
-    [
-      "send_message_1748722825201_c63i1wulc",
-      {
-        "id": "send_message_1748722825201_c63i1wulc",
-        "type": "send_message",
-        "params": {
-          "tabId": 999999,
-          "message": "This should fail",
-          "waitForReady": true
-        },
-        "status": "pending",
-        "milestones": [
-          {
-            "milestone": "message_sent",
-            "timestamp": 1748722828315,
-            "data": {}
-          }
-        ],
-        "createdAt": 1748722825201,
-        "lastUpdated": 1748722828315
-      }
-    ],
-    [
-      "send_message_1748722838078_65c9qem1p",
-      {
-        "id": "send_message_1748722838078_65c9qem1p",
-        "type": "send_message",
-        "params": {
-          "tabId": 948570854,
-          "message": "Quick test 1: 5+5?",
-          "waitForReady": true
-        },
-        "status": "pending",
-        "milestones": [
-          {
-            "milestone": "message_sent",
-            "timestamp": 1748722838409,
-            "data": {}
-          }
-        ],
-        "createdAt": 1748722838078,
-        "lastUpdated": 1748722838409
-      }
-    ],
-    [
-      "send_message_1748722838104_0ouwty0wq",
-      {
-        "id": "send_message_1748722838104_0ouwty0wq",
-        "type": "send_message",
-        "params": {
-          "tabId": 948570854,
-          "message": "Quick test 2: 6+6?",
-          "waitForReady": true
-        },
-        "status": "pending",
-        "milestones": [
-          {
-            "milestone": "message_sent",
-            "timestamp": 1748722842783,
-            "data": {}
-          }
-        ],
-        "createdAt": 1748722838104,
-        "lastUpdated": 1748722842783
-      }
-    ],
-    [
-      "send_message_1748722903111_wnsc8j9gw",
-      {
-        "id": "send_message_1748722903111_wnsc8j9gw",
-        "type": "send_message",
-        "params": {
-          "tabId": 948570856,
-          "message": "Test truly async: what's 13 * 19? (I will NOT poll, just wait for MCP notification)",
-          "waitForReady": true
-        },
-        "status": "pending",
-        "milestones": [
-          {
-            "milestone": "message_sent",
-            "timestamp": 1748722903437,
-            "data": {}
-          }
-        ],
-        "createdAt": 1748722903111,
-        "lastUpdated": 1748722903437
-      }
-    ],
-    [
-      "send_message_1748722954833_fmqua7zoj",
-      {
-        "id": "send_message_1748722954833_fmqua7zoj",
-        "type": "send_message",
-        "params": {
-          "tabId": 948570858,
-          "message": "Testing async notifications: what's 47 * 83?",
-          "waitForReady": true
-        },
-        "status": "pending",
-        "milestones": [
-          {
-            "milestone": "message_sent",
-            "timestamp": 1748722955158,
-            "data": {}
-          }
-        ],
-        "createdAt": 1748722954833,
-        "lastUpdated": 1748722955158
-      }
-    ],
-    [
-      "send_message_1748723099442_l7ipveyja",
-      {
-        "id": "send_message_1748723099442_l7ipveyja",
-        "type": "send_message",
-        "params": {
-          "tabId": 948570860,
-          "message": "Debug test: what's 9 * 7?",
+          "tabId": 948570894,
+          "message": "Test async message: What's 15 * 7? Please respond concisely.",
           "waitForReady": false
         },
         "status": "pending",
         "milestones": [
           {
             "milestone": "message_sent",
-            "timestamp": 1748723099763,
+            "timestamp": 1748727071339,
             "data": {}
           }
         ],
-        "createdAt": 1748723099442,
-        "lastUpdated": 1748723099763
+        "createdAt": 1748727071020,
+        "lastUpdated": 1748727071339
       }
     ],
     [
-      "send_message_1748723153108_ix6albgqx",
+      "send_message_1748727090201_iu345t6qv",
       {
-        "id": "send_message_1748723153108_ix6albgqx",
+        "id": "send_message_1748727090201_iu345t6qv",
         "type": "send_message",
         "params": {
-          "tabId": 948570862,
-          "message": "Test fixed notifications: what's 12 * 15?",
+          "tabId": 948570894,
+          "message": "Write a Python function to calculate fibonacci numbers recursively.",
           "waitForReady": false
         },
         "status": "pending",
         "milestones": [
           {
             "milestone": "message_sent",
-            "timestamp": 1748723153431,
+            "timestamp": 1748727090531,
             "data": {}
           }
         ],
-        "createdAt": 1748723153108,
-        "lastUpdated": 1748723153431
+        "createdAt": 1748727090201,
+        "lastUpdated": 1748727090531
       }
     ],
     [
-      "send_message_1748723215186_g60if98dp",
+      "send_message_1748727106385_kjt81m5co",
       {
-        "id": "send_message_1748723215186_g60if98dp",
+        "id": "send_message_1748727106385_kjt81m5co",
         "type": "send_message",
         "params": {
-          "tabId": 948570864,
-          "message": "Test fixed notifications: what's 6 * 11?",
+          "tabId": 948570894,
+          "message": "What's the capital of France?",
+          "waitForReady": false
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748727106908,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748727106385,
+        "lastUpdated": 1748727106908
+      }
+    ],
+    [
+      "send_message_1748727110924_p90lv3z5j",
+      {
+        "id": "send_message_1748727110924_p90lv3z5j",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570895,
+          "message": "What's 2+2?",
+          "waitForReady": false
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748727111249,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748727110924,
+        "lastUpdated": 1748727111249
+      }
+    ],
+    [
+      "send_message_1748727403605_epl7z189k",
+      {
+        "id": "send_message_1748727403605_epl7z189k",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570899,
+          "message": "Hello! I'm Claude Code working through MCP async architecture. Please respond concisely - just say \"Ready for collaboration\" and I'll explain our joint testing plan.",
+          "waitForReady": false
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748727403930,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748727403605,
+        "lastUpdated": 1748727403930
+      }
+    ],
+    [
+      "send_message_1748727411533_9t2xu05uh",
+      {
+        "id": "send_message_1748727411533_9t2xu05uh",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570899,
+          "message": "Great! We're testing concurrent Claude interactions. I'm Claude Code using MCP async tools. Soon Claude Desktop will join this same tab. When they do:\n\n1. Keep responses concise (1-2 sentences max)\n2. We'll work on coding tasks together \n3. I'll handle technical operations, you focus on code review/suggestions\n4. This stress tests our async architecture with real concurrent usage\n\nReady to begin collaborative coding session?",
+          "waitForReady": false
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748727411864,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748727411533,
+        "lastUpdated": 1748727411864
+      }
+    ],
+    [
+      "send_message_1748727613510_u7fxxy14v",
+      {
+        "id": "send_message_1748727613510_u7fxxy14v",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570899,
+          "message": "Perfect! Let's build a simple web scraper together. I'll implement, you review. Starting with basic HTTP request function:\n\n```javascript\nasync function fetchPage(url) {\n    const response = await fetch(url);\n    return response.text();\n}\n```\n\nWhat improvements would you suggest?",
+          "waitForReady": false
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748727613842,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748727613510,
+        "lastUpdated": 1748727613842
+      }
+    ],
+    [
+      "send_message_1748727629405_1djyr838l",
+      {
+        "id": "send_message_1748727629405_1djyr838l",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570899,
+          "message": "Excellent suggestions! Implemented your improvements. Now adding DOM parsing:\n\n```javascript\nasync function extractData(html, selector) {\n    const parser = new DOMParser();\n    const doc = parser.parseFromString(html, 'text/html');\n    return Array.from(doc.querySelectorAll(selector)).map(el => el.textContent.trim());\n}\n```\n\nNext: rate limiting for polite scraping?",
+          "waitForReady": false
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748727629735,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748727629405,
+        "lastUpdated": 1748727629735
+      }
+    ],
+    [
+      "send_message_1748728273644_an7kor8jj",
+      {
+        "id": "send_message_1748728273644_an7kor8jj",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570900,
+          "message": "Test network stream detection: what's 7*8?",
           "waitForReady": true
         },
         "status": "pending",
         "milestones": [
           {
             "milestone": "message_sent",
-            "timestamp": 1748723215509,
+            "timestamp": 1748728273973,
             "data": {}
           }
         ],
-        "createdAt": 1748723215186,
-        "lastUpdated": 1748723215509
+        "createdAt": 1748728273644,
+        "lastUpdated": 1748728273973
       }
     ],
     [
-      "send_message_1748723365071_y1aau9ebm",
+      "send_message_1748729651458_rt7n8vhe7",
       {
-        "id": "send_message_1748723365071_y1aau9ebm",
+        "id": "send_message_1748729651458_rt7n8vhe7",
         "type": "send_message",
         "params": {
-          "tabId": 948570866,
-          "message": "Pipeline test: what's 3 + 4?",
+          "tabId": 948570901,
+          "message": "Test network stream detection: what's 7*8?",
           "waitForReady": true
         },
         "status": "pending",
         "milestones": [
           {
             "milestone": "message_sent",
-            "timestamp": 1748723365395,
+            "timestamp": 1748729651787,
             "data": {}
           }
         ],
-        "createdAt": 1748723365071,
-        "lastUpdated": 1748723365395
+        "createdAt": 1748729651458,
+        "lastUpdated": 1748729651787
       }
     ],
     [
-      "send_message_1748723470896_ylt4izgr1",
+      "send_message_1748730914689_bxqfjlcpl",
       {
-        "id": "send_message_1748723470896_ylt4izgr1",
+        "id": "send_message_1748730914689_bxqfjlcpl",
         "type": "send_message",
         "params": {
-          "tabId": 948570868,
-          "message": "DOM test: what's 5 + 5?",
+          "tabId": 948570913,
+          "message": "Test async network detection: what's 7*8?",
           "waitForReady": true
         },
         "status": "pending",
         "milestones": [
           {
             "milestone": "message_sent",
-            "timestamp": 1748723471221,
+            "timestamp": 1748730915017,
             "data": {}
           }
         ],
-        "createdAt": 1748723470896,
-        "lastUpdated": 1748723471221
+        "createdAt": 1748730914689,
+        "lastUpdated": 1748730915018
       }
     ],
     [
-      "send_message_1748723545049_6vaubtkwh",
+      "send_message_1748731006689_wbofqvwsn",
       {
-        "id": "send_message_1748723545049_6vaubtkwh",
+        "id": "send_message_1748731006689_wbofqvwsn",
         "type": "send_message",
         "params": {
-          "tabId": 948570870,
-          "message": "Test updated selectors: what's 8 * 9?",
+          "tabId": 948570914,
+          "message": "Test complete workflow: what is 15 + 27?",
           "waitForReady": true
         },
         "status": "pending",
         "milestones": [
           {
             "milestone": "message_sent",
-            "timestamp": 1748723545373,
+            "timestamp": 1748731007015,
             "data": {}
           }
         ],
-        "createdAt": 1748723545049,
-        "lastUpdated": 1748723545373
+        "createdAt": 1748731006689,
+        "lastUpdated": 1748731007015
       }
     ],
     [
-      "send_message_1748723667953_kzq94wit5",
+      "send_message_1748731041296_kmmp5guve",
       {
-        "id": "send_message_1748723667953_kzq94wit5",
+        "id": "send_message_1748731041296_kmmp5guve",
         "type": "send_message",
         "params": {
-          "tabId": 948570872,
-          "message": "Test content-based detection: what's 11 * 12?",
+          "tabId": 948570919,
+          "message": "Quick test: 5*9?",
           "waitForReady": true
         },
         "status": "pending",
         "milestones": [
           {
             "milestone": "message_sent",
-            "timestamp": 1748723668278,
+            "timestamp": 1748731041626,
             "data": {}
           }
         ],
-        "createdAt": 1748723667953,
-        "lastUpdated": 1748723668278
+        "createdAt": 1748731041296,
+        "lastUpdated": 1748731041626
       }
     ],
     [
-      "send_message_1748723744866_lpl3bdwja",
+      "send_message_1748731140259_heyfg70y5",
       {
-        "id": "send_message_1748723744866_lpl3bdwja",
+        "id": "send_message_1748731140259_heyfg70y5",
         "type": "send_message",
         "params": {
-          "tabId": 948570873,
-          "message": "DOM analysis: what's 7 + 8?",
+          "tabId": 948570920,
+          "message": "Test: 9*9",
           "waitForReady": true
         },
         "status": "pending",
         "milestones": [
           {
             "milestone": "message_sent",
-            "timestamp": 1748723745192,
+            "timestamp": 1748731140587,
             "data": {}
           }
         ],
-        "createdAt": 1748723744866,
-        "lastUpdated": 1748723745192
-      }
-    ],
-    [
-      "send_message_1748723803881_70q62f1hk",
-      {
-        "id": "send_message_1748723803881_70q62f1hk",
-        "type": "send_message",
-        "params": {
-          "tabId": 948570875,
-          "message": "Test assistant message detection: what's 4 * 6?",
-          "waitForReady": true
-        },
-        "status": "pending",
-        "milestones": [
-          {
-            "milestone": "message_sent",
-            "timestamp": 1748723804208,
-            "data": {}
-          }
-        ],
-        "createdAt": 1748723803881,
-        "lastUpdated": 1748723804208
-      }
-    ],
-    [
-      "send_message_1748723916863_9t8nq7cf5",
-      {
-        "id": "send_message_1748723916863_9t8nq7cf5",
-        "type": "send_message",
-        "params": {
-          "tabId": 948570877,
-          "message": "Fresh chat test: what's 2 + 3?",
-          "waitForReady": true
-        },
-        "status": "pending",
-        "milestones": [
-          {
-            "milestone": "message_sent",
-            "timestamp": 1748723917188,
-            "data": {}
-          }
-        ],
-        "createdAt": 1748723916863,
-        "lastUpdated": 1748723917188
-      }
-    ],
-    [
-      "send_message_1748723936361_vxcr5tsyk",
-      {
-        "id": "send_message_1748723936361_vxcr5tsyk",
-        "type": "send_message",
-        "params": {
-          "tabId": 948570877,
-          "message": "Second message test: what's 5 + 7?",
-          "waitForReady": true
-        },
-        "status": "pending",
-        "milestones": [
-          {
-            "milestone": "message_sent",
-            "timestamp": 1748723936691,
-            "data": {}
-          }
-        ],
-        "createdAt": 1748723936361,
-        "lastUpdated": 1748723936691
-      }
-    ],
-    [
-      "send_message_1748723996979_eh4rpctwe",
-      {
-        "id": "send_message_1748723996979_eh4rpctwe",
-        "type": "send_message",
-        "params": {
-          "tabId": 948570879,
-          "message": "Debug with logging: what's 3 * 4?",
-          "waitForReady": true
-        },
-        "status": "pending",
-        "milestones": [
-          {
-            "milestone": "message_sent",
-            "timestamp": 1748723997303,
-            "data": {}
-          }
-        ],
-        "createdAt": 1748723996979,
-        "lastUpdated": 1748723997303
-      }
-    ],
-    [
-      "send_message_1748724093801_osy0onmqt",
-      {
-        "id": "send_message_1748724093801_osy0onmqt",
-        "type": "send_message",
-        "params": {
-          "tabId": 948570883,
-          "message": "Deep investigation: what's 6 + 9?",
-          "waitForReady": true
-        },
-        "status": "pending",
-        "milestones": [
-          {
-            "milestone": "message_sent",
-            "timestamp": 1748724094126,
-            "data": {}
-          }
-        ],
-        "createdAt": 1748724093801,
-        "lastUpdated": 1748724094126
+        "createdAt": 1748731140259,
+        "lastUpdated": 1748731140587
       }
     ]
   ],
-  "lastSaved": 1748724094126
+  "lastSaved": 1748731140587
 }

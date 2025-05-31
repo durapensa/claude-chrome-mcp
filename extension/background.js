@@ -3073,12 +3073,240 @@ class ContentScriptManager {
         return { success: true, alreadyInjected: true };
       }
 
-      // Use the optimized network-based content script  
+      // Use inline script injection with proper content script setup
       console.log(`CCM: Injecting network-based content script for tab ${tabId}`);
-      const result = await chrome.scripting.executeScript({
+      
+      // First inject the observer in MAIN world (for page access)
+      const mainWorldResult = await chrome.scripting.executeScript({
         target: { tabId: tabId },
-        files: ['content-network.js']
+        func: () => {
+          console.log('CCM: Network detection content script loading in MAIN world...');
+
+          class NetworkBasedConversationObserver {
+            constructor() {
+              this.activeOperations = new Map();
+              console.log('[NetworkObserver] Initialized in MAIN world');
+              this.setupNetworkInterception();
+            }
+
+            registerOperation(operationId, type, params = {}) {
+              const operation = {
+                id: operationId,
+                type,
+                params,
+                startTime: Date.now()
+              };
+              
+              this.activeOperations.set(operationId, operation);
+              this.notifyMilestone(operationId, 'started', { type, params });
+              console.log(`[NetworkObserver] Registered operation ${operationId} (${type})`);
+              return operation;
+            }
+
+            setupNetworkInterception() {
+              // Intercept fetch requests to detect Claude API completion
+              const originalFetch = window.fetch;
+              window.fetch = async (...args) => {
+                const url = args[0];
+                
+                // Only monitor Claude API requests
+                if (typeof url === 'string' && (url.includes('conversation') || url.includes('message') || url.includes('claude.ai/api'))) {
+                  console.log('[NetworkObserver] Claude API request detected:', url);
+                  
+                  const response = await originalFetch.apply(window, args);
+                  
+                  // For POST requests (likely message sending), detect completion
+                  if (args[1]?.method === 'POST') {
+                    this.handleMessageSent();
+                  }
+                  
+                  // Monitor response completion
+                  if (response.ok) {
+                    // For streaming responses, monitor completion
+                    if (response.headers.get('content-type')?.includes('stream')) {
+                      this.monitorStreamResponse(response);
+                    } else {
+                      // Non-streaming response completed immediately
+                      setTimeout(() => this.checkResponseCompletion(), 300);
+                    }
+                  }
+                  
+                  return response;
+                }
+                
+                return originalFetch.apply(window, args);
+              };
+              
+              console.log('[NetworkObserver] Network interception active');
+            }
+
+            monitorStreamResponse(response) {
+              // Monitor stream completion through periodic DOM checks
+              const checkTimes = [1000, 2000, 4000, 6000]; // Progressive delays
+              
+              checkTimes.forEach(delay => {
+                setTimeout(() => this.checkResponseCompletion(), delay);
+              });
+            }
+
+            handleMessageSent() {
+              for (const [operationId, operation] of this.activeOperations) {
+                if (operation.type === 'send_message') {
+                  this.notifyMilestone(operationId, 'message_sent');
+                }
+              }
+            }
+
+            checkResponseCompletion() {
+              const lastResponse = this.getLastResponse();
+              
+              if (lastResponse && lastResponse.text && lastResponse.text.length > 0) {
+                for (const [operationId, operation] of this.activeOperations) {
+                  if (operation.type === 'send_message' || operation.type === 'get_response') {
+                    // Avoid duplicate notifications
+                    if (!operation.lastResponseText || operation.lastResponseText !== lastResponse.text) {
+                      operation.lastResponseText = lastResponse.text;
+                      this.notifyMilestone(operationId, 'response_completed', { response: lastResponse });
+                      this.activeOperations.delete(operationId);
+                      console.log(`[NetworkObserver] Response completed for ${operationId}`);
+                    }
+                  }
+                }
+              }
+            }
+
+            getLastResponse() {
+              // Get all message elements (including ones without specific testids)
+              const allMessages = document.querySelectorAll('div[class*="message"]');
+              
+              if (allMessages.length >= 2) {
+                // The last message should be the assistant response
+                const lastMessage = allMessages[allMessages.length - 1];
+                const secondToLast = allMessages[allMessages.length - 2];
+                
+                // Check if the last message is different from the user message
+                const userText = secondToLast.textContent?.trim() || '';
+                const assistantText = lastMessage.textContent?.trim() || '';
+                
+                // If we have an assistant response that's different from user input
+                if (assistantText && assistantText !== userText && !lastMessage.getAttribute('data-testid')?.includes('user')) {
+                  return {
+                    text: assistantText,
+                    isAssistant: true,
+                    isComplete: true,
+                    isUser: false,
+                    success: true,
+                    timestamp: Date.now(),
+                    totalMessages: allMessages.length
+                  };
+                }
+              }
+              return null;
+            }
+
+            notifyMilestone(operationId, milestone, data = {}) {
+              console.log(`[NetworkObserver] ${operationId} -> ${milestone}`);
+              
+              // Send message to ISOLATED world for chrome.runtime access
+              window.postMessage({
+                type: 'ccm_milestone',
+                operationId,
+                milestone,
+                timestamp: Date.now(),
+                data
+              }, '*');
+            }
+          }
+
+          // Initialize network observer in MAIN world
+          window.conversationObserver = new NetworkBasedConversationObserver();
+          console.log('CCM: Network-based observer ready in MAIN world');
+          
+          return 'Observer initialized in MAIN world';
+        },
+        world: 'MAIN'
       });
+      
+      // Then inject the communication bridge in ISOLATED world (for chrome.runtime)
+      const isolatedWorldResult = await chrome.scripting.executeScript({
+        target: { tabId: tabId },
+        func: () => {
+          console.log('CCM: Communication bridge loading in ISOLATED world...');
+          
+          // Listen for messages from MAIN world
+          window.addEventListener('message', (event) => {
+            if (event.data.type === 'ccm_milestone') {
+              const { operationId, milestone, timestamp, data } = event.data;
+              
+              try {
+                if (chrome && chrome.runtime) {
+                  chrome.runtime.sendMessage({
+                    type: 'operation_milestone',
+                    operationId,
+                    milestone,
+                    timestamp,
+                    data
+                  });
+                  console.log(`[Bridge] Sent milestone: ${operationId} -> ${milestone}`);
+                } else {
+                  console.warn('[Bridge] chrome.runtime not available');
+                }
+              } catch (error) {
+                console.error('[Bridge] Failed to send milestone:', error);
+              }
+            }
+          });
+          
+          // Listen for operation registration from background script
+          if (chrome && chrome.runtime) {
+            chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+              if (message.type === 'register_operation') {
+                const { operationId, operationType, params } = message;
+                
+                // Send to MAIN world observer
+                window.postMessage({
+                  type: 'ccm_register_operation',
+                  operationId,
+                  operationType, 
+                  params
+                }, '*');
+                
+                sendResponse({ success: true, bridge: 'isolated_world' });
+                return true;
+              }
+              
+              return false;
+            });
+          }
+          
+          console.log('CCM: Communication bridge ready in ISOLATED world');
+          return 'Bridge initialized in ISOLATED world';
+        },
+        world: 'ISOLATED'
+      });
+      
+      // Add cross-world communication to MAIN world observer
+      await chrome.scripting.executeScript({
+        target: { tabId: tabId },
+        func: () => {
+          // Listen for registration messages from ISOLATED world
+          window.addEventListener('message', (event) => {
+            if (event.data.type === 'ccm_register_operation') {
+              const { operationId, operationType, params } = event.data;
+              
+              if (window.conversationObserver) {
+                const operation = window.conversationObserver.registerOperation(operationId, operationType, params);
+                console.log(`[Observer] Registered operation from bridge: ${operationId}`);
+              }
+            }
+          });
+          
+          return 'Cross-world communication setup complete';
+        },
+        world: 'MAIN'
+      });
+      
+      const result = [mainWorldResult, isolatedWorldResult];
       
       console.log(`CCM: Script execution result for tab ${tabId}:`, result);
       

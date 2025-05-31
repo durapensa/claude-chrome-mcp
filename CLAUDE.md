@@ -68,32 +68,36 @@ mcp__claude-chrome-mcp__get_claude_dot_ai_response --tabId <tab_id> --waitForCom
 ## Continuation Instructions for Next Session
 When you type 'continue', the system is ready for:
 
-1. **PRIORITY ITEM**: Investigate server disconnection issue
-   - Server stopped unexpectedly during session (see logs)
-   - Multiple WebSocket connections show disconnection pattern
-   - Need to diagnose and fix stability issue causing premature shutdown
+1. **PRIORITY ITEM**: Fix Bridge Communication Issue
+   - Content script injection now working correctly
+   - Network detection working (operations cleaned up properly)
+   - Bridge between MAIN/ISOLATED worlds not sending milestones to MCP server
+   - Need to debug chrome.runtime.sendMessage communication
 
 2. **System Health Status**:
-   - JSON parsing errors RESOLVED - MCP communication now clean
-   - Enhanced server with stability features operational
-   - Network detection optimized and working
-   - System functional but requires stability investigation
+   - ✅ JSON parsing errors RESOLVED - MCP communication clean
+   - ✅ Enhanced server with stability features operational  
+   - ✅ Content script injection fixed (hybrid MAIN/ISOLATED approach)
+   - ✅ Network detection working (operations removed correctly)
+   - ❌ Milestone notifications not reaching MCP server
 
 3. **Current State**:
-   - Fixed console.log → console.error in OperationManager (mcp-server/src/server.js)
-   - Enhanced server replaces original (backup: server-original-backup.js)
-   - Network-based content script active (extension/content-network.js)
-   - All changes committed and ready
+   - Fixed content script injection using hybrid approach (MAIN + ISOLATED worlds)
+   - Updated DOM selectors from `[data-message-author-role="assistant"]` to `div[class*="message"]`
+   - Removed manifest content_scripts declaration to avoid conflicts
+   - Network-based detection working but bridge communication failing
 
 4. **Files Changed in This Session**:
-   - `mcp-server/src/server.js` (fixed JSON parsing corruption)
+   - `extension/background.js` (implemented hybrid content script injection)
+   - `extension/manifest.json` (removed content_scripts declaration)
    - `CLAUDE.md` (updated with session results)
 
 5. **Next Priorities**:
-   - Debug WebSocket disconnection pattern causing server shutdown
-   - Test complete async workflow end-to-end
-   - Validate system stability under load
-   - Run comprehensive test suite
+   - Debug bridge communication between MAIN/ISOLATED worlds
+   - Verify chrome.runtime.sendMessage reaching background script
+   - Test milestone reception in background script message handlers
+   - Implement fallback detection if bridge communication fails
+   - Validate end-to-end async workflow completion
 
 ## Development Guidelines
 - Commit frequently so that you can review changes
