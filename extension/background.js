@@ -4,6 +4,50 @@
 const WEBSOCKET_PORT = 54321;
 const KEEPALIVE_INTERVAL = 20000;
 
+// IMPORTANT: Register event listeners immediately for Manifest V3 service worker persistence
+console.log('CCM: Registering critical event listeners at startup...');
+
+// Content script auto-injection - register immediately
+let contentScriptManager; // Will be initialized later
+
+// Tab update listener for content script injection
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  console.log(`CCM: Tab ${tabId} updated (immediate):`, { status: changeInfo.status, url: tab.url });
+  if (changeInfo.status === 'complete' && tab.url && tab.url.includes('claude.ai')) {
+    console.log(`CCM: Triggering immediate injection for tab ${tabId} via onUpdated`);
+    if (contentScriptManager) {
+      contentScriptManager.injectContentScript(tabId);
+    } else {
+      console.warn('CCM: ContentScriptManager not yet initialized, retrying...');
+      setTimeout(() => {
+        if (contentScriptManager) {
+          contentScriptManager.injectContentScript(tabId);
+        }
+      }, 1000);
+    }
+  }
+});
+
+// Navigation completion listener for content script injection
+chrome.webNavigation.onCompleted.addListener((details) => {
+  console.log(`CCM: Navigation completed (immediate) for tab ${details.tabId}:`, { frameId: details.frameId, url: details.url });
+  if (details.frameId === 0 && details.url.includes('claude.ai')) {
+    console.log(`CCM: Triggering immediate injection for tab ${details.tabId} via webNavigation`);
+    if (contentScriptManager) {
+      contentScriptManager.injectContentScript(details.tabId);
+    } else {
+      console.warn('CCM: ContentScriptManager not yet initialized, retrying...');
+      setTimeout(() => {
+        if (contentScriptManager) {
+          contentScriptManager.injectContentScript(details.tabId);
+        }
+      }, 1000);
+    }
+  }
+});
+
+console.log('CCM: Critical event listeners registered successfully');
+
 // Keep service worker alive
 chrome.runtime.onStartup.addListener(() => {
   console.log('CCM Extension: Service worker started');
@@ -415,9 +459,27 @@ class CCMExtensionHub {
           break;
           
         case 'spawn_claude_dot_ai_tab':
-          console.log('CCM Extension: Creating Claude tab with URL:', message.params?.url);
-          result = await this.createClaudeTab(message.params?.url);
-          console.log('CCM Extension: Created tab:', result);
+          console.log('CCM Extension: Creating Claude tab with params:', message.params);
+          result = await this.createClaudeTab(message.params?.url, {
+            waitForLoad: message.params?.waitForLoad,
+            injectContentScript: message.params?.injectContentScript,
+            waitForReady: message.params?.waitForReady
+          });
+          console.log('CCM Extension: Created tab with async options:', result);
+          break;
+          
+        case 'manual_inject_content_script':
+          console.log('CCM Extension: Manual content script injection for tab:', message.params?.tabId);
+          if (message.params?.tabId) {
+            try {
+              await contentScriptManager.injectContentScript(message.params.tabId);
+              result = { success: true, message: 'Content script injected successfully' };
+            } catch (error) {
+              result = { success: false, error: error.message };
+            }
+          } else {
+            result = { success: false, error: 'tabId parameter required' };
+          }
           break;
           
         case 'send_message_to_claude_dot_ai_tab':
@@ -578,20 +640,122 @@ class CCMExtensionHub {
     });
   }
 
-  async createClaudeTab(url = 'https://claude.ai') {
+  async createClaudeTab(url = 'https://claude.ai', options = {}) {
     return new Promise((resolve, reject) => {
-      chrome.tabs.create({ url }, (tab) => {
+      chrome.tabs.create({ url }, async (tab) => {
         if (chrome.runtime.lastError) {
           reject(new Error(chrome.runtime.lastError.message));
-        } else {
-          resolve({
-            id: tab.id,
-            url: tab.url,
-            title: tab.title
-          });
+          return;
         }
+        
+        const tabInfo = {
+          id: tab.id,
+          url: tab.url,
+          title: tab.title
+        };
+        
+        // If waitForLoad option is enabled, wait for tab to load and inject content script
+        if (options.waitForLoad || options.injectContentScript) {
+          try {
+            console.log(`CCM: Waiting for tab ${tab.id} to load...`);
+            
+            // Wait for tab to complete loading
+            await this.waitForTabLoad(tab.id);
+            
+            // Inject content script if requested
+            if (options.injectContentScript) {
+              console.log(`CCM: Injecting content script into tab ${tab.id}...`);
+              await contentScriptManager.injectContentScript(tab.id);
+              tabInfo.contentScriptInjected = true;
+            }
+            
+            // Additional wait for page readiness if requested
+            if (options.waitForReady) {
+              console.log(`CCM: Waiting for page readiness in tab ${tab.id}...`);
+              await this.waitForPageReady(tab.id);
+              tabInfo.pageReady = true;
+            }
+            
+            tabInfo.loadComplete = true;
+          } catch (error) {
+            console.error(`CCM: Error during tab preparation:`, error);
+            tabInfo.error = error.message;
+          }
+        }
+        
+        resolve(tabInfo);
       });
     });
+  }
+  
+  async waitForTabLoad(tabId, timeout = 10000) {
+    return new Promise((resolve, reject) => {
+      const startTime = Date.now();
+      
+      const checkLoad = () => {
+        chrome.tabs.get(tabId, (tab) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+            return;
+          }
+          
+          if (tab.status === 'complete') {
+            resolve(tab);
+          } else if (Date.now() - startTime > timeout) {
+            reject(new Error(`Tab load timeout after ${timeout}ms`));
+          } else {
+            setTimeout(checkLoad, 500);
+          }
+        });
+      };
+      
+      checkLoad();
+    });
+  }
+  
+  async waitForPageReady(tabId, timeout = 10000) {
+    try {
+      // Wait for page to be ready for interaction
+      await this.ensureDebuggerAttached(tabId);
+      
+      const result = await new Promise((resolve, reject) => {
+        chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
+          expression: `
+            (function() {
+              // Check if page is ready for interaction
+              const hasInput = !!document.querySelector('textarea, input[type="text"], div[contenteditable="true"]');
+              const hasContent = !!document.querySelector('main, .conversation, .chat, [data-testid*="message"]');
+              const hasClaudeUI = !!document.querySelector('h1, h2, nav, header') || document.title.includes('Claude');
+              
+              return {
+                ready: hasInput && (hasContent || hasClaudeUI),
+                hasInput,
+                hasContent,
+                hasClaudeUI,
+                title: document.title,
+                readyState: document.readyState
+              };
+            })()
+          `,
+          returnByValue: true
+        }, (result) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+          } else {
+            resolve(result);
+          }
+        });
+      });
+      
+      if (result?.result?.value?.ready) {
+        return result.result.value;
+      } else {
+        throw new Error('Page not ready for interaction');
+      }
+    } catch (error) {
+      console.warn(`CCM: Page readiness check failed for tab ${tabId}:`, error);
+      throw error;
+    }
   }
 
   async getClaudeConversations() {
@@ -2861,23 +3025,7 @@ class CCMExtensionHub {
 class ContentScriptManager {
   constructor() {
     this.injectedTabs = new Set();
-    this.setupTabListeners();
-  }
-
-  setupTabListeners() {
-    // Inject content script when tabs are updated
-    chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-      if (changeInfo.status === 'complete' && tab.url && tab.url.includes('claude.ai')) {
-        this.injectContentScript(tabId);
-      }
-    });
-
-    // Inject content script when navigating to claude.ai
-    chrome.webNavigation.onCompleted.addListener((details) => {
-      if (details.frameId === 0 && details.url.includes('claude.ai')) {
-        this.injectContentScript(details.tabId);
-      }
-    });
+    console.log('CCM: ContentScriptManager initialized - event listeners now registered at top level');
   }
 
   async injectContentScript(tabId) {
@@ -2887,7 +3035,34 @@ class ContentScriptManager {
         return;
       }
 
-      console.log(`CCM: Injecting content script into tab ${tabId} using debugger API`);
+      console.log(`CCM: Injecting content script into tab ${tabId} using scripting API`);
+      
+      // Use chrome.scripting.executeScript for Manifest V3
+      const result = await chrome.scripting.executeScript({
+        target: { tabId: tabId },
+        files: ['content.js']
+      });
+      
+      if (result && result.length > 0) {
+        this.injectedTabs.add(tabId);
+        console.log(`CCM: Content script injection completed for tab ${tabId} via scripting API`);
+        return result;
+      } else {
+        throw new Error('Script injection returned no results');
+      }
+
+    } catch (error) {
+      console.error(`CCM: Failed to inject content script into tab ${tabId}:`, error);
+      
+      // Fallback to debugger method if scripting API fails
+      console.log(`CCM: Falling back to debugger API for tab ${tabId}`);
+      return this.injectContentScriptViaDebugger(tabId);
+    }
+  }
+
+  async injectContentScriptViaDebugger(tabId) {
+    try {
+      console.log(`CCM: Injecting content script into tab ${tabId} using debugger API (fallback)`);
       
       // Read content script file
       const response = await fetch(chrome.runtime.getURL('content.js'));
@@ -2937,7 +3112,8 @@ class ContentScriptManager {
       });
 
     } catch (error) {
-      console.error(`CCM: Failed to inject content script into tab ${tabId}:`, error);
+      console.error(`CCM: Failed to inject content script via debugger into tab ${tabId}:`, error);
+      throw error;
     }
   }
 
@@ -2951,7 +3127,10 @@ class ContentScriptManager {
 const ccmHub = new CCMExtensionHub();
 
 // Initialize Content Script Manager
-const contentScriptManager = new ContentScriptManager();
+contentScriptManager = new ContentScriptManager();
+console.log('CCM: ContentScriptManager initialized and assigned to global variable');
+
+// Event listeners now registered at top of file for immediate availability
 
 // Clean up closed tabs
 chrome.tabs.onRemoved.addListener((tabId) => {
@@ -2965,5 +3144,36 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     console.log('CCM Extension: WebSocket not connected, attempting reconnection...');
     ccmHub.connectToHub();
   }
+  
+  // Handle manual injection requests and test ContentScriptManager
+  if (request.type === 'manual_inject_content_script' && request.tabId) {
+    console.log(`CCM: Manual injection requested for tab ${request.tabId}`);
+    contentScriptManager.injectContentScript(request.tabId)
+      .then(() => {
+        console.log(`CCM: Manual injection completed for tab ${request.tabId}`);
+        sendResponse({ success: true });
+      })
+      .catch(error => {
+        console.error(`CCM: Manual injection failed for tab ${request.tabId}:`, error);
+        sendResponse({ success: false, error: error.message });
+      });
+    return true; // Will respond asynchronously
+  }
+  
+  // Test ContentScriptManager directly
+  if (request.type === 'test_csm' && request.tabId) {
+    console.log(`CCM: Testing ContentScriptManager injection for tab ${request.tabId}`);
+    // Force injection regardless of existing state
+    contentScriptManager.injectedTabs.delete(request.tabId);
+    contentScriptManager.injectContentScript(request.tabId)
+      .then(() => {
+        sendResponse({ success: true, message: 'ContentScriptManager injection completed' });
+      })
+      .catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+    return true;
+  }
+  
   return false; // Let the existing handler process the message
 });

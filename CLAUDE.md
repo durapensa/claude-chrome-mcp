@@ -3,21 +3,23 @@
 Quick reference for Claude. See README.md for full documentation.
 
 ## Current Session
-- Focus: Test Suite Organization & Comprehensive Tool Testing
+- Focus: Testing Fixed ContentScriptManager Auto-Injection & Complete Async Workflow
 - Last update: 2025-05-31
 - Version: 2.4.0 
-- Status: Event-driven system operational, ready for test organization
+- Status: ContentScriptManager auto-injection fixed for Manifest V3, ready for end-to-end testing
 
 ## Quick Commands
 ```bash
-# Check system health (ALWAYS run first)
+# FIRST: Reload extension to activate fixed ContentScriptManager
+mcp__claude-chrome-mcp__reload_extension
+
+# Check system health 
 mcp__claude-chrome-mcp__get_connection_health
 
-# Test organized event-driven system
-cd tests/organized && node test-event-driven-system.js
-
-# Run comprehensive test suite
-cd tests && node run-all-tests-v2.js
+# Test complete async system with auto-injection
+mcp__claude-chrome-mcp__spawn_claude_dot_ai_tab --waitForLoad true --injectContentScript true
+mcp__claude-chrome-mcp__send_message_async --message "Test auto-injection - what's 9*7?"
+mcp__claude-chrome-mcp__wait_for_operation --operationId <operation_id>
 ```
 
 ## Important Tool Options
@@ -38,18 +40,18 @@ cd tests && node run-all-tests-v2.js
 - Roadmap: ROADMAP.md
 
 ## Recent Updates (2025-05-31)
-- **COMPLETED**: Event-Driven Completion Detection System (v2.4.0)
-  - send_message_async, get_response_async, wait_for_operation tools
-  - Real-time milestone detection via DOM MutationObserver
-  - MCP notification streaming for live progress updates
-  - Operation state persistence and recovery
-  - Comprehensive test suite integration
-- **FIXED**: MCP server shutdown issue - now exits cleanly when host terminates
-- **Completed**: Test suite refactoring with shared connections
-- **Completed**: Tab pool production implementation (v2)
-- **Completed**: TypeScript types for all APIs
-- **Completed**: Integration tests without server spawn
-- **Completed**: Enhanced signal handling and process lifecycle management
+- **FIXED**: ContentScriptManager auto-injection for Manifest V3
+  - Event listeners moved to top of background.js for service worker persistence
+  - Chrome.scripting.executeScript with chrome.debugger fallback
+  - Proper global variable handling for contentScriptManager reference
+- **ENHANCED**: ConversationObserver completion detection
+  - Added monitorResponseElement() for real-time response tracking
+  - Added checkResponseContentCompletion() with 2-second delay detection
+  - Enhanced mutation observers for text changes and completion states
+- **COMPLETED**: Async spawn_claude_dot_ai_tab with injection options
+  - waitForLoad, injectContentScript, waitForReady options added
+  - Content script injection verification and tab preparation
+- **READY**: Complete async workflow from spawn → inject → send → detect → notify
 
 ## Development Guidelines
 - Commit frequently so that you can review changes

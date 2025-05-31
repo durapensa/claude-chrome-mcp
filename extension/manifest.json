@@ -5,6 +5,7 @@
   "description": "Enable Claude Desktop to interact with claude.ai through MCP",
   "permissions": [
     "debugger",
+    "scripting",
     "tabs",
     "activeTab",
     "storage",

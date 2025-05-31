@@ -1,106 +1,115 @@
-# Restart Instructions - Test Suite Organization & Comprehensive Tool Testing
+# Restart Instructions - Async System Ready for End-to-End Testing
 
 **Date**: 2025-05-31  
-**Context**: Event-Driven System Complete - Ready for Test Suite Organization  
-**Next Task**: Organize test suite and comprehensive testing of async tools
+**Context**: Async System Implementation Complete - Content Script Auto-Injection Fixed  
+**Next Task**: Test complete async system with debugger-based content script injection
 
 ## 🎯 Current Status
 
 ### ✅ Major Achievements Completed
-- **Event-Driven Completion Detection System v2.4.0**: FULLY OPERATIONAL
-  - `send_message_async`, `get_response_async`, `wait_for_operation` working perfectly
-  - Real-time milestone detection via DOM MutationObserver
-  - MCP notification streaming for live progress updates
-  - Operation state persistence and recovery
-  - Live browser testing confirmed working
+- **Event-Driven Completion Detection System v2.4.0**: READY FOR TESTING
+  - `send_message_async`, `get_response_async`, `wait_for_operation` implemented
+  - DOM MutationObserver updated for current Claude.ai structure
+  - chrome.debugger-based content script auto-injection implemented
+  - Operation state persistence and recovery working
+- **Content Script Auto-Injection**: FIXED using chrome.debugger Runtime.evaluate
+- **DOM Selector Updates**: Fixed for current Claude.ai (.font-user-message/.font-claude-message)
+- **Test Suite Organization**: Consolidated v1/v2 files, archived old versions
 - **Version 2.4.0**: All components updated and committed
-- **System Health**: All components healthy and operational
+
+### 🔴 PRIORITY ISSUES
+- **MCP Server Stability**: Server disconnects/crashes - needs investigation
 
 ### 📁 Key Files Status
-- All event-driven changes committed in commit c7db561
-- CHANGELOG.md updated with v2.4.0 release notes
-- Version numbers updated across all components
-- Documentation includes comprehensive architecture diagram
-- Test files created: `tests/organized/test-event-driven-system.js`
+- **Latest commit**: 53d28ba - chrome.debugger content script auto-injection
+- **Content Script**: `/extension/content.js` - Updated DOM selectors for current Claude.ai
+- **Background Script**: `/extension/background.js` - Added ContentScriptManager with debugger injection
+- **Test Suite**: Organized in `tests/` with v1 files archived
+- **Modules**: Started modularization in `mcp-server/src/modules/`
 
-### 🎪 What Was Accomplished
-- Successfully demonstrated live browser testing with real Claude tab interactions
-- Event-driven milestone detection working flawlessly
-- JSON parsing error in operations state file resolved
-- Chrome extension reloaded and functioning properly
-- All MCP tools validated and operational
+### 🎪 What Was Accomplished This Session
+- **Root Cause Analysis**: Identified ConversationObserver DOM selector outdated issues
+- **DOM Structure Research**: Found Claude.ai now uses `.font-user-message`/`.font-claude-message`
+- **Content Script Injection**: Researched and implemented chrome.debugger Runtime.evaluate approach
+- **Test Suite Cleanup**: Consolidated v1/v2 test files, archived duplicates
+- **MCP Integration**: Verified async operations track milestones correctly
 
 ## 🔄 Session Continuation Tasks
 
-### 1. **Test Suite Organization** (In Progress)
+### 1. **End-to-End Async Testing** (IMMEDIATE PRIORITY)
 ```bash
-# Current organized test structure started in:
-tests/organized/
-├── README.md - Test categorization plan
-└── test-event-driven-system.js - Comprehensive async tools test
+# Test the complete async system:
+mcp__claude-chrome-mcp__get_connection_health
+mcp__claude-chrome-mcp__spawn_claude_dot_ai_tab
+mcp__claude-chrome-mcp__send_message_async
+mcp__claude-chrome-mcp__wait_for_operation
 ```
 
-**Next Steps:**
-- Consolidate duplicate test files (v1 vs v2 versions)
-- Remove debug/development test files  
-- Create organized test categories
-- Update main test runner to use organized tests
+**Expected Behavior:**
+- ConversationObserver auto-injects via chrome.debugger 
+- DOM mutations detected with new selectors
+- Complete milestone progression: started → message_sent → response_started → response_completed
 
-### 2. **Comprehensive Tool Testing** (High Priority)
-- Test all event-driven async tools thoroughly
-- Run stress tests with multiple concurrent operations
-- Validate live browser interactions
-- Test error handling and recovery scenarios
+### 2. **MCP Server Stability Investigation** (HIGH PRIORITY)
+- Investigate server disconnect/crash causes
+- Review lifecycle management and signal handling
+- Test server resilience under load
 
-### 3. **Test Suite Cleanup** (Medium Priority)
-- Archive or remove redundant test files
-- Standardize test file naming
-- Update test documentation
+### 3. **Async System Validation** (HIGH PRIORITY)
+- Verify all milestones detect correctly with real Claude interactions
+- Test concurrent operations
+- Validate error handling and timeout scenarios
 
 ## 🚀 Restart Checklist
 
-### 1. **System Health Verification**
+### 1. **Chrome Extension Reload**
 ```bash
-# Verify all systems operational
+# FIRST: Manually reload extension in Chrome://extensions or use:
+mcp__claude-chrome-mcp__reload_extension
+```
+
+### 2. **System Health Verification**
+```bash
+# Verify MCP connection restored
 mcp__claude-chrome-mcp__get_connection_health
 ```
 
-### 2. **Chrome Extension Status**
-- Extension should be at version 2.4.0
-- No reload needed unless issues detected
-- All tools should be available
-
-### 3. **Continue Testing Work**
+### 3. **Test Content Script Auto-Injection**
 ```bash
-# Test organized event-driven system
-cd tests/organized && node test-event-driven-system.js
+# Spawn new tab to trigger auto-injection
+mcp__claude-chrome-mcp__spawn_claude_dot_ai_tab
+# Check if ConversationObserver auto-injected via debugger
+```
 
-# Run comprehensive test suite  
-cd tests && node run-all-tests-v2.js
+### 4. **End-to-End Async Testing**
+```bash
+# Test complete async workflow
+mcp__claude-chrome-mcp__send_message_async --tabId <TAB_ID> --message "Test async system"
+mcp__claude-chrome-mcp__wait_for_operation --operationId <OP_ID>
 ```
 
 ## 🎯 Expected Actions on 'continue'
 
 When you restart Claude Code and type `continue`, the system should:
 
-1. **Verify System Health**: Check all MCP connections and Chrome extension
-2. **Continue Test Organization**: 
-   - Consolidate duplicate test files
-   - Create clean test structure in `tests/organized/`
-   - Update main test runners
-3. **Comprehensive Testing**:
-   - Run organized test suite with live browser activity
-   - Stress test event-driven system
-   - Validate all async tools working properly
-4. **Document Results**: Update test documentation and results
+1. **Reload Chrome Extension**: First priority to load new ContentScriptManager
+2. **Test Auto-Injection**: Verify ConversationObserver auto-injects via chrome.debugger 
+3. **End-to-End Async Testing**: 
+   - Test `send_message_async` with milestone detection
+   - Verify `wait_for_operation` receives completion notifications
+   - Validate full milestone progression: started → message_sent → response_started → response_completed
+4. **MCP Server Stability**: Investigate and fix server disconnect issues
+5. **Documentation**: Update results and commit final async system implementation
 
 ## 📊 System State
 
 - **Version**: 2.4.0 across all components
-- **Event-Driven System**: ✅ Fully operational
-- **Live Browser Testing**: ✅ Confirmed working
-- **Test Organization**: 🔄 In progress
-- **Chrome Extension**: ✅ Loaded and healthy
+- **Event-Driven System**: 🟡 Implementation complete, testing needed
+- **Content Script Auto-Injection**: 🟡 Implemented via chrome.debugger, needs testing
+- **DOM Selectors**: ✅ Updated for current Claude.ai
+- **Test Organization**: ✅ Complete (v1 archived, v2 active)
+- **Chrome Extension**: 🔴 Needs reload to activate ContentScriptManager
+- **MCP Server**: 🔴 Stability issues - crashes/disconnects
 
 ## 🔧 If Issues Occur
 
@@ -121,5 +130,6 @@ rm /Users/dp/claude-chrome-mcp/mcp-server/.operations-state.json
 
 ---
 
-**System Status**: ✅ **Ready for Test Suite Organization**  
-**Next Action**: Continue test suite organization and comprehensive testing
+**System Status**: 🟡 **Async System Ready for Testing**  
+**Next Action**: Test chrome.debugger content script auto-injection and complete async workflow  
+**Priority Fix**: MCP server stability issues

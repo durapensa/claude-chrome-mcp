@@ -1872,6 +1872,21 @@ class ChromeMCPServer {
                   type: 'string',
                   description: 'Optional URL to navigate to (defaults to claude.ai)',
                   default: 'https://claude.ai'
+                },
+                waitForLoad: {
+                  type: 'boolean',
+                  description: 'Wait for tab to complete loading before returning',
+                  default: false
+                },
+                injectContentScript: {
+                  type: 'boolean',
+                  description: 'Inject content script for async completion detection',
+                  default: false
+                },
+                waitForReady: {
+                  type: 'boolean',
+                  description: 'Wait for page to be ready for interaction (requires waitForLoad)',
+                  default: false
                 }
               },
               additionalProperties: false

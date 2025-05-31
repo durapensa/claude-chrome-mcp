@@ -107,6 +107,9 @@ class ConversationObserver {
           const assistantMessage = node.querySelector && node.querySelector('.font-claude-message');
           if (assistantMessage) {
             this.handleResponseStarted();
+            
+            // Start monitoring this specific response element for completion
+            this.monitorResponseElement(assistantMessage);
           }
           
           // Look for streaming indicators
@@ -116,6 +119,18 @@ class ConversationObserver {
           }
         }
       });
+    }
+    
+    // Check for text changes in Claude response elements (content being added/completed)
+    if (mutation.type === 'childList' || mutation.type === 'characterData') {
+      const target = mutation.target;
+      
+      // Check if this is within a Claude message
+      const claudeMessage = target.closest && target.closest('.font-claude-message');
+      if (claudeMessage) {
+        // Response content is being updated - check if it's complete
+        this.checkResponseContentCompletion(claudeMessage);
+      }
     }
     
     // Check for aria-busy changes (response completion)
@@ -181,6 +196,68 @@ class ConversationObserver {
     }
   }
 
+  monitorResponseElement(responseElement) {
+    // Store reference to the response element for this set of operations
+    for (const [operationId, operation] of this.activeOperations) {
+      if ((operation.type === 'send_message' || operation.type === 'get_response') && 
+          !operation.responseElement) {
+        operation.responseElement = responseElement;
+        operation.lastContentLength = 0;
+        operation.lastContentUpdate = Date.now();
+        console.log(`[ConversationObserver] Monitoring response element for operation ${operationId}`);
+      }
+    }
+  }
+
+  checkResponseContentCompletion(claudeMessage) {
+    const content = claudeMessage.textContent || '';
+    const contentLength = content.trim().length;
+    const now = Date.now();
+    
+    // Check all operations monitoring this element
+    for (const [operationId, operation] of this.activeOperations) {
+      if (operation.responseElement === claudeMessage) {
+        
+        // Update content tracking
+        if (contentLength > operation.lastContentLength) {
+          operation.lastContentLength = contentLength;
+          operation.lastContentUpdate = now;
+          
+          // If this is the first substantial content, mark response as started
+          if (contentLength > 0 && !operation.milestones.find(m => m.milestone === 'response_started')) {
+            this.notifyMilestone(operationId, 'response_started');
+          }
+        }
+        
+        // Check for completion indicators
+        const timeSinceLastUpdate = now - operation.lastContentUpdate;
+        const hasSubstantialContent = contentLength > 0;
+        const noRecentUpdates = timeSinceLastUpdate > 2000; // 2 seconds without updates
+        
+        // Look for completion indicators in the DOM
+        const hasStopButton = document.querySelector('[data-testid="stop-button"]');
+        const isStreaming = claudeMessage.querySelector('[aria-busy="true"]');
+        
+        // Detect completion: has content, no streaming indicators, and no recent updates
+        if (hasSubstantialContent && !hasStopButton && !isStreaming && noRecentUpdates &&
+            !operation.milestones.find(m => m.milestone === 'response_completed')) {
+          
+          console.log(`[ConversationObserver] Response completion detected for ${operationId}: ${contentLength} chars, ${timeSinceLastUpdate}ms since update`);
+          this.notifyMilestone(operationId, 'response_completed', {
+            contentLength,
+            timeSinceLastUpdate,
+            content: content.substring(0, 100)
+          });
+          
+          // Clean up completed operations
+          setTimeout(() => {
+            this.activeOperations.delete(operationId);
+          }, 1000);
+        }
+      }
+    }
+  }
+
   setupPeriodicChecks() {
     // Periodic fallback checks for milestone detection
     setInterval(() => {
@@ -215,12 +292,26 @@ class ConversationObserver {
       }
     }
     
-    // Check for stop button (indicates active response)
+    // Check for Claude response elements if not already monitoring one
+    if (!operation.responseElement) {
+      const claudeMessage = document.querySelector('.font-claude-message');
+      if (claudeMessage && claudeMessage.textContent.trim().length > 0) {
+        this.monitorResponseElement(claudeMessage);
+      }
+    }
+    
+    // If monitoring a response element, check its current state
+    if (operation.responseElement) {
+      this.checkResponseContentCompletion(operation.responseElement);
+    }
+    
+    // Fallback: Check for stop button (indicates active response)
     const stopButton = document.querySelector('[data-testid="stop-button"]');
     if (stopButton && !operation.milestones.find(m => m.milestone === 'response_started')) {
       this.notifyMilestone(operationId, 'response_started');
     } else if (!stopButton && operation.milestones.find(m => m.milestone === 'response_started') && 
-               !operation.milestones.find(m => m.milestone === 'response_completed')) {
+               !operation.milestones.find(m => m.milestone === 'response_completed') &&
+               !operation.responseElement) { // Only use fallback if not monitoring response element
       this.notifyMilestone(operationId, 'response_completed');
     }
   }
