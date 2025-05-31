@@ -2919,12 +2919,17 @@ class ContentScriptManager {
             expression: injectionCode,
             returnByValue: true
           }, (result) => {
+            // Always detach debugger after injection
+            chrome.debugger.detach({ tabId }, () => {
+              // Ignore detach errors
+            });
+            
             if (chrome.runtime.lastError) {
               console.error(`CCM: Failed to inject content script:`, chrome.runtime.lastError);
               reject(chrome.runtime.lastError);
             } else {
               this.injectedTabs.add(tabId);
-              console.log(`CCM: Content script injection completed for tab ${tabId}`);
+              console.log(`CCM: Content script injection completed for tab ${tabId}, debugger detached`);
               resolve(result);
             }
           });
