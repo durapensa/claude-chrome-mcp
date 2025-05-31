@@ -19,24 +19,35 @@ const { TestClientAdapter } = require('./helpers/test-client-adapter');
  * Interfaces with the real MCP server for actual discovery
  */
 class ProductionMCPTools {
-  constructor(client) {
-    this.client = client;
+  constructor(clientAdapter) {
+    this.clientAdapter = clientAdapter;
+  }
+
+  async getClient() {
+    if (this.clientAdapter.useSharedClient) {
+      return await this.clientAdapter.getClient();
+    }
+    return this.clientAdapter;
   }
 
   async start_network_inspection({ tabId }) {
-    return await this.client.callTool('start_network_inspection', { tabId });
+    const client = await this.getClient();
+    return await client.callTool('start_network_inspection', { tabId });
   }
 
   async stop_network_inspection({ tabId }) {
-    return await this.client.callTool('stop_network_inspection', { tabId });
+    const client = await this.getClient();
+    return await client.callTool('stop_network_inspection', { tabId });
   }
 
   async get_captured_requests({ tabId }) {
-    return await this.client.callTool('get_captured_requests', { tabId });
+    const client = await this.getClient();
+    return await client.callTool('get_captured_requests', { tabId });
   }
 
   async send_message_to_claude_dot_ai_tab({ tabId, message, waitForReady = true }) {
-    return await this.client.callTool('send_message_to_claude_dot_ai_tab', {
+    const client = await this.getClient();
+    return await client.callTool('send_message_to_claude_dot_ai_tab', {
       tabId,
       message,
       waitForReady
@@ -44,39 +55,48 @@ class ProductionMCPTools {
   }
 
   async get_claude_conversations(params = {}) {
-    return await this.client.callTool('get_claude_conversations', params);
+    const client = await this.getClient();
+    return await client.callTool('get_claude_conversations', params);
   }
 
   async search_claude_conversations(criteria) {
-    return await this.client.callTool('search_claude_conversations', criteria);
+    const client = await this.getClient();
+    return await client.callTool('search_claude_conversations', criteria);
   }
 
   async open_claude_dot_ai_conversation_tab({ conversationId }) {
-    return await this.client.callTool('open_claude_dot_ai_conversation_tab', { conversationId });
+    const client = await this.getClient();
+    return await client.callTool('open_claude_dot_ai_conversation_tab', { conversationId });
   }
 
   async delete_claude_conversation({ conversationId }) {
-    return await this.client.callTool('delete_claude_conversation', { conversationId });
+    const client = await this.getClient();
+    return await client.callTool('delete_claude_conversation', { conversationId });
   }
 
   async get_claude_dot_ai_response({ tabId }) {
-    return await this.client.callTool('get_claude_dot_ai_response', { tabId });
+    const client = await this.getClient();
+    return await client.callTool('get_claude_dot_ai_response', { tabId });
   }
 
   async execute_script({ tabId, script }) {
-    return await this.client.callTool('execute_script', { tabId, script });
+    const client = await this.getClient();
+    return await client.callTool('execute_script', { tabId, script });
   }
 
   async get_claude_dot_ai_tabs() {
-    return await this.client.callTool('get_claude_dot_ai_tabs', {});
+    const client = await this.getClient();
+    return await client.callTool('get_claude_dot_ai_tabs', {});
   }
 
   async spawn_claude_dot_ai_tab() {
-    return await this.client.callTool('spawn_claude_dot_ai_tab', {});
+    const client = await this.getClient();
+    return await client.callTool('spawn_claude_dot_ai_tab', {});
   }
 
   async close_claude_dot_ai_tab({ tabId }) {
-    return await this.client.callTool('close_claude_dot_ai_tab', { tabId });
+    const client = await this.getClient();
+    return await client.callTool('close_claude_dot_ai_tab', { tabId });
   }
 }
 
@@ -118,7 +138,7 @@ async function runAPIDiscovery(options = {}) {
   
   // Connect to MCP server
   const client = new TestClientAdapter();
-  await client.connect();
+  await client.getClient();
   
   const mcpTools = new ProductionMCPTools(client);
   
@@ -213,7 +233,9 @@ async function runAPIDiscovery(options = {}) {
     console.error('💥 API Discovery failed:', error);
     throw error;
   } finally {
-    await client.disconnect();
+    if (client.disconnect) {
+      await client.disconnect();
+    }
   }
 }
 
@@ -234,7 +256,7 @@ async function runUIDiscovery(options = {}) {
   
   // Connect to MCP server
   const client = new TestClientAdapter();
-  await client.connect();
+  await client.getClient();
   
   const mcpTools = new ProductionMCPTools(client);
   
@@ -342,7 +364,9 @@ async function runUIDiscovery(options = {}) {
     console.error('💥 UI Discovery failed:', error);
     throw error;
   } finally {
-    await client.disconnect();
+    if (client.disconnect) {
+      await client.disconnect();
+    }
   }
 }
 

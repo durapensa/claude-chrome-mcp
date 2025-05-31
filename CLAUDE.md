@@ -3,10 +3,10 @@
 Quick reference for Claude. See README.md for full documentation.
 
 ## Current Session
-- Focus: Hub startup fix and version management
-- Last update: 2025-05-30
-- See: `/development/CURRENT_STATE.md` (CRITICAL - Read First!)
-- Session summaries: `/development/session-summary-2025-05-30*.md`
+- Focus: Automated Discovery Framework Implementation Complete
+- Last update: 2025-05-31
+- See: `RESTART-INSTRUCTIONS.md` (CRITICAL - Read First for session continuation!)
+- Status: Ready for production discovery execution
 
 ## Quick Commands
 ```bash
@@ -67,3 +67,4 @@ mcp__claude-chrome-mcp__get_connection_health
 ## Development Memories
 - when developing with MCP always refer to mcp-server/node_modules/@modelcontextprotocol
 - in documentation, notes, and other places, do not add indications that features are completed until after extensive testing and Claude Code user approval
+- git commit frequently, whenever tasks are completed and tested. test as you go!
