@@ -3019,6 +3019,9 @@ class ChromeMCPServer {
 
   async start() {
     try {
+      // Add enhanced signal handling for stability
+      this.setupEnhancedSignalHandling();
+      
       await this.hubClient.connect();
       console.error('Claude Chrome MCP: Connected to hub');
       
@@ -3041,6 +3044,34 @@ class ChromeMCPServer {
       console.error('Claude Chrome MCP: Startup failed:', error);
       this.lifecycleManager.emergencyShutdown('startup_failed');
     }
+  }
+
+  setupEnhancedSignalHandling() {
+    // Handle uncaught exceptions without crashing
+    process.on('uncaughtException', (error) => {
+      this.errorTracker.logError(error, { source: 'uncaughtException' });
+      console.error('CCM: Uncaught Exception handled, continuing operation:', error.message);
+      // Don't exit - try to continue operation
+    });
+
+    // Handle unhandled promise rejections
+    process.on('unhandledRejection', (reason, promise) => {
+      this.errorTracker.logError(reason, { source: 'unhandledRejection' });
+      console.error('CCM: Unhandled Rejection handled, continuing operation:', reason);
+      // Don't exit - try to continue operation
+    });
+
+    // Enhanced SIGTERM handling
+    process.on('SIGTERM', () => {
+      console.error('CCM: Received SIGTERM, initiating graceful shutdown...');
+      this.lifecycleManager.emergencyShutdown('SIGTERM');
+    });
+
+    // Enhanced SIGINT handling
+    process.on('SIGINT', () => {
+      console.error('CCM: Received SIGINT, initiating graceful shutdown...');
+      this.lifecycleManager.emergencyShutdown('SIGINT');
+    });
   }
 
   async stop() {
