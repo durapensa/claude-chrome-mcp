@@ -2857,8 +2857,101 @@ class CCMExtensionHub {
   }
 }
 
+// Content Script Auto-Injection Manager
+class ContentScriptManager {
+  constructor() {
+    this.injectedTabs = new Set();
+    this.setupTabListeners();
+  }
+
+  setupTabListeners() {
+    // Inject content script when tabs are updated
+    chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+      if (changeInfo.status === 'complete' && tab.url && tab.url.includes('claude.ai')) {
+        this.injectContentScript(tabId);
+      }
+    });
+
+    // Inject content script when navigating to claude.ai
+    chrome.webNavigation.onCompleted.addListener((details) => {
+      if (details.frameId === 0 && details.url.includes('claude.ai')) {
+        this.injectContentScript(details.tabId);
+      }
+    });
+  }
+
+  async injectContentScript(tabId) {
+    try {
+      if (this.injectedTabs.has(tabId)) {
+        console.log(`CCM: Content script already injected in tab ${tabId}`);
+        return;
+      }
+
+      console.log(`CCM: Injecting content script into tab ${tabId} using debugger API`);
+      
+      // Read content script file
+      const response = await fetch(chrome.runtime.getURL('content.js'));
+      const contentScript = await response.text();
+      
+      // Attach debugger if not already attached
+      return new Promise((resolve, reject) => {
+        chrome.debugger.attach({ tabId }, '1.3', () => {
+          if (chrome.runtime.lastError) {
+            console.log(`CCM: Debugger already attached to tab ${tabId}`);
+          }
+          
+          // Inject content script using Runtime.evaluate
+          const injectionCode = `
+            (function() {
+              // Only inject if ConversationObserver doesn't exist
+              if (typeof window.ConversationObserver === 'undefined') {
+                ${contentScript}
+                console.log('CCM: ConversationObserver injected successfully via debugger');
+                return true;
+              } else {
+                console.log('CCM: ConversationObserver already exists');
+                return false;
+              }
+            })();
+          `;
+          
+          chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
+            expression: injectionCode,
+            returnByValue: true
+          }, (result) => {
+            if (chrome.runtime.lastError) {
+              console.error(`CCM: Failed to inject content script:`, chrome.runtime.lastError);
+              reject(chrome.runtime.lastError);
+            } else {
+              this.injectedTabs.add(tabId);
+              console.log(`CCM: Content script injection completed for tab ${tabId}`);
+              resolve(result);
+            }
+          });
+        });
+      });
+
+    } catch (error) {
+      console.error(`CCM: Failed to inject content script into tab ${tabId}:`, error);
+    }
+  }
+
+  // Clean up when tabs are closed
+  removeTab(tabId) {
+    this.injectedTabs.delete(tabId);
+  }
+}
+
 // Initialize Extension Hub
 const ccmHub = new CCMExtensionHub();
+
+// Initialize Content Script Manager
+const contentScriptManager = new ContentScriptManager();
+
+// Clean up closed tabs
+chrome.tabs.onRemoved.addListener((tabId) => {
+  contentScriptManager.removeTab(tabId);
+});
 
 // Ensure connection is established when service worker wakes up
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {

@@ -308,7 +308,29 @@
         "createdAt": 1748716143448,
         "lastUpdated": 1748716144071
       }
+    ],
+    [
+      "send_message_1748716270677_dgqv3hypf",
+      {
+        "id": "send_message_1748716270677_dgqv3hypf",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570650,
+          "message": "Final test of complete async system with all fixes applied!",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748716271004,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748716270677,
+        "lastUpdated": 1748716271004
+      }
     ]
   ],
-  "lastSaved": 1748716144071
+  "lastSaved": 1748716271004
 }
