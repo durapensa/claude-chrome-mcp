@@ -3207,14 +3207,17 @@ class ContentScriptManager {
             notifyMilestone(operationId, milestone, data = {}) {
               console.log(`[NetworkObserver] ${operationId} -> ${milestone}`);
               
-              // Send message to ISOLATED world for chrome.runtime access
-              window.postMessage({
-                type: 'ccm_milestone',
-                operationId,
-                milestone,
-                timestamp: Date.now(),
-                data
-              }, '*');
+              // Send CustomEvent to ISOLATED world for chrome.runtime access (more reliable than postMessage)
+              const customEvent = new CustomEvent('ccm_milestone_bridge', {
+                detail: {
+                  operationId,
+                  milestone,
+                  timestamp: Date.now(),
+                  data
+                }
+              });
+              document.dispatchEvent(customEvent);
+              console.log(`[NetworkObserver] Dispatched CustomEvent: ${operationId} -> ${milestone}`);
             }
           }
 
@@ -3233,27 +3236,25 @@ class ContentScriptManager {
         func: () => {
           console.log('CCM: Communication bridge loading in ISOLATED world...');
           
-          // Listen for messages from MAIN world
-          window.addEventListener('message', (event) => {
-            if (event.data.type === 'ccm_milestone') {
-              const { operationId, milestone, timestamp, data } = event.data;
-              
-              try {
-                if (chrome && chrome.runtime) {
-                  chrome.runtime.sendMessage({
-                    type: 'operation_milestone',
-                    operationId,
-                    milestone,
-                    timestamp,
-                    data
-                  });
-                  console.log(`[Bridge] Sent milestone: ${operationId} -> ${milestone}`);
-                } else {
-                  console.warn('[Bridge] chrome.runtime not available');
-                }
-              } catch (error) {
-                console.error('[Bridge] Failed to send milestone:', error);
+          // Listen for CustomEvent from MAIN world (more reliable than postMessage)
+          document.addEventListener('ccm_milestone_bridge', (event) => {
+            const { operationId, milestone, timestamp, data } = event.detail;
+            
+            try {
+              if (chrome && chrome.runtime) {
+                chrome.runtime.sendMessage({
+                  type: 'operation_milestone',
+                  operationId,
+                  milestone,
+                  timestamp,
+                  data
+                });
+                console.log(`[Bridge] Sent milestone via CustomEvent: ${operationId} -> ${milestone}`);
+              } else {
+                console.warn('[Bridge] chrome.runtime not available in ISOLATED world');
               }
+            } catch (error) {
+              console.error('[Bridge] Failed to send milestone via CustomEvent:', error);
             }
           });
           
@@ -3263,13 +3264,15 @@ class ContentScriptManager {
               if (message.type === 'register_operation') {
                 const { operationId, operationType, params } = message;
                 
-                // Send to MAIN world observer
-                window.postMessage({
-                  type: 'ccm_register_operation',
-                  operationId,
-                  operationType, 
-                  params
-                }, '*');
+                // Send CustomEvent to MAIN world observer
+                const registerEvent = new CustomEvent('ccm_register_operation', {
+                  detail: {
+                    operationId,
+                    operationType, 
+                    params
+                  }
+                });
+                document.dispatchEvent(registerEvent);
                 
                 sendResponse({ success: true, bridge: 'isolated_world' });
                 return true;
@@ -3289,15 +3292,13 @@ class ContentScriptManager {
       await chrome.scripting.executeScript({
         target: { tabId: tabId },
         func: () => {
-          // Listen for registration messages from ISOLATED world
-          window.addEventListener('message', (event) => {
-            if (event.data.type === 'ccm_register_operation') {
-              const { operationId, operationType, params } = event.data;
-              
-              if (window.conversationObserver) {
-                const operation = window.conversationObserver.registerOperation(operationId, operationType, params);
-                console.log(`[Observer] Registered operation from bridge: ${operationId}`);
-              }
+          // Listen for registration CustomEvents from ISOLATED world
+          document.addEventListener('ccm_register_operation', (event) => {
+            const { operationId, operationType, params } = event.detail;
+            
+            if (window.conversationObserver) {
+              const operation = window.conversationObserver.registerOperation(operationId, operationType, params);
+              console.log(`[Observer] Registered operation from CustomEvent bridge: ${operationId}`);
             }
           });
           
