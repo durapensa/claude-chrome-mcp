@@ -446,7 +446,7 @@ class OperationManager {
     this.operations.set(operationId, operation);
     this.saveState();
     
-    console.log(`[OperationManager] Created operation ${operationId} of type ${type}`);
+    console.error(`[OperationManager] Created operation ${operationId} of type ${type}`);
     return operationId;
   }
 
@@ -475,7 +475,7 @@ class OperationManager {
     
     this.saveState();
     
-    console.log(`[OperationManager] Updated operation ${operationId}: ${milestone}`);
+    console.error(`[OperationManager] Updated operation ${operationId}: ${milestone}`);
     return true;
   }
 
@@ -535,7 +535,7 @@ class OperationManager {
     
     if (cleanedCount > 0) {
       this.saveState();
-      console.log(`[OperationManager] Cleaned up ${cleanedCount} old operations`);
+      console.error(`[OperationManager] Cleaned up ${cleanedCount} old operations`);
     }
   }
 
@@ -544,7 +544,7 @@ class OperationManager {
       if (fs.existsSync(this.stateFile)) {
         const data = JSON.parse(fs.readFileSync(this.stateFile, 'utf8'));
         this.operations = new Map(data.operations || []);
-        console.log(`[OperationManager] Loaded ${this.operations.size} operations from state`);
+        console.error(`[OperationManager] Loaded ${this.operations.size} operations from state`);
       }
     } catch (error) {
       console.warn('[OperationManager] Failed to load state:', error.message);
@@ -725,14 +725,46 @@ class WebSocketHub extends EventEmitter {
         return;
       }
       
-      const message = JSON.parse(dataStr);
-      ws.lastActivity = Date.now();
-      ws.messageCount++;
-      this.messageCounter++;
-
-      this.routeMessage(ws, message);
+      // Initialize message buffer for this client if not exists
+      if (!ws.messageBuffer) {
+        ws.messageBuffer = '';
+      }
+      
+      // Append new data to buffer
+      ws.messageBuffer += dataStr;
+      
+      // Try to parse complete JSON messages from buffer
+      let processed = true;
+      while (processed) {
+        processed = false;
+        try {
+          const message = JSON.parse(ws.messageBuffer);
+          // Successfully parsed - clear buffer and process message
+          ws.messageBuffer = '';
+          ws.lastActivity = Date.now();
+          ws.messageCount++;
+          this.messageCounter++;
+          this.routeMessage(ws, message);
+          processed = false; // Exit loop after successful parse
+        } catch (parseError) {
+          // Check if this looks like a partial JSON message
+          const trimmed = ws.messageBuffer.trim();
+          if (trimmed.length === 0) {
+            ws.messageBuffer = '';
+            processed = false;
+          } else if (this.isPartialJSON(trimmed)) {
+            // Likely partial message - wait for more data
+            processed = false;
+          } else {
+            // Genuine parse error - clear buffer and log
+            throw parseError;
+          }
+        }
+      }
       
     } catch (error) {
+      // Clear buffer on parse error to prevent corruption
+      ws.messageBuffer = '';
       this.errorTracker.logError(error, { clientId: ws.clientId, action: 'parse_message', data: data.toString() });
       console.error(`WebSocket Hub: Invalid JSON from client ${ws.clientId}:`, error, 'Data:', data.toString());
       this.sendToClient(ws, {
@@ -878,6 +910,26 @@ class WebSocketHub extends EventEmitter {
 
     // Check if we should shut down
     this.checkShutdownConditions();
+  }
+
+  isPartialJSON(str) {
+    // Simple heuristic to detect partial JSON messages
+    const openBrackets = (str.match(/\{/g) || []).length;
+    const closeBrackets = (str.match(/\}/g) || []).length;
+    const openSquare = (str.match(/\[/g) || []).length;
+    const closeSquare = (str.match(/\]/g) || []).length;
+    
+    // If unmatched brackets/braces, likely partial
+    if (openBrackets !== closeBrackets || openSquare !== closeSquare) {
+      return true;
+    }
+    
+    // If starts with expected characters but doesn't parse, likely partial
+    if (str.startsWith('{') || str.startsWith('[') || str.startsWith('"')) {
+      return true;
+    }
+    
+    return false;
   }
 
   checkShutdownConditions() {
@@ -1506,6 +1558,9 @@ class AutoHubClient {
   }
 
   setupWebSocketHandlers(connectResolve, connectReject) {
+    // Initialize message buffer for hub client
+    this.messageBuffer = '';
+    
     this.ws.on('message', (data) => {
       this.lastActivityTime = Date.now();
       try {
@@ -1515,9 +1570,36 @@ class AutoHubClient {
           this.debug.verbose('Ignoring WebSocket protocol message:', dataStr);
           return;
         }
-        const message = JSON.parse(dataStr);
-        this.handleMessage(message, connectResolve, connectReject);
+        
+        // Append to buffer
+        this.messageBuffer += dataStr;
+        
+        // Try to parse complete JSON messages
+        let processed = true;
+        while (processed) {
+          processed = false;
+          try {
+            const message = JSON.parse(this.messageBuffer);
+            // Successfully parsed - clear buffer and process
+            this.messageBuffer = '';
+            this.handleMessage(message, connectResolve, connectReject);
+            processed = false;
+          } catch (parseError) {
+            const trimmed = this.messageBuffer.trim();
+            if (trimmed.length === 0) {
+              this.messageBuffer = '';
+              processed = false;
+            } else if (this.isPartialJSON(trimmed)) {
+              // Wait for more data
+              processed = false;
+            } else {
+              // Genuine error - clear buffer and log
+              throw parseError;
+            }
+          }
+        }
       } catch (error) {
+        this.messageBuffer = '';
         this.errorTracker.logError(error, { action: 'parse_message', data: data.toString() });
         console.error('CCM: Error parsing message:', error, 'Data:', data.toString());
       }
@@ -1567,6 +1649,26 @@ class AutoHubClient {
     this.ws.on('pong', () => {
       this.lastActivityTime = Date.now();
     });
+  }
+
+  isPartialJSON(str) {
+    // Simple heuristic to detect partial JSON messages
+    const openBrackets = (str.match(/\{/g) || []).length;
+    const closeBrackets = (str.match(/\}/g) || []).length;
+    const openSquare = (str.match(/\[/g) || []).length;
+    const closeSquare = (str.match(/\]/g) || []).length;
+    
+    // If unmatched brackets/braces, likely partial
+    if (openBrackets !== closeBrackets || openSquare !== closeSquare) {
+      return true;
+    }
+    
+    // If starts with expected characters but doesn't parse, likely partial
+    if (str.startsWith('{') || str.startsWith('[') || str.startsWith('"')) {
+      return true;
+    }
+    
+    return false;
   }
 
   registerWithHub() {
