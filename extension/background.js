@@ -3073,13 +3073,11 @@ class ContentScriptManager {
         return { success: true, alreadyInjected: true };
       }
 
-      console.log(`CCM: Starting fast injection for tab ${tabId}`);
-      
-      // Use the real content-fast.js file with proper isolation
-      console.log(`CCM: Attempting content-fast.js injection for tab ${tabId}`);
+      // Use the optimized network-based content script  
+      console.log(`CCM: Injecting network-based content script for tab ${tabId}`);
       const result = await chrome.scripting.executeScript({
         target: { tabId: tabId },
-        files: ['content-fast.js']
+        files: ['content-network.js']
       });
       
       console.log(`CCM: Script execution result for tab ${tabId}:`, result);

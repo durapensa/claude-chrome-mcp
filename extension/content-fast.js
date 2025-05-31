@@ -144,42 +144,81 @@ class ConversationObserver {
   }
 
   setupNetworkInterception() {
-    // Intercept fetch for streaming response completion
+    // Better approach: Monitor fetch requests without consuming the stream
     const originalFetch = window.fetch;
     window.fetch = async (...args) => {
-      const response = await originalFetch.apply(window, args);
       const url = args[0];
       
-      if (typeof url === 'string' && (url.includes('conversation') || url.includes('message'))) {
+      // Check if this is a Claude API request
+      if (typeof url === 'string' && (url.includes('conversation') || url.includes('message') || url.includes('claude.ai'))) {
         console.log('[ConversationObserver] Claude API request detected:', url);
         
-        // Clone response to read without consuming
-        const clonedResponse = response.clone();
+        // Call original fetch
+        const response = await originalFetch.apply(window, args);
         
-        if (response.body) {
-          const reader = response.body.getReader();
-          this.monitorStreamCompletion(reader);
+        // Monitor the response without consuming it
+        if (response.body && response.headers.get('content-type')?.includes('stream')) {
+          // For streaming responses, monitor completion via response state
+          this.monitorStreamResponse(response, url);
+        } else if (response.ok) {
+          // For regular responses, completion is immediate
+          console.log('[ConversationObserver] Non-stream response completed');
+          setTimeout(() => this.checkResponseCompletion(), 200);
         }
+        
+        return response;
       }
       
-      return response;
+      // For non-Claude requests, pass through normally
+      return originalFetch.apply(window, args);
+    };
+    
+    // Also monitor XMLHttpRequest for completeness
+    const originalXHR = window.XMLHttpRequest.prototype.send;
+    window.XMLHttpRequest.prototype.send = function(...args) {
+      const xhr = this;
+      const originalURL = xhr.url || this.responseURL;
+      
+      if (originalURL && (originalURL.includes('conversation') || originalURL.includes('message') || originalURL.includes('claude.ai'))) {
+        console.log('[ConversationObserver] XHR Claude API request detected:', originalURL);
+        
+        xhr.addEventListener('loadend', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            console.log('[ConversationObserver] XHR request completed');
+            setTimeout(() => window.conversationObserver?.checkResponseCompletion(), 200);
+          }
+        });
+      }
+      
+      return originalXHR.apply(this, args);
     };
     
     console.log('[ConversationObserver] Network interception setup complete');
   }
   
-  async monitorStreamCompletion(reader) {
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          console.log('[ConversationObserver] Stream completed - checking for response completion');
-          setTimeout(() => this.checkResponseCompletion(), 500);
-          break;
+  monitorStreamResponse(response, url) {
+    // Monitor stream completion using the response object's state
+    console.log('[ConversationObserver] Monitoring stream response for:', url);
+    
+    // Use the response's body stream state to detect completion
+    if (response.body && response.body.locked === false) {
+      // Set up periodic checks for stream completion
+      const checkCompletion = () => {
+        // In streaming responses, completion typically shows up in DOM updates
+        // So we trigger our DOM-based completion check
+        this.checkResponseCompletion();
+        
+        // Also check for stream state changes
+        if (response.body.locked) {
+          console.log('[ConversationObserver] Stream appears to be consumed/locked');
+          setTimeout(() => this.checkResponseCompletion(), 1000);
         }
-      }
-    } catch (error) {
-      console.log('[ConversationObserver] Stream monitoring error:', error);
+      };
+      
+      // Check completion at intervals
+      setTimeout(checkCompletion, 1000);
+      setTimeout(checkCompletion, 3000);
+      setTimeout(checkCompletion, 5000);
     }
   }
 
@@ -189,7 +228,7 @@ class ConversationObserver {
     if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
       try {
         chrome.runtime.sendMessage({
-          type: 'milestone_notification',
+          type: 'operation_milestone',
           operationId,
           milestone,
           timestamp: Date.now(),
