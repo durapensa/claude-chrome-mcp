@@ -1,12 +1,14 @@
 {
   "metadata": {
-    "version": "2.0.0",
-    "lastUpdated": "2025-05-31T17:00:00Z",
-    "discoveryMethod": "manual_network_capture + mcp_tool_analysis",
-    "totalAPIs": 8,
+    "version": "2.1.0",
+    "lastUpdated": "2025-05-31T17:30:00Z",
+    "discoveryMethod": "manual_network_capture + mcp_tool_analysis + pagination_workaround",
+    "totalAPIs": 9,
     "totalUIElements": 0,
     "totalMCPTools": 25,
-    "sessions": 2
+    "sessions": 3,
+    "workarounds": 1,
+    "conversationLimitBypass": "398 conversations (vs 30 tool limitation)"
   },
   "apis": {
     "chat_message_warning": {
@@ -129,6 +131,30 @@
       "mcpTools": ["search_claude_conversations"],
       "implementation": "API proxy + client-side filtering",
       "reliability": "high",
+      "changes": []
+    },
+    "conversation_pagination_workaround": {
+      "url": "https://claude.ai/api/organizations/{org_id}/chat_conversations",
+      "method": "GET",
+      "purpose": "Retrieve all conversations using pagination to bypass 30-conversation limit",
+      "discoveredAt": "2025-05-31T17:30:00Z",
+      "usage": "Multiple API calls with offset/limit to fetch complete conversation history",
+      "parameters": {
+        "required": ["offset", "limit"],
+        "authentication": ["lastActiveOrg cookie"]
+      },
+      "mcpTools": ["workaround for get_claude_conversations limitation"],
+      "implementation": "Manual pagination with authenticated API calls",
+      "reliability": "high",
+      "limitations": {
+        "current_tools": "Limited to 30 conversations",
+        "workaround_capability": "All conversations (398 verified)"
+      },
+      "performance": {
+        "batch_size": 100,
+        "total_time": "~800ms for 398 conversations",
+        "api_calls": 4
+      },
       "changes": []
     }
   },
