@@ -396,7 +396,522 @@
         "createdAt": 1748721825682,
         "lastUpdated": 1748721826009
       }
+    ],
+    [
+      "send_message_1748722357725_dubnbhro3",
+      {
+        "id": "send_message_1748722357725_dubnbhro3",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570850,
+          "message": "Test complete async system - what's 7*8?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748722358048,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748722357725,
+        "lastUpdated": 1748722358048
+      }
+    ],
+    [
+      "get_response_1748722361042_xn00qweoo",
+      {
+        "id": "get_response_1748722361042_xn00qweoo",
+        "type": "get_response",
+        "params": {
+          "tabId": 948570850,
+          "waitForCompletion": true
+        },
+        "status": "completed",
+        "milestones": [
+          {
+            "milestone": "response_completed",
+            "timestamp": 1748722361661,
+            "data": {
+              "response": {
+                "isAssistant": true,
+                "isComplete": true,
+                "isUser": false,
+                "success": true,
+                "text": "56",
+                "timestamp": 1748722361661,
+                "totalMessages": 2
+              }
+            }
+          }
+        ],
+        "createdAt": 1748722361042,
+        "lastUpdated": 1748722361661
+      }
+    ],
+    [
+      "send_message_1748722559709_rqvzyku4m",
+      {
+        "id": "send_message_1748722559709_rqvzyku4m",
+        "type": "send_message",
+        "params": {
+          "tabId": 0,
+          "message": "What's 15*12?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748722562824,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748722559709,
+        "lastUpdated": 1748722562824
+      }
+    ],
+    [
+      "send_message_1748722563927_ibk6fgy03",
+      {
+        "id": "send_message_1748722563927_ibk6fgy03",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570852,
+          "message": "What's 15*12?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748722564251,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748722563927,
+        "lastUpdated": 1748722564251
+      }
+    ],
+    [
+      "send_message_1748722818332_jgh5o0drh",
+      {
+        "id": "send_message_1748722818332_jgh5o0drh",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570854,
+          "message": "Test math: what is 23 * 17?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748722818649,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748722818332,
+        "lastUpdated": 1748722818649
+      }
+    ],
+    [
+      "send_message_1748722825201_c63i1wulc",
+      {
+        "id": "send_message_1748722825201_c63i1wulc",
+        "type": "send_message",
+        "params": {
+          "tabId": 999999,
+          "message": "This should fail",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748722828315,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748722825201,
+        "lastUpdated": 1748722828315
+      }
+    ],
+    [
+      "send_message_1748722838078_65c9qem1p",
+      {
+        "id": "send_message_1748722838078_65c9qem1p",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570854,
+          "message": "Quick test 1: 5+5?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748722838409,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748722838078,
+        "lastUpdated": 1748722838409
+      }
+    ],
+    [
+      "send_message_1748722838104_0ouwty0wq",
+      {
+        "id": "send_message_1748722838104_0ouwty0wq",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570854,
+          "message": "Quick test 2: 6+6?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748722842783,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748722838104,
+        "lastUpdated": 1748722842783
+      }
+    ],
+    [
+      "send_message_1748722903111_wnsc8j9gw",
+      {
+        "id": "send_message_1748722903111_wnsc8j9gw",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570856,
+          "message": "Test truly async: what's 13 * 19? (I will NOT poll, just wait for MCP notification)",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748722903437,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748722903111,
+        "lastUpdated": 1748722903437
+      }
+    ],
+    [
+      "send_message_1748722954833_fmqua7zoj",
+      {
+        "id": "send_message_1748722954833_fmqua7zoj",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570858,
+          "message": "Testing async notifications: what's 47 * 83?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748722955158,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748722954833,
+        "lastUpdated": 1748722955158
+      }
+    ],
+    [
+      "send_message_1748723099442_l7ipveyja",
+      {
+        "id": "send_message_1748723099442_l7ipveyja",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570860,
+          "message": "Debug test: what's 9 * 7?",
+          "waitForReady": false
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748723099763,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748723099442,
+        "lastUpdated": 1748723099763
+      }
+    ],
+    [
+      "send_message_1748723153108_ix6albgqx",
+      {
+        "id": "send_message_1748723153108_ix6albgqx",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570862,
+          "message": "Test fixed notifications: what's 12 * 15?",
+          "waitForReady": false
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748723153431,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748723153108,
+        "lastUpdated": 1748723153431
+      }
+    ],
+    [
+      "send_message_1748723215186_g60if98dp",
+      {
+        "id": "send_message_1748723215186_g60if98dp",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570864,
+          "message": "Test fixed notifications: what's 6 * 11?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748723215509,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748723215186,
+        "lastUpdated": 1748723215509
+      }
+    ],
+    [
+      "send_message_1748723365071_y1aau9ebm",
+      {
+        "id": "send_message_1748723365071_y1aau9ebm",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570866,
+          "message": "Pipeline test: what's 3 + 4?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748723365395,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748723365071,
+        "lastUpdated": 1748723365395
+      }
+    ],
+    [
+      "send_message_1748723470896_ylt4izgr1",
+      {
+        "id": "send_message_1748723470896_ylt4izgr1",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570868,
+          "message": "DOM test: what's 5 + 5?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748723471221,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748723470896,
+        "lastUpdated": 1748723471221
+      }
+    ],
+    [
+      "send_message_1748723545049_6vaubtkwh",
+      {
+        "id": "send_message_1748723545049_6vaubtkwh",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570870,
+          "message": "Test updated selectors: what's 8 * 9?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748723545373,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748723545049,
+        "lastUpdated": 1748723545373
+      }
+    ],
+    [
+      "send_message_1748723667953_kzq94wit5",
+      {
+        "id": "send_message_1748723667953_kzq94wit5",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570872,
+          "message": "Test content-based detection: what's 11 * 12?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748723668278,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748723667953,
+        "lastUpdated": 1748723668278
+      }
+    ],
+    [
+      "send_message_1748723744866_lpl3bdwja",
+      {
+        "id": "send_message_1748723744866_lpl3bdwja",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570873,
+          "message": "DOM analysis: what's 7 + 8?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748723745192,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748723744866,
+        "lastUpdated": 1748723745192
+      }
+    ],
+    [
+      "send_message_1748723803881_70q62f1hk",
+      {
+        "id": "send_message_1748723803881_70q62f1hk",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570875,
+          "message": "Test assistant message detection: what's 4 * 6?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748723804208,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748723803881,
+        "lastUpdated": 1748723804208
+      }
+    ],
+    [
+      "send_message_1748723916863_9t8nq7cf5",
+      {
+        "id": "send_message_1748723916863_9t8nq7cf5",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570877,
+          "message": "Fresh chat test: what's 2 + 3?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748723917188,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748723916863,
+        "lastUpdated": 1748723917188
+      }
+    ],
+    [
+      "send_message_1748723936361_vxcr5tsyk",
+      {
+        "id": "send_message_1748723936361_vxcr5tsyk",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570877,
+          "message": "Second message test: what's 5 + 7?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748723936691,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748723936361,
+        "lastUpdated": 1748723936691
+      }
+    ],
+    [
+      "send_message_1748723996979_eh4rpctwe",
+      {
+        "id": "send_message_1748723996979_eh4rpctwe",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570879,
+          "message": "Debug with logging: what's 3 * 4?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748723997303,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748723996979,
+        "lastUpdated": 1748723997303
+      }
+    ],
+    [
+      "send_message_1748724093801_osy0onmqt",
+      {
+        "id": "send_message_1748724093801_osy0onmqt",
+        "type": "send_message",
+        "params": {
+          "tabId": 948570883,
+          "message": "Deep investigation: what's 6 + 9?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748724094126,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748724093801,
+        "lastUpdated": 1748724094126
+      }
     ]
   ],
-  "lastSaved": 1748721826009
+  "lastSaved": 1748724094126
 }

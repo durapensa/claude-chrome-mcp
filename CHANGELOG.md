@@ -5,7 +5,7 @@
 ### Added
 - **Event-Driven Completion Detection System**: Revolutionary replacement of timeout-based operations
   - `send_message_async`: Returns operation ID immediately, sends message asynchronously
-  - `get_response_async`: Returns operation ID immediately, retrieves response asynchronously  
+  - Removed `get_response_async`: Use regular `get_claude_dot_ai_response` after MCP notification  
   - `wait_for_operation`: Waits for operation completion with real-time progress updates
   - **OperationManager**: Async operation state management with disk persistence
   - **NotificationManager**: MCP notification system for real-time progress streaming

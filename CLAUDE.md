@@ -3,23 +3,23 @@
 Quick reference for Claude. See README.md for full documentation.
 
 ## Current Session
-- Focus: Fast and Reliable Async Functionality - Optimized ContentScriptManager & ConversationObserver
-- Last update: 2025-05-31
-- Version: 2.4.0 
-- Status: Removed tab reloading kludge, created fast content script, simplified injection - ready for testing optimized async workflow
+- Focus: MCP Notification System - Network-Level Response Completion Detection
+- Last update: 2025-05-31  
+- Version: 2.4.0
+- Status: Fixed get_response_async removal, implementing network stream interception for reliable completion detection
 
 ## Quick Commands - After Restart
 ```bash
 # 1. Check system health after restart
 mcp__claude-chrome-mcp__get_connection_health
 
-# 2. Test complete optimized async workflow
-mcp__claude-chrome-mcp__spawn_claude_dot_ai_tab --waitForLoad true --injectContentScript true
-mcp__claude-chrome-mcp__send_message_async --message "Test complete async system - what's 7*8?"
-# Should receive INSTANT MCP notification when response completes (no need to poll)
+# 2. Test streamlined async workflow with network-level detection
+mcp__claude-chrome-mcp__spawn_claude_dot_ai_tab --injectContentScript true
+mcp__claude-chrome-mcp__send_message_async --message "Test network stream detection: what's 7*8?"
+# Should receive MCP notification when network stream completes
 
-# 3. If successful, test get_response_async as well
-mcp__claude-chrome-mcp__get_response_async --tabId <tab_id>
+# 3. Use regular get_claude_dot_ai_response to retrieve completed response
+mcp__claude-chrome-mcp__get_claude_dot_ai_response --tabId <tab_id> --waitForCompletion false
 ```
 
 ## Important Tool Options
@@ -40,18 +40,16 @@ mcp__claude-chrome-mcp__get_response_async --tabId <tab_id>
 - Roadmap: ROADMAP.md
 
 ## Recent Updates (2025-05-31)
-- **COMPLETED**: ContentScriptManager auto-injection mechanism 
-  - Fixed injection using chrome.scripting.executeScript with files approach
-  - Disabled conflicting automatic injection listeners to prevent race conditions
-  - Added detailed error handling and logging for injection debugging
-  - Verified injection working with `contentScriptInjected: true` response
-- **COMPLETED**: Async operation registration system
-  - Added `send_content_script_message` method to background script using chrome.tabs.sendMessage
-  - Updated handleSendMessageAsync/handleGetResponseAsync to use message passing instead of execute_script
-  - Added chrome.runtime.onMessage listener to content-fast.js for operation registration
-  - Fixed execution context issue (ISOLATED world vs MAIN world) for proper chrome.runtime access
-- **READY**: Test complete optimized async workflow after MCP server restart
-- **NEXT**: Verify instant MCP notifications on response completion
+- **COMPLETED**: Streamlined async architecture
+  - Removed redundant `get_response_async` tool - use `get_claude_dot_ai_response` after MCP notification
+  - Cleaned up documentation to reflect streamlined workflow
+  - Confirmed MCP notification pipeline works for `message_sent` milestone
+- **IN PROGRESS**: Network-level completion detection
+  - Identified issue: DOM-based detection unreliable due to React batching/timing
+  - Implemented fetch() interception to detect stream completion directly
+  - Added network monitoring for Claude API streaming responses
+- **KEY INSIGHT**: Network stream completion is more reliable than DOM mutation detection
+- **NEXT**: Test network-level detection and commit working solution
 
 ## Development Guidelines
 - Commit frequently so that you can review changes

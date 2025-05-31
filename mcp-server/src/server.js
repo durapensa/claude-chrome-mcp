@@ -2186,26 +2186,6 @@ class ChromeMCPServer {
             }
           },
           {
-            name: 'get_response_async',
-            description: 'Get response from a Claude tab with event-driven completion detection (returns immediately with operation ID)',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                tabId: {
-                  type: 'number',
-                  description: 'The tab ID of the Claude session'
-                },
-                waitForCompletion: {
-                  type: 'boolean',
-                  description: 'Whether to wait for response completion before returning',
-                  default: true
-                }
-              },
-              required: ['tabId'],
-              additionalProperties: false
-            }
-          },
-          {
             name: 'wait_for_operation',
             description: 'Wait for an async operation to complete and return the result',
             inputSchema: {
@@ -2546,9 +2526,6 @@ class ChromeMCPServer {
             break;
           case 'send_message_async':
             result = await this.handleSendMessageAsync(args);
-            break;
-          case 'get_response_async':
-            result = await this.handleGetResponseAsync(args);
             break;
           case 'wait_for_operation':
             result = await this.handleWaitForOperation(args);
@@ -3125,55 +3102,6 @@ class ChromeMCPServer {
       operationId,
       status: 'started',
       type: 'send_message',
-      timestamp: Date.now()
-    };
-  }
-
-  async handleGetResponseAsync(args) {
-    const { tabId, waitForCompletion = true } = args;
-    
-    // Create operation
-    const operationId = operationManager.createOperation('get_response', { tabId, waitForCompletion });
-    
-    // Register operation with content script observer via message passing
-    try {
-      await this.hubClient.sendRequest('send_content_script_message', {
-        tabId,
-        message: {
-          type: 'register_operation',
-          operationId,
-          operationType: 'get_response',
-          params: { waitForCompletion }
-        }
-      });
-    } catch (error) {
-      console.warn('[handleGetResponseAsync] Failed to register operation with observer:', error);
-    }
-    
-    // Start monitoring for response
-    setTimeout(async () => {
-      try {
-        // Get current response using existing tool
-        const response = await this.hubClient.sendRequest('get_claude_dot_ai_response', { 
-          tabId,
-          waitForCompletion 
-        });
-        
-        // If registration failed, simulate completion
-        if (!global.observerRegistered) {
-          operationManager.updateOperation(operationId, 'response_completed', { response });
-          notificationManager.sendCompletion(operationId, response);
-        }
-      } catch (error) {
-        operationManager.updateOperation(operationId, 'error', { error: error.message });
-        notificationManager.sendError(operationId, error);
-      }
-    }, 100);
-    
-    return {
-      operationId,
-      status: 'started',
-      type: 'get_response',
       timestamp: Date.now()
     };
   }
