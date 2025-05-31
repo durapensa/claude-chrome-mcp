@@ -1,12 +1,15 @@
 // Content Script for claude.ai pages
 // Handles session detection and page-level interactions
 
+console.log('CCM: Content script loading...', window.location.href);
+
 // Event-driven completion detection
 class ConversationObserver {
   constructor() {
     this.activeOperations = new Map();
     this.observer = null;
     this.responseObserver = null;
+    console.log('[ConversationObserver] Initialized in content script context');
     this.setupObservers();
   }
 
@@ -342,6 +345,7 @@ class ConversationObserver {
 
   // Public API for scripts to register operations
   registerOperation(operationId, type, params = {}) {
+    console.log(`[ConversationObserver] registerOperation called: ${operationId} (${type})`);
     return this.trackOperation(operationId, type, params);
   }
 

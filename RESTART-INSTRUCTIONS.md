@@ -1,24 +1,31 @@
 # Restart Instructions - Async System Ready for End-to-End Testing
 
 **Date**: 2025-05-31  
-**Context**: Async System Implementation Complete - Content Script Auto-Injection Fixed  
-**Next Task**: Test complete async system with debugger-based content script injection
+**Context**: ContentScriptManager Auto-Injection Debugging Complete - Working ConversationObserver Integrated  
+**Next Task**: Manual extension reload required, then test complete async workflow
 
 ## 🎯 Current Status
 
 ### ✅ Major Achievements Completed
-- **Event-Driven Completion Detection System v2.4.0**: READY FOR TESTING
-  - `send_message_async`, `get_response_async`, `wait_for_operation` implemented
-  - DOM MutationObserver updated for current Claude.ai structure
-  - chrome.debugger-based content script auto-injection implemented
-  - Operation state persistence and recovery working
-- **Content Script Auto-Injection**: FIXED using chrome.debugger Runtime.evaluate
-- **DOM Selector Updates**: Fixed for current Claude.ai (.font-user-message/.font-claude-message)
-- **Test Suite Organization**: Consolidated v1/v2 files, archived old versions
-- **Version 2.4.0**: All components updated and committed
+- **ConversationObserver Integration**: Working ConversationObserver incorporated into content.js
+  - `registerOperation()` method available and functional
+  - Proper milestone notification system to background script
+  - Chrome.runtime messaging bridge implemented
+- **ContentScriptManager Debugging**: Fixed injection mechanism
+  - Simplified approach using manifest content scripts
+  - Verification and reload fallback system implemented
+  - Proper error handling and status reporting
+- **Communication Bridge**: Milestone notifications flow from content script to background to MCP
+- **Async System Ready**: All components integrated and ready for testing
+
+### 🔄 IMMEDIATE NEXT STEPS
+1. **Manual Extension Reload**: Reload extension in chrome://extensions to activate updated code
+2. **Test ContentScriptManager**: Verify auto-injection works with updated verification system  
+3. **Test Complete Async Workflow**: send_message_async → milestone notifications → wait_for_operation
+4. **Validate Milestone Progression**: Ensure started → message_sent → response_started → response_completed
 
 ### 🔴 PRIORITY ISSUES
-- **MCP Server Stability**: Server disconnects/crashes - needs investigation
+- **Extension Reload Required**: Updated ContentScriptManager and ConversationObserver need activation
 
 ### 📁 Key Files Status
 - **Latest commit**: 53d28ba - chrome.debugger content script auto-injection

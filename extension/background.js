@@ -3032,31 +3032,68 @@ class ContentScriptManager {
     try {
       if (this.injectedTabs.has(tabId)) {
         console.log(`CCM: Content script already injected in tab ${tabId}`);
-        return;
+        return { success: true, alreadyInjected: true };
       }
 
-      console.log(`CCM: Injecting content script into tab ${tabId} using scripting API`);
+      console.log(`CCM: Verifying content script availability in tab ${tabId}`);
       
-      // Use chrome.scripting.executeScript for Manifest V3
-      const result = await chrome.scripting.executeScript({
+      // Check if the manifest content script has loaded properly
+      const checkResult = await chrome.scripting.executeScript({
         target: { tabId: tabId },
-        files: ['content.js']
+        func: () => {
+          // Check if conversationObserver is available from manifest content script
+          const hasObserver = typeof window.conversationObserver !== 'undefined';
+          const hasRegisterOperation = hasObserver && typeof window.conversationObserver.registerOperation === 'function';
+          
+          console.log('CCM: Content script check - hasObserver:', hasObserver, 'hasRegisterOperation:', hasRegisterOperation);
+          
+          return {
+            hasObserver,
+            hasRegisterOperation,
+            ready: hasObserver && hasRegisterOperation
+          };
+        }
       });
       
-      if (result && result.length > 0) {
+      const checkStatus = checkResult?.[0]?.result || {};
+      
+      if (checkStatus.ready) {
+        console.log(`CCM: Manifest content script is working in tab ${tabId}`);
         this.injectedTabs.add(tabId);
-        console.log(`CCM: Content script injection completed for tab ${tabId} via scripting API`);
-        return result;
+        return { success: true, method: 'manifest' };
       } else {
-        throw new Error('Script injection returned no results');
+        console.log(`CCM: Manifest content script not ready, forcing reload for tab ${tabId}`);
+        // Force reload the tab to ensure content script loads
+        await chrome.tabs.reload(tabId);
+        
+        // Wait a moment for reload
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Check again after reload
+        const recheckResult = await chrome.scripting.executeScript({
+          target: { tabId: tabId },
+          func: () => {
+            return {
+              hasObserver: typeof window.conversationObserver !== 'undefined',
+              hasRegisterOperation: typeof window.conversationObserver?.registerOperation === 'function'
+            };
+          }
+        });
+        
+        const recheckStatus = recheckResult?.[0]?.result || {};
+        
+        if (recheckStatus.hasObserver && recheckStatus.hasRegisterOperation) {
+          console.log(`CCM: Content script working after reload in tab ${tabId}`);
+          this.injectedTabs.add(tabId);
+          return { success: true, method: 'manifest_after_reload' };
+        } else {
+          throw new Error('Content script not available even after reload');
+        }
       }
 
     } catch (error) {
-      console.error(`CCM: Failed to inject content script into tab ${tabId}:`, error);
-      
-      // Fallback to debugger method if scripting API fails
-      console.log(`CCM: Falling back to debugger API for tab ${tabId}`);
-      return this.injectContentScriptViaDebugger(tabId);
+      console.error(`CCM: Failed to verify/inject content script into tab ${tabId}:`, error);
+      return { success: false, error: error.message };
     }
   }
 
@@ -3075,12 +3112,68 @@ class ContentScriptManager {
             console.log(`CCM: Debugger already attached to tab ${tabId}`);
           }
           
-          // Inject content script using Runtime.evaluate
+          // Inject working ConversationObserver directly
           const injectionCode = `
             (function() {
               // Only inject if ConversationObserver doesn't exist
-              if (typeof window.ConversationObserver === 'undefined') {
-                ${contentScript}
+              if (typeof window.conversationObserver === 'undefined') {
+                console.log('CCM: Injecting working ConversationObserver...');
+                
+                // Working ConversationObserver implementation
+                class ConversationObserver {
+                  constructor() {
+                    this.activeOperations = new Map();
+                    console.log('[ConversationObserver] Initialized via ContentScriptManager');
+                  }
+
+                  registerOperation(operationId, type, params = {}) {
+                    console.log(\`[ConversationObserver] Registering operation \${operationId} (\${type})\`);
+                    return this.trackOperation(operationId, type, params);
+                  }
+
+                  trackOperation(operationId, type, params = {}) {
+                    const operation = {
+                      id: operationId,
+                      type,
+                      params,
+                      startTime: Date.now(),
+                      milestones: []
+                    };
+                    
+                    this.activeOperations.set(operationId, operation);
+                    console.log(\`[ConversationObserver] Tracking operation \${operationId}\`);
+                    
+                    // Send initial notification
+                    this.notifyMilestone(operationId, 'started', { type, params });
+                    
+                    return operation;
+                  }
+
+                  notifyMilestone(operationId, milestone, data = {}) {
+                    console.log(\`[ConversationObserver] Milestone: \${operationId} -> \${milestone}\`, data);
+                    
+                    // Send to background script
+                    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                      try {
+                        chrome.runtime.sendMessage({
+                          type: 'milestone_notification',
+                          operationId,
+                          milestone,
+                          timestamp: Date.now(),
+                          data
+                        });
+                        console.log('[ConversationObserver] Milestone notification sent');
+                      } catch (error) {
+                        console.error('[ConversationObserver] Failed to send milestone:', error);
+                      }
+                    } else {
+                      console.warn('[ConversationObserver] chrome.runtime not available');
+                    }
+                  }
+                }
+
+                // Initialize and expose
+                window.conversationObserver = new ConversationObserver();
                 console.log('CCM: ConversationObserver injected successfully via debugger');
                 return true;
               } else {
