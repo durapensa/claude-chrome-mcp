@@ -205,9 +205,11 @@ class CCMPopup {
       const clientDiv = document.createElement('div');
       clientDiv.className = 'client-card';
       
-      // Format timing
-      const connectedTime = this.formatDuration(Date.now() - client.connectedAt);
-      const lastActivityTime = this.formatDuration(Date.now() - client.lastActivity);
+      // Format timing with fallbacks
+      const connectedTime = client.connectedAt ? 
+        this.formatDuration(Date.now() - client.connectedAt) : 'Unknown';
+      const lastActivityTime = client.lastActivity ? 
+        this.formatDuration(Date.now() - client.lastActivity) : 'Unknown';
       
       // Determine badge color based on type
       const badgeClass = this.getClientBadgeClass(client.type);
@@ -255,6 +257,9 @@ class CCMPopup {
   }
 
   formatDuration(ms) {
+    if (!ms || isNaN(ms) || ms < 0) {
+      return 'Unknown';
+    }
     const seconds = Math.floor(ms / 1000);
     if (seconds < 60) {
       return `${seconds}s ago`;

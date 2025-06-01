@@ -76,9 +76,9 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     
     // Check WebSocket connection status
     if (!ccmHub.isConnected()) {
-      console.log('CCM Extension: WebSocket not connected');
-      // Don't attempt reconnection here - let the persistent reconnection handle it
-      // This prevents multiple reconnection attempts from different mechanisms
+      console.log('CCM Extension: WebSocket not connected, attempting reconnection...');
+      // Proactively attempt reconnection during alarm - this persists across service worker cycles
+      ccmHub.connectToHub();
     } else {
       console.log('CCM Extension: WebSocket connection is healthy');
     }
@@ -3432,8 +3432,14 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // Handle wake-up by ensuring WebSocket is connected
   if (!ccmHub.hubConnection || ccmHub.hubConnection.readyState !== WebSocket.OPEN) {
-    console.log('CCM Extension: WebSocket not connected, attempting reconnection...');
+    console.log('CCM Extension: Service worker wake-up detected, WebSocket not connected, attempting reconnection...');
     ccmHub.connectToHub();
+    
+    // Set up persistent reconnection interval if not already active
+    if (!ccmHub.persistentReconnectInterval) {
+      console.log('CCM Extension: Setting up persistent reconnection after wake-up');
+      ccmHub.scheduleReconnect();
+    }
   }
   
   // Handle manual injection requests and test ContentScriptManager
