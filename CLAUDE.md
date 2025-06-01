@@ -5,7 +5,7 @@ Quick reference for Claude. See README.md for full documentation.
 ## System Status
 - Version: 2.4.1
 - Architecture: Extension-as-Hub with CustomEvent bridge for async operations
-- Status: DEBUGGING - Async system requires extension reload, see docs/DEBUGGING-SESSION-MASTER.md
+- Status: TESTING ASYNC-BY-DEFAULT - Core workflows validated, comprehensive testing in progress
 
 ## Important System Limitations
 - Claude Code cannot restart its own MPC servers. User must exit and re-run Claude Code if claude-code-mcp tools are not avilable

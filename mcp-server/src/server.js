@@ -1966,7 +1966,7 @@ class ChromeMCPServer {
         tools: [
           {
             name: 'spawn_claude_dot_ai_tab',
-            description: 'Create a new Claude.ai tab',
+            description: 'Create a new Claude.ai tab. ASYNC-BY-DEFAULT: Use injectContentScript=true for async workflows. Returns immediately without waitForLoad/waitForReady unless explicitly needed.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -2129,7 +2129,7 @@ class ChromeMCPServer {
           },
           {
             name: 'send_message_to_claude_dot_ai_tab',
-            description: 'Send a message to a specific Claude tab',
+            description: 'Send a message to a specific Claude tab. ASYNC-BY-DEFAULT: Use send_message_async instead for async workflows. This tool waits for completion which may timeout.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -2160,7 +2160,7 @@ class ChromeMCPServer {
           },
           {
             name: 'get_claude_dot_ai_response',
-            description: 'Get the latest response from a Claude tab with optional waiting for completion',
+            description: 'Get the latest response from a Claude tab with optional waiting for completion. ASYNC-BY-DEFAULT: Primary async response retrieval tool. Use after send_message_async for optimal performance.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -2190,7 +2190,7 @@ class ChromeMCPServer {
           },
           {
             name: 'batch_send_messages',
-            description: 'Send messages to multiple Claude tabs simultaneously or sequentially',
+            description: 'Send messages to multiple Claude tabs simultaneously or sequentially. ASYNC-BY-DEFAULT: Supports parallel batch operations. Use sequential=false for async workflows with immediate return.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -2543,7 +2543,7 @@ class ChromeMCPServer {
           },
           {
             name: 'batch_get_responses',
-            description: 'Get responses from multiple Claude tabs with polling and progress tracking',
+            description: 'Get responses from multiple Claude tabs with polling and progress tracking. ASYNC-BY-DEFAULT: For completed responses only. Use after batch_send_messages or individual async operations complete.'
             inputSchema: {
               type: 'object',
               properties: {
