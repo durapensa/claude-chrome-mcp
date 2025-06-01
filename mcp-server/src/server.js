@@ -116,9 +116,16 @@ class ProcessLifecycleManager {
     this.shutdownReason = null;
     this.allIntervals = []; // Track all intervals for cleanup
     
+    // Health monitoring properties (Fix 4)
+    this.lastClaudeCodeHeartbeat = Date.now();
+    this.heartbeatInterval = null;
+    this.HEARTBEAT_TIMEOUT = 120000; // 2 minutes
+    this.HEARTBEAT_INTERVAL = 30000; // 30 seconds
+    
     this.setupSignalHandlers();
     this.setupParentMonitoring();
     this.setupOrphanDetection();
+    this.startHealthMonitoring(); // Fix 4: Start health monitoring
   }
 
   addCleanupTask(name, cleanupFn) {
@@ -274,6 +281,50 @@ class ProcessLifecycleManager {
     this.lastActivityTime = Date.now();
   }
 
+  // Health monitoring methods (Fix 4)
+  startHealthMonitoring() {
+    // Send periodic heartbeats to Claude Code
+    this.heartbeatInterval = setInterval(() => {
+      this.sendHeartbeatToClaudeCode();
+      this.checkClaudeCodeHealth();
+    }, this.HEARTBEAT_INTERVAL);
+    
+    // Add to tracked intervals for cleanup
+    this.addInterval(this.heartbeatInterval, 'health-monitoring');
+  }
+
+  sendHeartbeatToClaudeCode() {
+    try {
+      // Send heartbeat via stdout (Claude Code will respond with MCP messages)
+      // For now, just log that we're checking health
+      console.error(`CCM: Health check - last heartbeat ${Date.now() - this.lastClaudeCodeHeartbeat}ms ago`);
+    } catch (error) {
+      console.error('CCM: Failed to send heartbeat:', error);
+    }
+  }
+
+  checkClaudeCodeHealth() {
+    const timeSinceLastHeartbeat = Date.now() - this.lastClaudeCodeHeartbeat;
+    
+    if (timeSinceLastHeartbeat > this.HEARTBEAT_TIMEOUT) {
+      console.error(`CCM: Claude Code appears unresponsive (${timeSinceLastHeartbeat}ms since last activity)`);
+      // For now, just log - don't shutdown as activity tracking via MCP calls is sufficient
+      // this.emergencyShutdown('claude_code_unresponsive');
+    }
+  }
+
+  updateHeartbeat() {
+    this.lastClaudeCodeHeartbeat = Date.now();
+    this.updateActivity(); // Also update general activity
+  }
+
+  stopHealthMonitoring() {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+  }
+
   async gracefulShutdown(reason = 'unknown') {
     // Prevent multiple simultaneous shutdowns
     if (this.isShuttingDown) {
@@ -295,6 +346,7 @@ class ProcessLifecycleManager {
     try {
       // Clear all intervals immediately
       console.error('CCM: Clearing all intervals...');
+      this.stopHealthMonitoring(); // Fix 4: Stop health monitoring explicitly
       this.clearAllIntervals();
 
       // Stop stdin monitoring to prevent keeping process alive
@@ -933,14 +985,20 @@ class WebSocketHub extends EventEmitter {
   }
 
   checkShutdownConditions() {
+    // Enhanced shutdown condition handling (Fix 3)
     // Shut down if no MCP clients remain and we're not the extension
     if (this.clients.size === 0 && !this.chromeExtensionConnection) {
-      console.error('WebSocket Hub: No clients remaining, scheduling shutdown...');
+      console.error('WebSocket Hub: No clients remaining, scheduling graceful shutdown...');
+      
+      // Use graceful shutdown with proper cleanup sequencing
       setTimeout(() => {
         if (this.clients.size === 0 && !this.chromeExtensionConnection) {
-          this.shutdown('no_clients');
+          console.error('WebSocket Hub: Confirming graceful shutdown - no clients remain');
+          this.shutdown('no_clients_remaining');
+        } else {
+          console.error('WebSocket Hub: Shutdown cancelled - clients reconnected');
         }
-      }, 5000); // 5 second grace period
+      }, 5000); // 5 second grace period for reconnections
     }
   }
 
@@ -1130,7 +1188,7 @@ class WebSocketHub extends EventEmitter {
     }
 
     this.isShuttingDown = true;
-    console.error(`WebSocket Hub: Shutting down (reason: ${reason})`);
+    console.error(`WebSocket Hub: Shutdown initiated (reason: ${reason})`);
 
     // Clear intervals
     if (this.keepaliveInterval) {
@@ -1140,29 +1198,54 @@ class WebSocketHub extends EventEmitter {
       clearInterval(this.healthCheckInterval);
     }
 
-    // Notify all clients
-    const shutdownMessage = {
-      type: 'hub_shutdown',
-      reason,
-      timestamp: Date.now()
-    };
-
-    if (this.chromeExtensionConnection) {
-      this.sendToClient(this.chromeExtensionConnection, shutdownMessage);
+    // Enhanced shutdown sequencing (Fix 3)
+    // STEP 1: Notify extension BEFORE closing connections
+    if (this.chromeExtensionConnection && this.chromeExtensionConnection.readyState === WebSocket.OPEN) {
+      try {
+        this.sendToClient(this.chromeExtensionConnection, {
+          type: 'hub_shutdown',
+          reason: reason,
+          timestamp: Date.now()
+        });
+        
+        // Give extension time to process the shutdown message
+        console.error('WebSocket Hub: Notified extension, waiting for processing...');
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (error) {
+        console.error('WebSocket Hub: Error notifying extension of shutdown:', error);
+      }
     }
 
-    for (const client of this.clients.values()) {
-      this.sendToClient(client.ws, shutdownMessage);
+    // STEP 2: Notify all MCP clients
+    for (const [id, client] of this.clients) {
+      try {
+        this.sendToClient(client.ws, {
+          type: 'hub_shutdown',
+          reason: reason,
+          timestamp: Date.now()
+        });
+      } catch (error) {
+        console.error(`WebSocket Hub: Error notifying client ${id}:`, error);
+      }
     }
 
-    // Close server aggressively
+    // STEP 3: Wait for messages to be sent
+    console.error('WebSocket Hub: Waiting for shutdown messages to be delivered...');
+    await new Promise(resolve => setTimeout(resolve, 200));
+
+    // STEP 4: Close all connections gracefully first
     if (this.server) {
-      // Terminate all connections immediately
+      console.error('WebSocket Hub: Closing connections gracefully...');
       this.server.clients.forEach(ws => {
-        ws.terminate();
+        try {
+          ws.close(1000, 'Server shutdown');
+        } catch (error) {
+          // If graceful close fails, terminate
+          ws.terminate();
+        }
       });
       
-      // Close server with timeout
+      // STEP 5: Close server with timeout
       await Promise.race([
         new Promise((resolve) => {
           this.server.close(() => {
@@ -1920,6 +2003,13 @@ class ChromeMCPServer {
     this.hubClient = new AutoHubClient();
     this.lifecycleManager = new ProcessLifecycleManager();
     
+    // Transport resilience properties (Fix 1)
+    this.transportRetries = 0;
+    this.maxTransportRetries = 3;
+    this.transportReconnectDelay = 1000;
+    this.isShuttingDown = false;
+    this.currentTransport = null;
+    
     // Initialize event-driven completion detection
     operationManager = new OperationManager();
     notificationManager = new NotificationManager(this.server);
@@ -2650,7 +2740,7 @@ class ChromeMCPServer {
       const { name, arguments: args } = request.params;
 
       // Update activity for lifecycle management
-      this.lifecycleManager.updateActivity();
+      this.lifecycleManager.updateHeartbeat(); // Fix 4: Update health monitoring
 
       try {
         let result;
@@ -3176,6 +3266,74 @@ class ChromeMCPServer {
     }
   }
 
+  // Transport resilience methods (Fix 1)
+  async handleTransportLoss() {
+    if (this.isShuttingDown) {
+      console.error('CCM: Transport lost during shutdown - expected');
+      return;
+    }
+
+    if (this.transportRetries >= this.maxTransportRetries) {
+      console.error(`CCM: Max transport retries (${this.maxTransportRetries}) exceeded, shutting down`);
+      this.lifecycleManager.emergencyShutdown('transport_retry_exhausted');
+      return;
+    }
+
+    this.transportRetries++;
+    const delay = this.transportReconnectDelay * Math.pow(2, this.transportRetries - 1);
+    
+    console.error(`CCM: Transport retry ${this.transportRetries}/${this.maxTransportRetries} in ${delay}ms`);
+    
+    setTimeout(async () => {
+      try {
+        // Try to restart the transport connection
+        await this.restartTransport();
+        console.error('CCM: Transport reconnection successful');
+        this.transportRetries = 0; // Reset on success
+      } catch (error) {
+        console.error('CCM: Transport reconnection failed:', error);
+        this.handleTransportLoss(); // Retry again
+      }
+    }, delay);
+  }
+
+  async restartTransport() {
+    if (this.isShuttingDown) {
+      throw new Error('Cannot restart transport during shutdown');
+    }
+
+    // Close existing transport if any
+    if (this.currentTransport) {
+      try {
+        await this.server.close();
+      } catch (error) {
+        console.error('CCM: Error closing existing transport:', error);
+      }
+    }
+
+    // Create new transport
+    const transport = new StdioServerTransport();
+    this.currentTransport = transport;
+    
+    // Set up event handlers
+    transport.onclose = () => {
+      if (this.isShuttingDown) {
+        console.error('CCM: Transport closed during shutdown - expected');
+        return;
+      }
+      console.error('CCM: Transport closed unexpectedly, attempting recovery...');
+      this.handleTransportLoss();
+    };
+    
+    transport.onerror = (error) => {
+      console.error('CCM: Transport error:', error);
+      // Don't shutdown on transport errors - log and continue
+    };
+    
+    // Connect to transport
+    await this.server.connect(transport);
+  }
+
   async start() {
     try {
       // Add enhanced signal handling for stability
@@ -3184,20 +3342,15 @@ class ChromeMCPServer {
       await this.hubClient.connect();
       console.error('Claude Chrome MCP: Connected to hub');
       
-      const transport = new StdioServerTransport();
+      // Use resilient transport handling (Fix 1)
+      await this.restartTransport();
+      console.error('Claude Chrome MCP: MCP server started with resilient transport');
       
-      // Enhanced transport close handler with immediate shutdown
-      transport.onclose = () => {
-        console.error('Claude Chrome MCP: Client disconnected, initiating immediate shutdown...');
-        // Use emergency shutdown for faster exit when client disconnects
-        this.lifecycleManager.emergencyShutdown('mcp_client_disconnect');
-      };
-      
-      await this.server.connect(transport);
-      console.error('Claude Chrome MCP: MCP server started');
+      // Reset retry counter on successful start
+      this.transportRetries = 0;
       
       // Update activity on successful start
-      this.lifecycleManager.updateActivity();
+      this.lifecycleManager.updateHeartbeat(); // Fix 4: Update health monitoring
       
     } catch (error) {
       console.error('Claude Chrome MCP: Startup failed:', error);
@@ -3234,10 +3387,16 @@ class ChromeMCPServer {
   }
 
   async stop() {
-    console.error('Claude Chrome MCP: Shutting down...');
+    this.isShuttingDown = true; // Fix 1: Prevent transport reconnection during shutdown
+    console.error('Claude Chrome MCP: Graceful shutdown initiated...');
+    
     try {
-      await this.hubClient.close();
-      await this.server.close();
+      if (this.hubClient) {
+        await this.hubClient.close();
+      }
+      if (this.server) {
+        await this.server.close();
+      }
       console.error('Claude Chrome MCP: Shutdown complete');
     } catch (error) {
       console.error('Claude Chrome MCP: Error during shutdown:', error);

@@ -230,6 +230,10 @@ class CCMExtensionHub {
     this.messageQueue = new MessageQueue(); // Add message queue
     this.operationLock = new TabOperationLock(); // Add operation lock
     
+    // Client timeout tracking properties (Fix 2)
+    this.clientTimeouts = new Map(); // Track client heartbeat timeouts
+    this.CLIENT_TIMEOUT_MS = 60000; // 1 minute timeout
+    
     // Enhanced reconnection settings
     this.lastConnectionAttempt = 0;
     this.resetAttemptsAfter = 300000; // Reset after 5 minutes
@@ -304,8 +308,9 @@ class CCMExtensionHub {
       };
       
       this.hubConnection.onclose = (event) => {
-        console.log('CCM Extension: Disconnected from WebSocket Hub', event.code, event.reason);
+        console.log('CCM Extension: Hub disconnected - clearing all client state (Fix 2)');
         this.hubConnection = null;
+        this.clearAllClients(); // Fix 2: Clear stale client data immediately
         this.updateBadge('hub-disconnected');
         
         // Immediately try to reconnect if it was a clean shutdown (hub restarting)
@@ -396,7 +401,8 @@ class CCMExtensionHub {
         break;
         
       case 'hub_shutdown':
-        console.log('CCM Extension: Hub is shutting down');
+        console.log('CCM Extension: Hub shutdown - clearing all client state (Fix 2)');
+        this.clearAllClients(); // Fix 2: Clear immediately
         this.updateBadge('hub-disconnected');
         // Immediately attempt reconnection when hub announces shutdown
         this.scheduleReconnect();
@@ -427,10 +433,55 @@ class CCMExtensionHub {
     }
   }
   
-  updateClientList(clients) {
+  // Client state management methods (Fix 2)
+  clearAllClients() {
     this.connectedClients.clear();
+    this.clientTimeouts.forEach(timeout => clearTimeout(timeout));
+    this.clientTimeouts.clear();
+    this.updateGlobalState();
+    console.log('CCM Extension: All client state cleared');
+  }
+
+  setClientTimeout(clientId) {
+    // Clear existing timeout
+    const existingTimeout = this.clientTimeouts.get(clientId);
+    if (existingTimeout) {
+      clearTimeout(existingTimeout);
+    }
+
+    // Set new timeout
+    const timeout = setTimeout(() => {
+      console.log(`CCM Extension: Client ${clientId} timed out, removing`);
+      this.connectedClients.delete(clientId);
+      this.clientTimeouts.delete(clientId);
+      this.updateGlobalState();
+    }, this.CLIENT_TIMEOUT_MS);
+    
+    this.clientTimeouts.set(clientId, timeout);
+  }
+
+  updateClientActivity(clientId) {
+    const client = this.connectedClients.get(clientId);
+    if (client) {
+      client.lastSeen = Date.now();
+      this.setClientTimeout(clientId); // Reset timeout
+    }
+  }
+
+  updateClientList(clients) {
+    // Clear all existing state (Fix 2)
+    this.connectedClients.clear();
+    this.clientTimeouts.forEach(timeout => clearTimeout(timeout));
+    this.clientTimeouts.clear();
+    
     clients.forEach(client => {
-      this.connectedClients.set(client.id, client);
+      this.connectedClients.set(client.id, {
+        ...client,
+        lastSeen: Date.now()
+      });
+      
+      // Set timeout for each client
+      this.setClientTimeout(client.id);
     });
     
     console.log(`CCM Extension: Updated client list, ${clients.length} clients connected`);
