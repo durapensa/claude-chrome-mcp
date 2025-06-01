@@ -5,7 +5,10 @@ Quick reference for Claude. See README.md for full documentation.
 ## System Status
 - Version: 2.4.1
 - Architecture: Extension-as-Hub with CustomEvent bridge for async operations
-- Status: STABLE - Network-level response detection with complete async workflow
+- Status: DEBUGGING - Async system requires extension reload, see docs/DEBUGGING-SESSION-MASTER.md
+
+## Important System Limitations
+- Claude Code cannot restart its own MPC servers. User must exit and re-run Claude Code if claude-code-mcp tools are not avilable
 
 ## Quick Commands
 ```bash
@@ -23,6 +26,8 @@ mcp__claude-chrome-mcp__get_claude_dot_ai_response --tabId <tab_id>
 ## Important Tool Options
 - `send_message_to_claude_tab`: Use `waitForReady: true` (default)
 - `get_claude_response`: Keep `timeoutMs < 30000` for MCP
+- Do not use `waitForCompletion` or similar while testing async operation
+- **ALL claude-chrome-mcp tools should operate in async mode by default, with waitForCompletion flags added only if applicable and only for optional use**
 
 ## Project Structure
 - `extension/` - Chrome extension (WebSocket client)
@@ -36,6 +41,7 @@ mcp__claude-chrome-mcp__get_claude_dot_ai_response --tabId <tab_id>
 - Troubleshooting: docs/TROUBLESHOOTING.md
 - TypeScript: docs/TYPESCRIPT.md
 - Roadmap: ROADMAP.md
+- **Current Debug Session**: docs/DEBUGGING-SESSION-MASTER.md
 
 ## Architecture Overview
 - **Extension-as-Hub**: Chrome extension runs WebSocket server, MCP clients connect to it
@@ -43,12 +49,12 @@ mcp__claude-chrome-mcp__get_claude_dot_ai_response --tabId <tab_id>
 - **Network-Level Detection**: Uses fetch interception + `/latest` endpoint for response completion
 - **Async Operations**: Full async workflow with operation registration and milestone tracking
 
-## Continuation Workflow
+## Continuation Workflow  
 When you type 'continue', the system is ready for development and testing:
 
 1. **System Health Check**: `get_connection_health`
-2. **Standard Testing**: Follow testing workflow below  
-3. **Development Tasks**: See Architecture and Troubleshooting docs for guidance
+2. **CRITICAL**: Follow docs/DEBUGGING-SESSION-MASTER.md for async system debugging
+3. **Use Network Inspection Tools**: Don't fall back to console logging methodology
 
 ## Testing Workflow
 1. **System Health**: `get_connection_health` - verify hub and clients connected
@@ -70,3 +76,9 @@ When you type 'continue', the system is ready for development and testing:
 - **GIT FOR HISTORY**: Don't keep backup files in filesystem
 - **TEST AS YOU GO**: Each change should be immediately testable
 - **CLEAN REFERENCES**: Update doc links when files are moved/deleted
+
+## Essential Workflows
+- Change code → Reload extension → Test
+
+## Tool Usage Directive
+- Use all of the claude-chrome-mcp tools available to debug, test, and develop

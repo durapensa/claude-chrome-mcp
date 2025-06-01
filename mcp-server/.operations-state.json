@@ -329,7 +329,515 @@
         "createdAt": 1748733859035,
         "lastUpdated": 1748733859363
       }
+    ],
+    [
+      "send_message_1748735195628_rvkl8ddz3",
+      {
+        "id": "send_message_1748735195628_rvkl8ddz3",
+        "type": "send_message",
+        "params": {
+          "tabId": 948571013,
+          "message": "Test async: 7*8=?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748735195957,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748735195628,
+        "lastUpdated": 1748735195957
+      }
+    ],
+    [
+      "send_message_1748735441891_ptsdwuc53",
+      {
+        "id": "send_message_1748735441891_ptsdwuc53",
+        "type": "send_message",
+        "params": {
+          "tabId": 948571013,
+          "message": "Fresh test: What is 15 x 3?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748735442225,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748735441891,
+        "lastUpdated": 1748735442225
+      }
+    ],
+    [
+      "send_message_1748735522398_tg5adevel",
+      {
+        "id": "send_message_1748735522398_tg5adevel",
+        "type": "send_message",
+        "params": {
+          "tabId": 948571014,
+          "message": "Test async after reload: 12 x 4 = ?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748735522727,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748735522398,
+        "lastUpdated": 1748735522727
+      }
+    ],
+    [
+      "send_message_1748735654714_q7fof2sjd",
+      {
+        "id": "send_message_1748735654714_q7fof2sjd",
+        "type": "send_message",
+        "params": {
+          "tabId": 948571015,
+          "message": "Final test: What is the capital of France?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748735655040,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748735654714,
+        "lastUpdated": 1748735655040
+      }
+    ],
+    [
+      "send_message_1748735839693_mbs9woy27",
+      {
+        "id": "send_message_1748735839693_mbs9woy27",
+        "type": "send_message",
+        "params": {
+          "tabId": 948571016,
+          "message": "Stream test: What is 17 * 23?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748735840023,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748735839693,
+        "lastUpdated": 1748735840023
+      }
+    ],
+    [
+      "send_message_1748736017550_8przvlcth",
+      {
+        "id": "send_message_1748736017550_8przvlcth",
+        "type": "send_message",
+        "params": {
+          "tabId": 948571021,
+          "message": "Network stream detection test: 19 x 13 = ?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748736017875,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748736017550,
+        "lastUpdated": 1748736017875
+      }
+    ],
+    [
+      "send_message_1748736092478_pnuqu912s",
+      {
+        "id": "send_message_1748736092478_pnuqu912s",
+        "type": "send_message",
+        "params": {
+          "tabId": 948571021,
+          "message": "Debug network: 5 + 3 = ?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748736092811,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748736092478,
+        "lastUpdated": 1748736092811
+      }
+    ],
+    [
+      "send_message_1748736210734_d4my8h9q7",
+      {
+        "id": "send_message_1748736210734_d4my8h9q7",
+        "type": "send_message",
+        "params": {
+          "tabId": 948571021,
+          "message": "Network inspection test: 7 x 6 = ?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748736211070,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748736210734,
+        "lastUpdated": 1748736211070
+      }
+    ],
+    [
+      "send_message_1748736756808_gsjlegk0e",
+      {
+        "id": "send_message_1748736756808_gsjlegk0e",
+        "type": "send_message",
+        "params": {
+          "tabId": 948571022,
+          "message": "Test network fix after reload: 9 x 7 = ?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748736757129,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748736756808,
+        "lastUpdated": 1748736757129
+      }
+    ],
+    [
+      "send_message_1748736843326_p8qz9jd2p",
+      {
+        "id": "send_message_1748736843326_p8qz9jd2p",
+        "type": "send_message",
+        "params": {
+          "tabId": 948571022,
+          "message": "Network debug: 4 + 8 = ?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748736843658,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748736843326,
+        "lastUpdated": 1748736843658
+      }
+    ],
+    [
+      "send_message_1748736926726_nkcd4ikjt",
+      {
+        "id": "send_message_1748736926726_nkcd4ikjt",
+        "type": "send_message",
+        "params": {
+          "tabId": 948571022,
+          "message": "Enhanced debug: 5 + 2 = ?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748736927059,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748736926726,
+        "lastUpdated": 1748736927059
+      }
+    ],
+    [
+      "send_message_1748737133979_17nxka0zf",
+      {
+        "id": "send_message_1748737133979_17nxka0zf",
+        "type": "send_message",
+        "params": {
+          "tabId": 948571023,
+          "message": "Test async system: What is 7*8?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748737134301,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748737133979,
+        "lastUpdated": 1748737134301
+      }
+    ],
+    [
+      "send_message_1748737200773_fd44te3rb",
+      {
+        "id": "send_message_1748737200773_fd44te3rb",
+        "type": "send_message",
+        "params": {
+          "tabId": 948571024,
+          "message": "Network debug test: Calculate 15*23",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748737201097,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748737200773,
+        "lastUpdated": 1748737201097
+      }
+    ],
+    [
+      "send_message_1748737315787_ewk2wsysj",
+      {
+        "id": "send_message_1748737315787_ewk2wsysj",
+        "type": "send_message",
+        "params": {
+          "tabId": 948571025,
+          "message": "Async test 1: What is the capital of France?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748737317092,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748737315787,
+        "lastUpdated": 1748737317092
+      }
+    ],
+    [
+      "send_message_1748737315796_bwrasgtke",
+      {
+        "id": "send_message_1748737315796_bwrasgtke",
+        "type": "send_message",
+        "params": {
+          "tabId": 948571026,
+          "message": "Async test 2: Calculate 42 * 17",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748737316113,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748737315796,
+        "lastUpdated": 1748737316113
+      }
+    ],
+    [
+      "send_message_1748737616574_eavg2ovhf",
+      {
+        "id": "send_message_1748737616574_eavg2ovhf",
+        "type": "send_message",
+        "params": {
+          "tabId": 948571034,
+          "message": "Test: What is 5+5?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748737616885,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748737616574,
+        "lastUpdated": 1748737616885
+      }
+    ],
+    [
+      "send_message_1748737779859_o0xem0i3m",
+      {
+        "id": "send_message_1748737779859_o0xem0i3m",
+        "type": "send_message",
+        "params": {
+          "tabId": 948571026,
+          "message": "Fresh start test: What is 12 * 8?",
+          "waitForReady": true
+        },
+        "status": "failed",
+        "milestones": [
+          {
+            "milestone": "error",
+            "timestamp": 1748737839964,
+            "data": {
+              "error": "Request timeout after 30000ms (requestId: req-39, type: send_message_to_claude_dot_ai_tab)"
+            }
+          }
+        ],
+        "createdAt": 1748737779859,
+        "lastUpdated": 1748737839964
+      }
+    ],
+    [
+      "send_message_1748737848796_g8o6dlvdf",
+      {
+        "id": "send_message_1748737848796_g8o6dlvdf",
+        "type": "send_message",
+        "params": {
+          "tabId": 948571037,
+          "message": "Fresh tab test: What is 9 + 16?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748737849106,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748737848796,
+        "lastUpdated": 1748737849106
+      }
+    ],
+    [
+      "send_message_1748738303471_7zs738qcw",
+      {
+        "id": "send_message_1748738303471_7zs738qcw",
+        "type": "send_message",
+        "params": {
+          "tabId": 948571039,
+          "message": "Test async: 7*8=?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748738303783,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748738303471,
+        "lastUpdated": 1748738303783
+      }
+    ],
+    [
+      "send_message_1748738368922_z8w0q2pz0",
+      {
+        "id": "send_message_1748738368922_z8w0q2pz0",
+        "type": "send_message",
+        "params": {
+          "tabId": 948571039,
+          "message": "What's the capital of France?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748738369239,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748738368922,
+        "lastUpdated": 1748738369239
+      }
+    ],
+    [
+      "send_message_1748738368928_jpgdw40ci",
+      {
+        "id": "send_message_1748738368928_jpgdw40ci",
+        "type": "send_message",
+        "params": {
+          "tabId": 948571039,
+          "message": "Now tell me a joke about programming",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748738371572,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748738368928,
+        "lastUpdated": 1748738371572
+      }
+    ],
+    [
+      "send_message_1748738683767_3bbc2y0an",
+      {
+        "id": "send_message_1748738683767_3bbc2y0an",
+        "type": "send_message",
+        "params": {
+          "tabId": 948571039,
+          "message": "Write a detailed explanation of how photosynthesis works in plants, including the chemical equation, the role of chloroplasts, and why it's important for all life on Earth. Make it about 3 paragraphs long.",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748738684091,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748738683767,
+        "lastUpdated": 1748738684091
+      }
+    ],
+    [
+      "send_message_1748739081523_cfr5r1s97",
+      {
+        "id": "send_message_1748739081523_cfr5r1s97",
+        "type": "send_message",
+        "params": {
+          "tabId": 948571044,
+          "message": "Test async architecture: What is 7 * 8 + 15?",
+          "waitForReady": true
+        },
+        "status": "pending",
+        "milestones": [
+          {
+            "milestone": "message_sent",
+            "timestamp": 1748739081834,
+            "data": {}
+          }
+        ],
+        "createdAt": 1748739081523,
+        "lastUpdated": 1748739081834
+      }
     ]
   ],
-  "lastSaved": 1748733859363
+  "lastSaved": 1748739081834
 }

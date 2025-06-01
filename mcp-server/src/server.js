@@ -2289,7 +2289,7 @@ class ChromeMCPServer {
           },
           {
             name: 'wait_for_operation',
-            description: 'Wait for an async operation to complete and return the result',
+            description: 'DEPRECATED: Wait for operation completion - DO NOT USE with async workflows. Only for rare synchronous operations. Use get_claude_dot_ai_response directly instead.',
             inputSchema: {
               type: 'object',
               properties: {
