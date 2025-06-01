@@ -116,6 +116,80 @@ After applying the fix, verify:
 TAB_POOL_ENABLED=1
 ```
 
+## Debugging Methodology
+
+### Evidence-Based Network Debugging
+
+When debugging async operations or network-related issues, use systematic evidence gathering:
+
+**Step 1: Health Check**
+```bash
+mcp__claude-chrome-mcp__get_connection_health
+```
+
+**Step 2: Network Inspection** (for async/network issues)
+```bash
+# Start monitoring BEFORE sending messages
+mcp__claude-chrome-mcp__start_network_inspection --tabId <id>
+
+# Send test message
+mcp__claude-chrome-mcp__send_message_async --message "test" --tabId <id>
+
+# Analyze actual traffic patterns
+mcp__claude-chrome-mcp__get_captured_requests --tabId <id>
+
+# Stop monitoring
+mcp__claude-chrome-mcp__stop_network_inspection --tabId <id>
+```
+
+**Step 3: Analyze Evidence**
+- Look for `/latest` endpoints in captured requests
+- Verify `/completion` streams are being detected
+- Check if network interception is working
+
+### Critical Development Pattern
+
+**Always reload extension after code changes**:
+1. Make changes to `extension/background.js`
+2. **Reload Chrome extension** (chrome://extensions)
+3. Test changes
+
+**Common failure pattern**: Changing code → Testing → Assuming fix doesn't work → More debugging
+**Correct pattern**: Changing code → **Reloading extension** → Testing → Verification
+
+### Common Debugging Anti-Patterns
+
+❌ **Don't fallback to console logging methodology**
+- Avoid using `execute_script` for logging when network tools exist
+- Don't assume network patterns without evidence
+
+❌ **Don't skip systematic tool usage**
+- Network inspection should be first step for network issues
+- Use MCP tools methodically rather than randomly
+
+✅ **Do use evidence-based approach**
+- Capture actual network traffic before making assumptions
+- Use systematic tool sequences
+- Verify each component independently
+
+### Tool Selection Guide
+
+**For async operation issues**:
+1. `get_connection_health` - System status
+2. `start_network_inspection` - Traffic analysis
+3. `get_claude_dot_ai_response` - Response verification
+4. `debug_claude_dot_ai_page` - Page state
+
+**For connection issues**:
+1. `get_connection_health` - Hub and client status
+2. `get_claude_dot_ai_tabs` - Tab verification
+3. `debug_attach` - Advanced debugging
+
+**For response detection**:
+1. `start_network_inspection` - Monitor `/latest` endpoints
+2. `execute_script` - Manual completion triggers
+3. `get_captured_requests` - Network pattern analysis
+
 ## Debug Mode
 
 Enable verbose logging:

@@ -1,31 +1,47 @@
 {
-  "name": "claude-chrome-mcp-cli",
-  "version": "1.0.0",
-  "description": "CLI tool for Claude Chrome MCP",
-  "main": "src/index.ts",
+  "name": "mcp-cli",
+  "version": "2.0.0",
+  "description": "Universal MCP CLI Client - Dynamic CLI for any MCP server",
+  "main": "dist/mcp.js",
   "bin": {
-    "ccm": "bin/ccm"
+    "mcp": "bin/mcp"
   },
   "scripts": {
     "build": "tsc",
-    "start": "node dist/index.js",
-    "dev": "ts-node src/index.ts",
+    "dev": "ts-node src/mcp.ts",
+    "start": "node dist/mcp.js",
+    "daemon": "node dist/daemon/daemon.js",
+    "clean": "rm -rf dist/",
     "test": "jest"
   },
+  "keywords": [
+    "mcp",
+    "cli",
+    "claude",
+    "universal",
+    "client"
+  ],
+  "author": "",
+  "license": "MIT",
   "dependencies": {
-    "commander": "^11.1.0",
-    "axios": "^1.6.2",
-    "ws": "^8.14.2",
-    "chalk": "^4.1.2"
+    "@types/yargs": "^17.0.33",
+    "ajv": "^8.12.0",
+    "chalk": "^4.1.2",
+    "inquirer": "^9.2.0",
+    "json-schema": "^0.4.0",
+    "yargs": "^18.0.0",
+    "yargs-parser": "^21.1.1"
   },
   "devDependencies": {
+    "@types/inquirer": "^9.0.7",
+    "@types/jest": "^29.5.8",
+    "@types/json-schema": "^7.0.15",
     "@types/node": "^20.10.4",
-    "@types/ws": "^8.5.10",
-    "typescript": "^5.3.3",
+    "jest": "^29.7.0",
     "ts-node": "^10.9.2",
-    "jest": "^29.7.0"
+    "typescript": "^5.3.3"
   },
-  "keywords": ["cli", "claude", "chrome", "mcp"],
-  "author": "",
-  "license": "MIT"
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }

@@ -5,7 +5,6 @@ Quick reference for Claude. See README.md for full documentation.
 ## System Status
 - Version: 2.4.1
 - Architecture: Extension-as-Hub with CustomEvent bridge for async operations
-- Status: TESTING ASYNC-BY-DEFAULT - Core workflows validated, comprehensive testing in progress
 
 ## Important System Limitations
 - Claude Code cannot restart its own MPC servers. User must exit and re-run Claude Code if claude-chrome-mcp tools are not avilable
@@ -22,7 +21,7 @@ mcp__claude-chrome-mcp__send_message_async --message "Test async: 7*8=?" --tabId
 # 3. Get response after completion
 mcp__claude-chrome-mcp__get_claude_dot_ai_response --tabId <tab_id>
 
-# 4. Test Claude-to-Claude forwarding (NEW in 2.4.1)
+# 4. Test Claude-to-Claude forwarding
 mcp__claude-chrome-mcp__forward_response_to_claude_dot_ai_tab --sourceTabId <source> --targetTabId <target>
 ```
 
@@ -44,7 +43,6 @@ mcp__claude-chrome-mcp__forward_response_to_claude_dot_ai_tab --sourceTabId <sou
 - Troubleshooting: docs/TROUBLESHOOTING.md
 - TypeScript: docs/TYPESCRIPT.md
 - Roadmap: ROADMAP.md
-- **Current Debug Session**: docs/DEBUGGING-SESSION-MASTER.md
 
 ## Architecture Overview
 - **Extension-as-Hub**: Chrome extension runs WebSocket server, MCP clients connect to it
@@ -53,11 +51,7 @@ mcp__claude-chrome-mcp__forward_response_to_claude_dot_ai_tab --sourceTabId <sou
 - **Async Operations**: Full async workflow with operation registration and milestone tracking
 
 ## Continuation Workflow  
-When you type 'continue', the system is ready for development and testing:
-
-1. **System Health Check**: `get_connection_health`
-2. **CRITICAL**: Follow docs/DEBUGGING-SESSION-MASTER.md for async system debugging
-3. **Use Network Inspection Tools**: Don't fall back to console logging methodology
+When you type 'continue', follow the standard workflow in docs/CONTINUATION.md
 
 ## Testing Workflow
 1. **System Health**: `get_connection_health` - verify hub and clients connected
@@ -66,14 +60,8 @@ When you type 'continue', the system is ready for development and testing:
 4. **Get Response**: `get_claude_dot_ai_response --tabId <id>` (auto-completion detection)
 5. **Claude-to-Claude**: `forward_response_to_claude_dot_ai_tab --sourceTabId <src> --targetTabId <tgt>`
 
-## Claude Code Integration Status
-- **GitHub Issue Created**: MCP Notification-Driven Auto-Resume for Async Operations
-- **Issue Script**: `docs/create-claude-code-issue.sh` - submitted to anthropics/claude-code  
-- **Integration Gap**: Claude Code needs async operation completion triggers
-- **Workaround**: Manual polling until auto-resume is implemented
-
-## Current Session Context
-- **Active Session**: See `docs/SESSION-2025-06-01.md` for current progress and restart checkpoint
+## Session Continuity
+- **Latest Status**: See docs/CONTINUATION.md for current session and continuation workflow
 
 ## Development Guidelines
 - **Code Hygiene**: Delete backup/test files immediately after confirming working solution

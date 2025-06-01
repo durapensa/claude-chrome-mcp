@@ -217,6 +217,11 @@ DOM Events Detected by ConversationObserver:
 - **Background Script**: `extension/background.js` (WebSocket forwarding)
 - **State Persistence**: `mcp-server/.operations-state.json` (auto-created)
 
+## Related Documentation
+
+- [**Architecture**](ARCHITECTURE.md) - Complete system design overview
+- [**Troubleshooting**](TROUBLESHOOTING.md) - Debugging async operations and network issues
+
 ---
 
 *This event-driven system replaces the previous timeout-based approach with reliable, real-time milestone detection and MCP notification streaming.*

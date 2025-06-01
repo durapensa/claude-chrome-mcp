@@ -46,6 +46,8 @@ Claude.ai Tabs
 
 ## Async Operation Architecture
 
+For visual diagrams of the async system, see [Event-Driven Architecture](event-driven-architecture-diagram.md).
+
 ### Event-Driven Completion Detection (Version 2.4.0+)
 - **Operation Manager**: Tracks async operations with unique operation IDs
 - **Notification Manager**: Real-time progress updates via MCP protocol
@@ -119,3 +121,11 @@ Claude.ai Tabs
 - Graceful degradation on connection loss
 - Detailed error messages for debugging
 - Health monitoring endpoint for diagnostics
+
+For common issues and debugging methodology, see [Troubleshooting Guide](TROUBLESHOOTING.md).
+
+## Related Documentation
+
+- [**TypeScript Types**](TYPESCRIPT.md) - API type definitions and usage examples
+- [**Restart Capability**](RESTART-CAPABILITY.md) - MCP lifecycle and restart mechanisms  
+- [**Event-Driven Architecture**](event-driven-architecture-diagram.md) - Visual system diagrams

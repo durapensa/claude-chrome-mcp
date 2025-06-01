@@ -150,4 +150,9 @@ Update your MCP configuration to use the wrapper:
 ✅ **Tested** - Comprehensive test suite with 7 test scenarios
 ✅ **Production Ready** - Enhanced stability and monitoring
 
+## Related Documentation
+
+- [**Architecture**](ARCHITECTURE.md) - System design and MCP server components
+- [**Troubleshooting**](TROUBLESHOOTING.md) - Connection issues and debugging methodology
+
 The restart capability addresses the early exit issues and provides a robust foundation for reliable MCP server operation.

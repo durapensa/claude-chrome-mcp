@@ -1,226 +1,73 @@
-# Claude Chrome MCP (CCM)
+# Claude Chrome MCP
 
-Developer tool suite enabling Claude Desktop, Claude Code, and other MCP hosts like Cursor, to interact with claude.ai in Chrome browsers.
-
-## Documentation
-
-- [Architecture](docs/ARCHITECTURE.md) - System design and components
-- [MCP Configuration](CLAUDE.md) - Claude Desktop setup  
-- [Troubleshooting](docs/TROUBLESHOOTING.md) - Debug guide and common issues
-- [TypeScript Types](shared/TYPES.md) - Complete TypeScript API documentation
-- [Changelog](CHANGELOG.md) - Release history
-- [Roadmap](ROADMAP.md) - Planned features
+Browser automation tool enabling MCP clients (Claude Desktop, Claude Code, Cursor) to interact with claude.ai through Chrome extension and MCP server.
 
 ## Components
-
-- **Chrome Extension** - Provides chrome.debugger access via WebSocket (claude.ai only)
-- **MCP Server** - Node.js server exposing Chrome capabilities to MCP clients
-- **CLI Tool** - Command-line interface for direct browser control
+- **Chrome Extension** - WebSocket hub providing claude.ai browser access
+- **MCP Server** - Exposes Chrome capabilities to MCP clients
+- **CLI Tool** - Direct command-line browser control
 
 ## Quick Start
 
-### 1. Install Chrome Extension
+1. **Install Chrome Extension**: Load `extension/` directory in Chrome developer mode
+2. **Install MCP Server**: Add to your MCP client configuration (see [CLAUDE.md](CLAUDE.md))
+3. **Test Connection**: Run health check and spawn test tab
 
-1. Open Chrome and navigate to `chrome://extensions/`
-2. Enable "Developer mode" (toggle in top right)
-3. Click "Load unpacked"
-4. Select the `extension/` directory from this project
-5. Extension should appear as "Claude Chrome MCP"
+## Key Features
 
-The extension will only activate on claude.ai pages and requires no configuration.
+- Async message sending with completion detection
+- Claude-to-Claude response forwarding
+- Conversation management via Claude.ai API
+- Network inspection and debugging tools
+- Multi-client WebSocket hub architecture
 
-### 2. Install MCP Server to Claude Desktop
+## Documentation
 
+| Guide | Description |
+|-------|-------------|
+| [**Getting Started**](docs/CONTINUATION.md) | Session continuation and standard workflow |
+| [**Architecture**](docs/ARCHITECTURE.md) | System design and components |
+| [**Troubleshooting**](docs/TROUBLESHOOTING.md) | Common issues and debugging methodology |
+| [**TypeScript**](docs/TYPESCRIPT.md) | Type definitions and development |
+| [**Restart Capability**](docs/RESTART-CAPABILITY.md) | MCP lifecycle management |
+| [**Event Architecture**](docs/event-driven-architecture-diagram.md) | Visual system diagrams |
+
+## Project Resources
+
+- [**MCP Configuration**](CLAUDE.md) - Quick commands and setup
+- [**Changelog**](CHANGELOG.md) - Release history  
+- [**Roadmap**](ROADMAP.md) - Planned features
+- [**GitHub Issue Script**](docs/create-claude-code-issue.sh) - Claude Code integration utilities
+
+## Installation
+
+### Chrome Extension
+1. Navigate to `chrome://extensions/` in Chrome
+2. Enable "Developer mode" 
+3. Click "Load unpacked" and select `extension/` directory
+
+### MCP Server
 ```bash
-cd mcp-server
-npm install
+cd mcp-server && npm install
 ```
 
-Add to Claude Desktop's MCP configuration (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
+Add to your MCP client configuration (see [CLAUDE.md](CLAUDE.md) for examples).
 
-```json
-{
-  "mcpServers": {
-    "claude-chrome-mcp": {
-      "command": "node",
-      "args": ["/path/to/claude-chrome-mcp/mcp-server/src/server.js"]
-    }
-  }
-}
-```
-
-Replace `/path/to/claude-chrome-mcp` with your actual project path.
-
-Claude Desktop will start the MCP server on launch.
-
-Refer to MCP server installation instructions for Claude Code, Cursor, and other MCP clients.
-
-### 3. Install CLI Tool
-
+### CLI Tool (Optional)
 ```bash
-cd cli
-npm install
-npm run build
-npm link  # Makes 'ccm' command globally available
+cd cli && npm install && npm run build && npm link
 ```
 
-## Testing
-
-1. **Verify Extension**: Load extension in Chrome and visit claude.ai
-2. **Check Claude Desktop MCP**: Start Claude Desktop with MCP config, should show "Extension connected" 
-3. **Test Claude Desktop**: Ask Claude to "spawn a new Claude tab" or "get Claude sessions"
-4. **Test CLI Tool**: Run `ccm sessions` to verify CLI connection to port 54322
-5. **Multi-Client Test**: Use both Claude Desktop and CLI simultaneously
-
-## Usage
-
-### MCP Tools
-
-#### Core Browser Automation
-- `spawn_claude_dot_ai_tab` - Create new Claude.ai tab with async support
-- `get_claude_dot_ai_tabs` - List active Claude tabs with conversation IDs  
-- `send_message_async` - Send messages with async completion detection
-- `get_claude_dot_ai_response` - Get latest responses with event-driven completion
-- `close_claude_dot_ai_tab` - Close tabs with optional force flag
-
-#### Advanced Workflows (NEW in 2.4.1)
-- `forward_response_to_claude_dot_ai_tab` - Forward responses between Claude instances
-  - Template-based message transformation
-  - Regex extraction and text processing
-  - Full async operation support
-  - Enables sophisticated Claude-to-Claude automation
-
-#### Conversation Management
-- `get_claude_conversations` - Fetch conversation list from Claude.ai API
-- `delete_claude_conversation` - Delete conversations via API
-- `bulk_delete_conversations` - Safely delete multiple conversations
-- `open_claude_dot_ai_conversation_tab` - Open specific conversations by ID
-- `search_claude_conversations` - Search conversations with filters
-
-#### Development & Debugging  
-- `get_connection_health` - Monitor system health and connectivity
-- `debug_claude_dot_ai_page` - Attach Chrome debugger for advanced operations
-- `execute_script` - Run JavaScript in tabs
-- `get_dom_elements` - Query DOM elements
-- Network monitoring tools for API discovery
-
-### CLI Usage
-
-The `ccm` command-line tool provides direct control over Claude.ai tabs:
-
-#### Basic Commands
-
-```bash
-# List all Claude.ai sessions
-ccm sessions
-
-# Create a new Claude tab
-ccm spawn
-
-# Send a message to a specific tab
-ccm send 123456789 "Hello, Claude!"
-
-# Get the latest response from a tab
-ccm response 123456789
-
-# Execute JavaScript in a tab
-ccm script 123456789 "document.title"
-
-# Query DOM elements
-ccm elements 123456789 ".message"
-```
-
-#### Advanced Usage
-
-```bash
-# Show detailed session information
-ccm sessions --json
-
-# Create tab and wait for it to load
-ccm spawn --wait 10
-
-# Send message and wait for response
-ccm send 123456789 "What is 2+2?" --wait --timeout 30
-
-# Execute script from file
-ccm script 123456789 --file my-script.js
-
-# Get only text content from latest response
-ccm response 123456789 --raw
-
-# Count matching elements
-ccm elements 123456789 ".conversation" --count
-
-# Attach/detach debugger manually
-ccm attach 123456789
-ccm attach 123456789 --detach
-```
-
-#### Global Options
-
-```bash
-# Use Claude Desktop server (port 54321)
-ccm --server ws://localhost:54321 sessions
-
-# Enable verbose logging
-ccm --verbose send 123456789 "Hello"
-
-# Disable colored output
-ccm --no-color sessions
-```
-
-#### Getting Tab IDs
-
-To get tab IDs for use with other commands:
-
-```bash
-# List sessions with IDs
-ccm sessions
-
-# Use in scripts
-TAB_ID=$(ccm sessions --quiet | head -1)
-ccm send $TAB_ID "Hello from script!"
-```
-
-## Multi-Client Architecture
+## Architecture
 
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Claude Web    │    │  Chrome Extension│◄──►│  Claude Desktop │
-│                 │    │  Multi-Server    │    │  MCP Server     │
-└─────────────────┘    │  Connection Mgr  │    │  (Port 54321)   │
-         ▲              │  - Port 54321 ✅ │    └─────────────────┘
-         │              │  - Port 54322 ✅ │           
+│   Claude.ai     │    │  Chrome Extension│◄──►│  Claude Desktop │
+│   (Browser)     │    │  WebSocket Hub   │    │  MCP Client     │
+└─────────────────┘    │                  │    └─────────────────┘
+         ▲              │                  │           
          │              │                  │◄──►┌─────────────────┐
          └──────────────┤                  │    │  Claude Code    │
-                        │                  │    │  WebSocket      │
-                        └──────────────────┘    │  (Port 54322)   │
-                                                └─────────────────┘
-                                                        ▲
-                                                        │
-                                                ┌─────────────────┐
-                                                │   CCM CLI Tool  │
-                                                │  (Port 54322)   │
-                                                └─────────────────┘
+                        │                  │    │  MCP Client     │
+                        └──────────────────┘    └─────────────────┘
 ```
-
-## TypeScript Support
-
-The project includes comprehensive TypeScript type definitions for all APIs:
-
-```typescript
-import { 
-  ClaudeTab, 
-  SendMessageResponse,
-  MCPToolName 
-} from '@claude-chrome-mcp/shared';
-
-// All tool parameters and responses are fully typed
-const response: SendMessageResponse = await client.sendMessage({
-  tabId: 123,
-  message: "Hello, Claude!",
-  waitForReady: true
-});
-```
-
-See [TypeScript Types Documentation](shared/TYPES.md) for complete API reference and examples.

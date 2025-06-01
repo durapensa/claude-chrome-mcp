@@ -245,4 +245,9 @@ When adding new tools or modifying APIs:
 - `/shared/types.ts` - Core types (existing)
 - `/shared/mcp-tool-types.ts` - MCP tool specific types
 - `/shared/index.ts` - Central export point
+
+## Related Documentation
+
+- [**Architecture**](ARCHITECTURE.md) - System design and component overview
+- [**Troubleshooting**](TROUBLESHOOTING.md) - Common issues and debugging for type-related problems
 - `/tests/test-typescript-types.ts` - Type compilation tests
