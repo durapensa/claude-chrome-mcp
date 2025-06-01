@@ -136,3 +136,15 @@ dist
 .pnp.*
 test-discovery-output/
 discovery-data/
+
+# Runtime state files
+*.operations-state.json
+.operations-state.json
+
+# AI tool state and memory directories
+.goose/
+*/.goose/
+
+# Claude Code local settings (explicit, redundant but clear)
+.claude/settings.local.json
+*/.claude/settings.local.json
