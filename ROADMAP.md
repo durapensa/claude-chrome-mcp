@@ -1,6 +1,17 @@
 # Roadmap
 
-## Recently Completed (January 30, 2025) ✅
+## Recently Completed (June 1, 2025) ✅
+
+### Advanced Async Workflows & Claude Code Integration
+- ✅ `forward_response_to_claude_dot_ai_tab` tool for Claude-to-Claude automation
+- ✅ Template-based message transformation with regex extraction capabilities
+- ✅ Async-by-default architecture validation and comprehensive testing
+- ✅ Enhanced MCP tool descriptions with async usage guidance
+- ✅ Extension hub connection stability improvements
+- ✅ Conversation API reliability enhancements
+- ✅ Claude Code ecosystem integration research and issue creation
+
+### Infrastructure Foundations (January 30, 2025) ✅
 
 ### Infrastructure & Testing
 - ✅ Test lifecycle management with automatic cleanup
@@ -12,7 +23,37 @@
 - ✅ Comprehensive test documentation
 - ✅ Verified all MCP tools working correctly
 
-## Q1 2025
+## Immediate Priorities (Q2-Q3 2025)
+
+### Claude Code MCP Integration
+- [ ] **MCP Notification-Driven Auto-Resume**: Implement async operation completion triggers
+  - Automatic continuation when MCP operations complete
+  - Smart context preservation across async boundaries  
+  - Todo list integration for operation state management
+  - Configuration system for customizable auto-resume behavior
+  - [GitHub Issue Created](https://github.com/anthropics/claude-code/issues) for community collaboration
+
+### Advanced Multi-Claude Workflows  
+- [ ] **Chain Operation Templates**: Pre-built automation patterns
+  - Research workflows across multiple Claude instances
+  - A/B testing automation with cross-instance comparison
+  - Content generation pipelines with validation stages
+  - Multi-step analysis with distributed processing
+
+- [ ] **Workflow Orchestration Engine**: Declarative automation configuration
+  - YAML/JSON workflow definitions
+  - Conditional branching based on response analysis  
+  - Error handling and retry logic for complex pipelines
+  - State persistence across workflow steps
+
+### Enhanced Browser Automation
+- [ ] **Visual Interaction Capabilities**: Expand beyond text-based automation
+  - Screenshot analysis and visual element detection
+  - Form filling and interaction automation
+  - Page navigation and state management
+  - Cross-tab coordination for complex user flows
+
+## Q1 2025 (Completed & In Progress)
 
 ### Test Architecture Improvements
 - [ ] Refactor test suite to use shared MCP connections
@@ -44,7 +85,23 @@
 - [ ] Conversation templates and quick starts
 - [ ] Export to multiple formats (PDF, DOCX)
 
-## Q2 2025
+## Long-Term Vision (Q4 2025 & Beyond)
+
+### Ecosystem Integration
+- [ ] **Claude Code Native Integration**: Official MCP server inclusion
+  - Standardized async operation patterns
+  - Built-in support for browser automation workflows
+  - Seamless Claude-to-Claude communication protocols
+  - Community-driven workflow sharing platform
+
+### Enterprise Automation Platform
+- [ ] **Multi-Tenant Claude Orchestration**: Scale to enterprise workflows
+  - Role-based access control for Claude instances
+  - Audit logging and compliance features
+  - Resource management and scaling controls
+  - Integration with enterprise identity providers
+
+## Q2-Q3 2025
 
 ### Architecture Enhancements
 

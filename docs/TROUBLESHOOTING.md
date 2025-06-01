@@ -54,6 +54,39 @@ After applying the fix, verify:
 2. Run `node shared/check-hub-status.js` - should show hub running
 3. Extension popup should show "Connected to port 54321"
 
+## Async Operation Issues
+
+### Async Operations Not Completing
+**Symptoms**: Operation returns `operationId` but never sends completion notification.
+
+**Diagnosis**:
+1. Check if DOM observer is working: Look for console messages in Claude.ai tab
+2. Verify operation is in state file: `cat .operations-state.json`
+3. Check MCP server logs for notification sending
+
+**Fixes**:
+1. **Reload Claude.ai tab**: DOM observer may have detached
+2. **Restart MCP server**: Recovers operations from state file
+3. **Check content script injection**: Ensure content script is properly injected
+
+### Forward Response Tool Issues
+**Symptoms**: `forward_response_to_claude_dot_ai_tab` returns operation ID but message doesn't appear in target tab.
+
+**Fixes**:
+1. **Verify target tab**: Ensure target tab ID is valid and tab is active
+2. **Check template syntax**: Ensure `{response}` placeholder is properly formatted
+3. **Wait for source completion**: Source tab must have completed response before forwarding
+
+### MCP Notification Delays
+**Symptoms**: Operations complete but notifications arrive late or not at all.
+
+**Diagnosis**: Check WebSocket connection health with `get_connection_health`
+
+**Fixes**:
+1. **Restart extension**: May resolve WebSocket notification issues
+2. **Check network connectivity**: Ensure localhost connections aren't blocked
+3. **Verify hub is running**: `lsof -i :54321` should show active connection
+
 ## Other Common Issues
 
 ### Extension Doesn't Auto-Reconnect After Inactivity

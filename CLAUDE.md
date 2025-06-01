@@ -8,7 +8,7 @@ Quick reference for Claude. See README.md for full documentation.
 - Status: TESTING ASYNC-BY-DEFAULT - Core workflows validated, comprehensive testing in progress
 
 ## Important System Limitations
-- Claude Code cannot restart its own MPC servers. User must exit and re-run Claude Code if claude-code-mcp tools are not avilable
+- Claude Code cannot restart its own MPC servers. User must exit and re-run Claude Code if claude-chrome-mcp tools are not avilable
 
 ## Quick Commands
 ```bash
@@ -21,6 +21,9 @@ mcp__claude-chrome-mcp__send_message_async --message "Test async: 7*8=?" --tabId
 
 # 3. Get response after completion
 mcp__claude-chrome-mcp__get_claude_dot_ai_response --tabId <tab_id>
+
+# 4. Test Claude-to-Claude forwarding (NEW in 2.4.1)
+mcp__claude-chrome-mcp__forward_response_to_claude_dot_ai_tab --sourceTabId <source> --targetTabId <target>
 ```
 
 ## Important Tool Options
@@ -60,8 +63,14 @@ When you type 'continue', the system is ready for development and testing:
 1. **System Health**: `get_connection_health` - verify hub and clients connected
 2. **Spawn Tab**: `spawn_claude_dot_ai_tab --injectContentScript true` 
 3. **Async Message**: `send_message_async --message "test" --tabId <id>`
-4. **Wait for Completion**: `wait_for_operation --operationId <id>`
-5. **Get Response**: `get_claude_dot_ai_response --tabId <id>`
+4. **Get Response**: `get_claude_dot_ai_response --tabId <id>` (auto-completion detection)
+5. **Claude-to-Claude**: `forward_response_to_claude_dot_ai_tab --sourceTabId <src> --targetTabId <tgt>`
+
+## Claude Code Integration Status
+- **GitHub Issue Created**: MCP Notification-Driven Auto-Resume for Async Operations
+- **Issue Script**: `docs/create-claude-code-issue.sh` - submitted to anthropics/claude-code  
+- **Integration Gap**: Claude Code needs async operation completion triggers
+- **Workaround**: Manual polling until auto-resume is implemented
 
 ## Development Guidelines
 - **Code Hygiene**: Delete backup/test files immediately after confirming working solution

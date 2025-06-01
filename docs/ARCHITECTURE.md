@@ -44,6 +44,34 @@ Claude.ai Tabs
 4. **Execute Command**: Extension performs action on Claude.ai tab
 5. **Return Result**: Reverse path back to Claude Desktop
 
+## Async Operation Architecture
+
+### Event-Driven Completion Detection (Version 2.4.0+)
+- **Operation Manager**: Tracks async operations with unique operation IDs
+- **Notification Manager**: Real-time progress updates via MCP protocol
+- **Conversation Observer**: DOM MutationObserver for milestone detection
+- **State Persistence**: Operations survive server restarts via `.operations-state.json`
+
+### Milestone Detection System
+- `message_sent`: Detects when messages are successfully sent to Claude.ai
+- `response_started`: Detects when Claude begins responding
+- `response_completed`: Detects when responses are fully rendered
+- Real-time notifications via MCP `notifications/progress` method
+
+### Async Tool Pattern
+```javascript
+// Async tools return immediately with operation ID
+{
+  "operationId": "send_message_1234567890_abcdef",
+  "status": "started",
+  "type": "send_message", 
+  "timestamp": 1234567890
+}
+
+// Completion detected via DOM events, not timeouts
+// MCP notification sent automatically on completion
+```
+
 ## Key Design Decisions
 
 ### WebSocket Hub Architecture

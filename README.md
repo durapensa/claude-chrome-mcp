@@ -76,15 +76,30 @@ npm link  # Makes 'ccm' command globally available
 
 ### MCP Tools
 
-- `spawn_claude_tab` - Create new Claude.ai tab
-- `get_claude_tabs` - List active Claude tabs with conversation IDs
+#### Core Browser Automation
+- `spawn_claude_dot_ai_tab` - Create new Claude.ai tab with async support
+- `get_claude_dot_ai_tabs` - List active Claude tabs with conversation IDs  
+- `send_message_async` - Send messages with async completion detection
+- `get_claude_dot_ai_response` - Get latest responses with event-driven completion
+- `close_claude_dot_ai_tab` - Close tabs with optional force flag
+
+#### Advanced Workflows (NEW in 2.4.1)
+- `forward_response_to_claude_dot_ai_tab` - Forward responses between Claude instances
+  - Template-based message transformation
+  - Regex extraction and text processing
+  - Full async operation support
+  - Enables sophisticated Claude-to-Claude automation
+
+#### Conversation Management
 - `get_claude_conversations` - Fetch conversation list from Claude.ai API
-- `send_message_to_claude_tab` - Send messages to Claude sessions
-- `get_claude_response` - Get latest responses
 - `delete_claude_conversation` - Delete conversations via API
-- `open_claude_conversation_tab` - Open specific conversations by ID
-- `close_claude_tab` - Close tabs with optional force flag
-- `debug_attach` - Attach Chrome debugger
+- `bulk_delete_conversations` - Safely delete multiple conversations
+- `open_claude_dot_ai_conversation_tab` - Open specific conversations by ID
+- `search_claude_conversations` - Search conversations with filters
+
+#### Development & Debugging  
+- `get_connection_health` - Monitor system health and connectivity
+- `debug_claude_dot_ai_page` - Attach Chrome debugger for advanced operations
 - `execute_script` - Run JavaScript in tabs
 - `get_dom_elements` - Query DOM elements
 - Network monitoring tools for API discovery

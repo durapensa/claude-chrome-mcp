@@ -1,5 +1,71 @@
 # Changelog
 
+## 2025-06-01 - Version 2.4.1: Advanced Async Workflows & Claude Code Integration
+
+### Added
+- **`forward_response_to_claude_dot_ai_tab` Tool**: Revolutionary Claude-to-Claude automation capability
+  - Forward responses between Claude instances seamlessly
+  - Template-based message transformation with `{response}` placeholder
+  - Text processing with `prefixText`, `suffixText`, and regex `extractPattern`
+  - Full async support with operation tracking and completion detection
+  - Enables sophisticated multi-Claude workflows and automation pipelines
+
+- **Enhanced MCP Tool Descriptions**: Comprehensive async-by-default guidance
+  - All tools updated with detailed async usage patterns
+  - Clear recommendations for `waitForCompletion` usage
+  - Explicit guidance on when to use sync vs async modes
+  - Improved developer experience for MCP host integration
+
+### Fixed
+- **Extension Hub Connection Race Conditions**: Critical reliability improvements
+  - Fixed popup display issues during WebSocket reconnection
+  - Enhanced connection state management for smoother user experience
+  - Better handling of service worker suspension/wake cycles
+  - Improved Chrome extension stability under stress
+
+- **Conversation API Reliability**: Enhanced bulk operations and error handling
+  - Improved CLI tool mappings for better command consistency
+  - Enhanced bulk delete testing with comprehensive validation
+  - Better error reporting and recovery for conversation operations
+  - More robust conversation management across multiple sessions
+
+### Architecture Improvements
+- **Async-by-Default Philosophy**: Complete shift to async-first design
+  - All new tools designed with async operations as the primary mode
+  - Sync modes available as optional fallback for specific use cases
+  - Better alignment with modern async programming patterns
+  - Enhanced scalability for complex automation workflows
+
+- **Claude Code Integration Discovery**: Major ecosystem development
+  - Identified async workflow gaps in Claude Code MCP notification handling
+  - Created comprehensive GitHub issue for MCP notification-driven auto-resume
+  - Developed `docs/create-claude-code-issue.sh` for community contribution
+  - Established foundation for future Claude Code ecosystem improvements
+
+### Developer Experience
+- **Enhanced Documentation**: Comprehensive async workflow guidance
+  - Updated CLAUDE.md with latest async patterns and best practices
+  - Clearer tool usage examples and workflow recommendations
+  - Better troubleshooting guidance for async operations
+  - Improved onboarding for new developers
+
+### Breaking Changes
+- **Tool Behavior Updates**: Async-by-default for new tools
+  - `forward_response_to_claude_dot_ai_tab` operates async by default
+  - Enhanced existing tools maintain backward compatibility
+  - New async patterns may require workflow adjustments for advanced users
+
+### Technical Implementation
+- **Files Modified**:
+  - `mcp-server/src/server.js`: Added forward_response tool with advanced templating
+  - `extension/background.js`: Enhanced connection stability and popup handling
+  - `extension/popup.js`: Improved reconnection logic and user feedback
+  - `docs/create-claude-code-issue.sh`: New script for community contribution
+- **Testing**: Validated async workflows and Claude-to-Claude communication
+  - Comprehensive testing of forward_response functionality
+  - End-to-end async workflow validation
+  - Performance testing under various connection conditions
+
 ## 2025-05-31 - Version 2.4.0: Event-Driven Completion Detection
 
 ### Added
