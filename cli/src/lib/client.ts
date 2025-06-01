@@ -196,7 +196,7 @@ export class CCMClient {
   // Public API methods using MCP tools
   
   async getClaudeTabs(): Promise<ClaudeTab[]> {
-    const result = await this.sendMCPToolCall('get_claude_tabs');
+    const result = await this.sendMCPToolCall('get_claude_dot_ai_tabs');
     
     // Handle error responses
     if (result.text && result.text.includes('Error:')) {
@@ -233,7 +233,7 @@ export class CCMClient {
   }
 
   async spawnClaudeTab(url: string = 'https://claude.ai'): Promise<{ id: number; url: string; title: string }> {
-    return await this.sendMCPToolCall('spawn_claude_tab', { url });
+    return await this.sendMCPToolCall('spawn_claude_dot_ai_tab', { url });
   }
 
   async attachDebugger(tabId: number): Promise<{ attached: boolean }> {
@@ -250,11 +250,11 @@ export class CCMClient {
   }
 
   async sendMessage(tabId: number, message: string): Promise<MessageResponse> {
-    return await this.sendMCPToolCall('send_message_to_claude_tab', { tabId, message });
+    return await this.sendMCPToolCall('send_message_to_claude_dot_ai_tab', { tabId, message });
   }
 
   async getLatestResponse(tabId: number): Promise<any> {
-    return await this.sendMCPToolCall('get_claude_response', { tabId });
+    return await this.sendMCPToolCall('get_claude_dot_ai_response', { tabId });
   }
 
   async getDOMElements(tabId: number, selector: string): Promise<any[]> {

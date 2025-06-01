@@ -441,6 +441,7 @@ class CCMExtensionHub {
     const { type, requestId, sourceClientId, sourceClientName } = message;
     
     console.log(`CCM Extension: Handling ${type} from ${sourceClientName} (requestId: ${requestId})`);
+    console.log(`CCM Extension: Full message:`, JSON.stringify(message, null, 2));
 
     try {
       let result;
@@ -454,8 +455,9 @@ class CCMExtensionHub {
           
         case 'get_claude_conversations':
           console.log('CCM Extension: Getting Claude conversations...');
+          console.log('CCM Extension: Request ID:', requestId);
           result = await this.getClaudeConversations();
-          console.log('CCM Extension: Found', result.length, 'conversations');
+          console.log('CCM Extension: getClaudeConversations returned:', result?.length || 'error');
           break;
           
         case 'spawn_claude_dot_ai_tab':
@@ -584,6 +586,7 @@ class CCMExtensionHub {
       // Send response back through hub
       if (this.hubConnection && this.hubConnection.readyState === WebSocket.OPEN) {
         console.log(`CCM Extension: Sending response for ${type} (requestId: ${requestId})`);
+        console.log(`CCM Extension: Response result:`, result ? 'SUCCESS' : 'NULL/UNDEFINED');
         this.hubConnection.send(JSON.stringify({
           type: 'response',
           requestId,
@@ -597,9 +600,11 @@ class CCMExtensionHub {
       
     } catch (error) {
       console.error(`CCM Extension: Error handling ${type} from ${sourceClientName}:`, error);
+      console.error(`CCM Extension: Error stack:`, error.stack);
       
       // Send error back through hub
       if (this.hubConnection && this.hubConnection.readyState === WebSocket.OPEN) {
+        console.log(`CCM Extension: Sending error response for ${type} (requestId: ${requestId})`);
         this.hubConnection.send(JSON.stringify({
           type: 'error',
           requestId,
@@ -775,9 +780,11 @@ class CCMExtensionHub {
   }
 
   async getClaudeConversations() {
+    console.log('CCM: getClaudeConversations called');
     try {
-      // First get current Claude tabs to match with conversations
+      // Get current Claude tabs to match with conversations
       const claudeTabs = await this.getClaudeTabs();
+      console.log('CCM: Found', claudeTabs.length, 'Claude tabs');
       const tabsByConversationId = new Map();
       
       claudeTabs.forEach(tab => {
@@ -786,23 +793,27 @@ class CCMExtensionHub {
         }
       });
 
-      // Find a Claude tab to execute the API call from
-      let claudeTab = claudeTabs.find(tab => tab.url.includes('claude.ai'));
-      
+      // Use first available Claude tab - no creation logic
+      const claudeTab = claudeTabs.find(tab => tab.url.includes('claude.ai'));
       if (!claudeTab) {
-        // Create a temporary Claude tab for the API call
-        claudeTab = await this.createClaudeTab();
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for page load
+        throw new Error('No Claude.ai tab found. Please open claude.ai first.');
       }
+      
+      console.log('CCM: Using Claude tab:', claudeTab.id);
 
-      // Attach debugger to execute script
-      await this.ensureDebuggerAttached(claudeTab.id);
-
-      // Execute script to fetch conversations from Claude API with timeout handling
+      // Test simple script first
+      console.log('CCM: Testing simple script');
+      const testResult = await this.executeScript({ 
+        tabId: claudeTab.id, 
+        script: '2 + 2',
+        timeout: 2000
+      });
+      console.log('CCM: Simple script result:', testResult);
+      
+      // Execute script to fetch conversations from Claude API 
       const conversationsScript = `
         (async function() {
           try {
-            // Extract organization ID from cookies
             const cookies = document.cookie;
             const orgMatch = cookies.match(/lastActiveOrg=([^;]+)/);
             if (!orgMatch) {
@@ -810,7 +821,7 @@ class CCMExtensionHub {
             }
             const orgId = orgMatch[1];
             
-            const response = await fetch('/api/organizations/' + orgId + '/chat_conversations?offset=0&limit=30', {
+            const response = await fetch('/api/organizations/' + orgId + '/chat_conversations?offset=0&limit=5', {
               method: 'GET',
               headers: {
                 'Accept': 'application/json',
@@ -823,17 +834,18 @@ class CCMExtensionHub {
               throw new Error('Failed to fetch conversations: ' + response.status);
             }
             
-            const data = await response.json();
-            return data;
+            return await response.json();
           } catch (error) {
             return { error: error.toString() };
           }
         })()
       `;
 
+      console.log('CCM: Executing API script');
       const result = await this.executeScript({ 
         tabId: claudeTab.id, 
-        script: conversationsScript 
+        script: conversationsScript,
+        timeout: 3000  // Short timeout for testing
       });
 
       const apiData = result.result?.value;
@@ -846,7 +858,7 @@ class CCMExtensionHub {
         throw new Error('Invalid API response format');
       }
 
-      // Transform the conversations to include tab IDs
+      // Transform conversations to include tab IDs
       const conversations = apiData.map(conv => ({
         id: conv.uuid,
         title: conv.name || 'Untitled Conversation',
@@ -857,6 +869,7 @@ class CCMExtensionHub {
         isOpen: tabsByConversationId.has(conv.uuid)
       }));
 
+      console.log('CCM: Successfully retrieved', conversations.length, 'conversations');
       return conversations;
 
     } catch (error) {

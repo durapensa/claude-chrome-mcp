@@ -1768,7 +1768,7 @@ class AutoHubClient {
     const requestId = `req-${++this.requestCounter}`;
     
     return new Promise((resolve, reject) => {
-      const timeoutMs = 30000; // Increased timeout
+      const timeoutMs = 10000; // Reduced timeout for faster debugging
       
       this.pendingRequests.set(requestId, { resolve, reject });
       
@@ -1966,7 +1966,7 @@ class ChromeMCPServer {
         tools: [
           {
             name: 'spawn_claude_dot_ai_tab',
-            description: 'Create a new Claude.ai tab. ASYNC-BY-DEFAULT: Use injectContentScript=true for async workflows. Returns immediately without waitForLoad/waitForReady unless explicitly needed.',
+            description: 'Create a new Claude.ai tab. ASYNC-BY-DEFAULT: Use injectContentScript=true and waitForLoad=false for optimal async performance. Tab becomes immediately usable for send_message_async workflows. Only set waitForLoad=true when you need guaranteed page readiness.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -2078,7 +2078,7 @@ class ChromeMCPServer {
           },
           {
             name: 'bulk_delete_conversations',
-            description: 'Delete multiple conversations with safety checks and progress tracking',
+            description: 'Delete multiple conversations with safety checks and progress tracking. ASYNC-BY-DEFAULT: Batch processing with configurable delays and comprehensive safety mechanisms. CRITICAL SAFETY: Always use dryRun=true first to preview deletions. Use conservative filtering (e.g., titleSearch for test conversations only). Never bulk delete without explicit user confirmation of specific conversations.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -2190,7 +2190,7 @@ class ChromeMCPServer {
           },
           {
             name: 'batch_send_messages',
-            description: 'Send messages to multiple Claude tabs simultaneously or sequentially. ASYNC-BY-DEFAULT: Supports parallel batch operations. Use sequential=false for async workflows with immediate return.',
+            description: 'Send messages to multiple Claude tabs simultaneously or sequentially. ASYNC-BY-DEFAULT: Optimal for parallel batch operations. Recommended workflow: use sequential=false for fastest execution, then use batch_get_responses or individual get_claude_dot_ai_response calls to retrieve completed responses.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -2265,7 +2265,7 @@ class ChromeMCPServer {
           },
           {
             name: 'send_message_async',
-            description: 'Send a message to a Claude tab with event-driven completion detection (returns immediately with operation ID)',
+            description: 'ASYNC-BY-DEFAULT: Send a message to a Claude tab with event-driven completion detection (returns immediately with operation ID). Primary tool for async message workflows. RECOMMENDED WORKFLOW: 1) call send_message_async, 2) wait briefly or perform other tasks, 3) use get_claude_dot_ai_response to retrieve completed response. Much faster than synchronous alternatives.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -2379,7 +2379,7 @@ class ChromeMCPServer {
           },
           {
             name: 'delete_claude_conversation',
-            description: 'Delete a conversation from Claude.ai using API (works from any Claude tab)',
+            description: 'Delete a conversation from Claude.ai using API (works from any Claude tab). SAFETY WARNING: Permanent deletion - cannot be undone. Verify conversation ID carefully before use.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -2453,7 +2453,7 @@ class ChromeMCPServer {
           },
           {
             name: 'close_claude_dot_ai_tab',
-            description: 'Close a specific Claude.ai tab by tab ID',
+            description: 'Close a specific Claude.ai tab by tab ID. SAFETY WARNING: Will close tab and lose any unsaved work. Use force=true only when necessary.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -2473,7 +2473,7 @@ class ChromeMCPServer {
           },
           {
             name: 'open_claude_dot_ai_conversation_tab',
-            description: 'Open a specific Claude conversation in a new tab using conversation ID',
+            description: 'Open a specific Claude conversation in a new tab using conversation ID. ASYNC-BY-DEFAULT: Use waitForLoad=false for immediate return.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -2543,7 +2543,7 @@ class ChromeMCPServer {
           },
           {
             name: 'batch_get_responses',
-            description: 'Get responses from multiple Claude tabs with polling and progress tracking. ASYNC-BY-DEFAULT: For completed responses only. Use after batch_send_messages or individual async operations complete.'
+            description: 'Get responses from multiple Claude tabs with polling and progress tracking. ASYNC-BY-DEFAULT: For completed responses only. Use after batch_send_messages or individual async operations complete. NOTE: Current implementation has readiness detection issues - recommend using individual get_claude_dot_ai_response calls until fixed.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -2566,6 +2566,11 @@ class ChromeMCPServer {
                   type: 'number',
                   description: 'Polling interval in milliseconds',
                   default: 1000
+                },
+                checkReadiness: {
+                  type: 'boolean',
+                  description: 'Whether to verify response readiness before fetching (default: true)',
+                  default: true
                 }
               },
               required: ['tabIds'],
@@ -2946,18 +2951,11 @@ class ChromeMCPServer {
       if (conversationIds && conversationIds.length > 0) {
         // Get all conversations and filter by provided IDs
         const allConversationsResult = await this.hubClient.sendRequest('get_claude_conversations');
-        if (!allConversationsResult || !allConversationsResult.data) {
+        if (!allConversationsResult || !Array.isArray(allConversationsResult)) {
           throw new Error('Failed to retrieve conversations');
         }
         
-        let allConversations;
-        if (typeof allConversationsResult.data === 'string') {
-          allConversations = JSON.parse(allConversationsResult.data);
-        } else {
-          allConversations = allConversationsResult.data;
-        }
-        
-        targetConversations = allConversations.filter(conv => conversationIds.includes(conv.id));
+        targetConversations = allConversationsResult.filter(conv => conversationIds.includes(conv.id));
         
       } else if (filterCriteria) {
         // Use search functionality to find conversations based on criteria
@@ -3024,6 +3022,14 @@ class ChromeMCPServer {
         };
       }
       
+      // Get a Claude tab for executing delete operations
+      const tabsResult = await this.hubClient.sendRequest('get_claude_dot_ai_tabs');
+      const claudeTab = Array.isArray(tabsResult) ? tabsResult.find(tab => tab.url.includes('claude.ai')) : null;
+      
+      if (!claudeTab) {
+        throw new Error('No Claude.ai tab found. Please open claude.ai first.');
+      }
+      
       // Perform actual deletion in batches
       const results = {
         deleted: 0,
@@ -3041,29 +3047,22 @@ class ChromeMCPServer {
         const batchPromises = batch.map(async (conv) => {
           try {
             const deleteResult = await this.hubClient.sendRequest('delete_claude_conversation', {
+              tabId: claudeTab.id,
               conversationId: conv.id
             });
             
-            // Check if deletion was successful
-            if (deleteResult && deleteResult.data) {
-              const deleteData = typeof deleteResult.data === 'string' 
-                ? JSON.parse(deleteResult.data) 
-                : deleteResult.data;
-              
-              if (deleteData.success) {
-                results.deleted++;
-                results.deletedConversations.push({
-                  id: conv.id,
-                  title: conv.title
-                });
-                return { success: true, conversation: conv };
-              } else {
-                results.errors.push(`Failed to delete "${conv.title}": ${deleteData.error || 'Unknown error'}`);
-                return { success: false, conversation: conv, error: deleteData.error };
-              }
+            // Check if deletion was successful - deleteResult is direct response now
+            if (deleteResult && deleteResult.success) {
+              results.deleted++;
+              results.deletedConversations.push({
+                id: conv.id,
+                title: conv.title
+              });
+              return { success: true, conversation: conv };
             } else {
-              results.errors.push(`Failed to delete "${conv.title}": No response from server`);
-              return { success: false, conversation: conv, error: 'No response' };
+              const errorMsg = deleteResult?.reason || deleteResult?.error || 'Unknown error';
+              results.errors.push(`Failed to delete "${conv.title}": ${errorMsg}`);
+              return { success: false, conversation: conv, error: errorMsg };
             }
           } catch (error) {
             results.errors.push(`Failed to delete "${conv.title}": ${error.message}`);
