@@ -72,6 +72,9 @@ When you type 'continue', the system is ready for development and testing:
 - **Integration Gap**: Claude Code needs async operation completion triggers
 - **Workaround**: Manual polling until auto-resume is implemented
 
+## Current Session Context
+- **Active Session**: See `docs/SESSION-2025-06-01.md` for current progress and restart checkpoint
+
 ## Development Guidelines
 - **Code Hygiene**: Delete backup/test files immediately after confirming working solution
 - **Documentation**: Keep docs architectural, not session-specific
