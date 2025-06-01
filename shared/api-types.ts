@@ -176,6 +176,19 @@ export interface GetConnectionHealthParams {
   // No parameters
 }
 
+export interface ForwardResponseToClaudeTabParams {
+  sourceTabId: number;
+  targetTabId: number;
+  template?: string;
+  prefixText?: string;
+  suffixText?: string;
+  extractPattern?: string;
+  waitForCompletion?: boolean; // defaults to true
+  waitForReady?: boolean; // defaults to true
+  timeoutMs?: number; // defaults to 30000
+  maxRetries?: number; // defaults to 3
+}
+
 // ============================================================================
 // MCP Tool Responses
 // ============================================================================
@@ -249,6 +262,13 @@ export interface BatchSendMessagesResponse {
     durationMs: number;
   };
   results: BatchSendResult[];
+}
+
+export interface ForwardResponseResult {
+  operationId: string;
+  status: 'started';
+  type: 'forward_response';
+  timestamp: number;
 }
 
 export interface ConversationMessage {

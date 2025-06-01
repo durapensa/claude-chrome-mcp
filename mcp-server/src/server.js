@@ -2585,6 +2585,61 @@ class ChromeMCPServer {
               properties: {},
               additionalProperties: false
             }
+          },
+          {
+            name: 'forward_response_to_claude_dot_ai_tab',
+            description: 'ASYNC-BY-DEFAULT: Forward a response from one Claude tab to another with optional processing (regex extraction, template substitution, prefix/suffix). Enables automated Claude-to-Claude workflows and response pipelines.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                sourceTabId: {
+                  type: 'number',
+                  description: 'Tab ID to get response from'
+                },
+                targetTabId: {
+                  type: 'number', 
+                  description: 'Tab ID to send processed response to'
+                },
+                template: {
+                  type: 'string',
+                  description: 'Optional template with {response} placeholder for response formatting'
+                },
+                prefixText: {
+                  type: 'string',
+                  description: 'Text to prepend to the response'
+                },
+                suffixText: {
+                  type: 'string',
+                  description: 'Text to append to the response'
+                },
+                extractPattern: {
+                  type: 'string',
+                  description: 'Regex pattern to extract specific parts of the response'
+                },
+                waitForCompletion: {
+                  type: 'boolean',
+                  description: 'Wait for source response completion (default: true)',
+                  default: true
+                },
+                waitForReady: {
+                  type: 'boolean',
+                  description: 'Wait for target tab readiness (default: true)',
+                  default: true
+                },
+                timeoutMs: {
+                  type: 'number',
+                  description: 'Timeout for source response in milliseconds (default: 30000)',
+                  default: 30000
+                },
+                maxRetries: {
+                  type: 'number',
+                  description: 'Max retries for failed operations (default: 3)',
+                  default: 3
+                }
+              },
+              required: ['sourceTabId', 'targetTabId'],
+              additionalProperties: false
+            }
           }
         ]
       };
@@ -2681,6 +2736,9 @@ class ChromeMCPServer {
             break;
           case 'get_connection_health':
             result = await this.hubClient.sendRequest('get_connection_health', args);
+            break;
+          case 'forward_response_to_claude_dot_ai_tab':
+            result = await this.handleForwardResponseAsync(args);
             break;
           default:
             throw new Error(`Unknown tool: ${name}`);
@@ -3234,6 +3292,149 @@ class ChromeMCPServer {
       operationId,
       status: 'started',
       type: 'send_message',
+      timestamp: Date.now()
+    };
+  }
+
+  async handleForwardResponseAsync(args) {
+    const { 
+      sourceTabId, 
+      targetTabId, 
+      template, 
+      prefixText, 
+      suffixText, 
+      extractPattern,
+      waitForCompletion = true,
+      waitForReady = true,
+      timeoutMs = 30000,
+      maxRetries = 3
+    } = args;
+    
+    // Create operation
+    const operationId = operationManager.createOperation('forward_response', { 
+      sourceTabId, targetTabId, waitForCompletion, waitForReady, timeoutMs, maxRetries
+    });
+    
+    // Register operation with content script observer
+    try {
+      await this.hubClient.sendRequest('send_content_script_message', {
+        tabId: targetTabId,
+        message: {
+          type: 'register_operation',
+          operationId,
+          operationType: 'forward_response',
+          params: { sourceTabId, targetTabId, waitForCompletion, waitForReady }
+        }
+      });
+    } catch (error) {
+      console.warn('[handleForwardResponseAsync] Failed to register operation with observer:', error);
+    }
+    
+    // Start the forward response operation
+    setTimeout(async () => {
+      let attempt = 0;
+      while (attempt < maxRetries) {
+        try {
+          // 1. Get response from source tab
+          const responseResult = await this.hubClient.sendRequest('get_claude_dot_ai_response', { 
+            tabId: sourceTabId,
+            waitForCompletion,
+            timeoutMs,
+            includeMetadata: false
+          });
+          
+          if (!responseResult.success || !responseResult.text) {
+            throw new Error(`Failed to get response from source tab ${sourceTabId}: ${responseResult.reason || 'No response text'}`);
+          }
+          
+          let processedMessage = responseResult.text;
+          
+          // Update milestone: response retrieved
+          operationManager.updateOperation(operationId, 'response_retrieved');
+          if (!global.observerRegistered) {
+            notificationManager.sendProgress(operationId, 'response_retrieved', { 
+              sourceTabId, responseLength: processedMessage.length 
+            });
+          }
+          
+          // 2. Apply processing pipeline in specified order
+          
+          // First: Extract using regex pattern if provided
+          if (extractPattern) {
+            try {
+              const regex = new RegExp(extractPattern);
+              const match = processedMessage.match(regex);
+              if (match) {
+                // Use the first capture group if available, otherwise the full match
+                processedMessage = match[1] || match[0];
+              } else {
+                console.warn(`[handleForwardResponseAsync] Regex pattern "${extractPattern}" did not match any content`);
+                // Continue with original text if no match
+              }
+            } catch (regexError) {
+              console.warn(`[handleForwardResponseAsync] Invalid regex pattern "${extractPattern}":`, regexError);
+              // Continue with original text if regex is invalid
+            }
+          }
+          
+          // Second: Apply template substitution if provided
+          if (template) {
+            processedMessage = template.replace(/\{response\}/g, processedMessage);
+          }
+          
+          // Third: Add prefix and suffix text if provided
+          if (prefixText) {
+            processedMessage = prefixText + processedMessage;
+          }
+          if (suffixText) {
+            processedMessage = processedMessage + suffixText;
+          }
+          
+          // Update milestone: processing complete
+          operationManager.updateOperation(operationId, 'processing_complete');
+          if (!global.observerRegistered) {
+            notificationManager.sendProgress(operationId, 'processing_complete', { 
+              processedLength: processedMessage.length 
+            });
+          }
+          
+          // 3. Send processed message to target tab
+          await this.hubClient.sendRequest('send_message_to_claude_dot_ai_tab', { 
+            tabId: targetTabId, 
+            message: processedMessage,
+            waitForReady 
+          });
+          
+          // Update milestone: message forwarded
+          operationManager.updateOperation(operationId, 'message_forwarded');
+          if (!global.observerRegistered) {
+            notificationManager.sendProgress(operationId, 'message_forwarded', { 
+              targetTabId, finalMessageLength: processedMessage.length 
+            });
+          }
+          
+          // Success - break retry loop
+          break;
+          
+        } catch (error) {
+          attempt++;
+          console.error(`[handleForwardResponseAsync] Attempt ${attempt}/${maxRetries} failed:`, error);
+          
+          if (attempt >= maxRetries) {
+            operationManager.updateOperation(operationId, 'error', { error: error.message });
+            notificationManager.sendError(operationId, error);
+          } else {
+            // Wait before retrying (exponential backoff)
+            await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+          }
+        }
+      }
+    }, 100);
+    
+    return {
+      operationId,
+      status: 'started',
+      type: 'forward_response',
       timestamp: Date.now()
     };
   }
