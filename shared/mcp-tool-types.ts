@@ -117,9 +117,8 @@ export interface GetClaudeDotAiResponseStatusParams {
 
 export interface BatchGetResponsesParams {
   tabIds: number[];
-  waitForAll?: boolean;
-  timeoutMs?: number;
-  pollIntervalMs?: number;
+  timeoutMs?: number;        // Reduced default timeout for immediate fetch
+  checkReadiness?: boolean;  // Optional readiness verification
 }
 
 export interface GetConnectionHealthParams {

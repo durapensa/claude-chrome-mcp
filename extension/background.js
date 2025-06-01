@@ -883,18 +883,23 @@ class CCMExtensionHub {
   }
 
   async executeScript(params) {
-    const { tabId, script } = params;
+    const { tabId, script, timeout = 10000 } = params;
     
     if (!this.debuggerSessions.has(tabId)) {
       await this.attachDebugger(tabId);
     }
 
     return new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        reject(new Error(`Script execution timeout after ${timeout}ms`));
+      }, timeout);
+
       chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
         expression: script,
         returnByValue: true,
         awaitPromise: true
       }, (result) => {
+        clearTimeout(timeoutId);
         if (chrome.runtime.lastError) {
           reject(new Error(chrome.runtime.lastError.message));
         } else {
@@ -963,7 +968,7 @@ class CCMExtensionHub {
   }
 
   async sendMessageToClaudeTab(params) {
-    const { tabId, message, waitForReady = true, maxRetries = 3 } = params;
+    const { tabId, message, waitForReady = false, maxRetries = 3 } = params;
     
     // Use message queue to prevent concurrent sends to same tab
     return this.messageQueue.enqueue(tabId, async () => {
@@ -980,7 +985,7 @@ class CCMExtensionHub {
   }
   
   async _sendMessageToClaudeTabInternal(params) {
-    const { tabId, message, waitForReady = true, maxRetries = 3 } = params;
+    const { tabId, message, waitForReady = false, maxRetries = 3 } = params;
     
     // Retry logic with exponential backoff
     let lastError = null;
@@ -1348,6 +1353,15 @@ class CCMExtensionHub {
     let lastTextLength = 0;
     let stableCount = 0;
     
+    // First check - if already complete and not generating, return immediately
+    const status = await this.getClaudeResponseStatus({ tabId });
+    if (status.status !== 'generating' && !status.isStreaming) {
+      const immediateResponse = await getResponseImmediate();
+      if (immediateResponse.success && immediateResponse.isComplete) {
+        return immediateResponse;
+      }
+    }
+    
     while (Date.now() - startTime < timeoutMs) {
       const response = await getResponseImmediate();
       
@@ -1357,7 +1371,13 @@ class CCMExtensionHub {
       
       // Check if response is complete
       if (response.isComplete) {
-        // Additional stability check: ensure text hasn't changed
+        // Check generation status to avoid stability check race condition
+        const currentStatus = await this.getClaudeResponseStatus({ tabId });
+        if (!currentStatus.isStreaming && currentStatus.status !== 'generating') {
+          return response; // Clearly complete, no stability check needed
+        }
+        
+        // Additional stability check for edge cases: ensure text hasn't changed
         if (lastResponse && lastResponse.text === response.text) {
           stableCount++;
           if (stableCount >= 2) { // Text stable for 2 checks
@@ -2352,7 +2372,7 @@ class CCMExtensionHub {
     const { 
       conversationId, 
       activate = true, 
-      waitForLoad = true, 
+      waitForLoad = false, 
       loadTimeoutMs = 10000 
     } = params;
     
@@ -2803,7 +2823,7 @@ class CCMExtensionHub {
         })()
       `;
       
-      const result = await this.executeScript({ tabId, script });
+      const result = await this.executeScript({ tabId, script, timeout: 5000 });
       
       return {
         success: true,
@@ -2827,106 +2847,67 @@ class CCMExtensionHub {
   async batchGetResponses(params) {
     const {
       tabIds,
-      timeoutMs = 30000,
-      waitForAll = true,
-      pollIntervalMs = 1000
+      timeoutMs = 5000,  // Reduced timeout - assume responses are ready
+      checkReadiness = true  // New param to optionally verify readiness
     } = params;
     
     const results = [];
     const startTime = Date.now();
     
     try {
-      if (waitForAll) {
-        // Wait for all responses to complete
-        const promises = tabIds.map(async (tabId) => {
-          const startTabTime = Date.now();
-          
-          // Poll for completion
-          while (Date.now() - startTime < timeoutMs) {
+      // Async-by-default: assume responses are ready, just fetch them
+      const promises = tabIds.map(async (tabId) => {
+        const startTabTime = Date.now();
+        
+        try {
+          // Optional readiness check if requested
+          if (checkReadiness) {
             const status = await this.getClaudeResponseStatus({ tabId });
             
-            if (status.status === 'complete' || status.status === 'error') {
-              const response = await this.getClaudeResponse({ 
-                tabId, 
-                waitForCompletion: false,
-                timeoutMs: 5000
-              });
-              
+            if (status.status !== 'complete' && status.status !== 'error') {
               return {
                 tabId,
-                response,
-                status: status.status,
+                response: null,
+                status: status.status || 'not_ready',
                 completedAt: Date.now(),
                 duration: Date.now() - startTabTime,
-                success: status.status === 'complete'
+                success: false,
+                error: 'Response not ready - batch_get_responses should only be called when responses are complete'
               };
             }
-            
-            await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
           }
           
-          // Timeout reached
+          // Fetch the response (should be immediate if ready)
+          const response = await this.getClaudeResponse({ 
+            tabId, 
+            waitForCompletion: false,
+            timeoutMs: timeoutMs
+          });
+          
+          return {
+            tabId,
+            response,
+            status: 'complete',
+            completedAt: Date.now(),
+            duration: Date.now() - startTabTime,
+            success: true
+          };
+          
+        } catch (error) {
           return {
             tabId,
             response: null,
-            status: 'timeout',
+            status: 'error',
             completedAt: Date.now(),
             duration: Date.now() - startTabTime,
             success: false,
-            error: 'Response timeout'
+            error: error.message
           };
-        });
-        
-        const allResults = await Promise.all(promises);
-        results.push(...allResults);
-        
-      } else {
-        // Return responses as they complete
-        const pendingTabs = [...tabIds];
-        
-        while (pendingTabs.length > 0 && Date.now() - startTime < timeoutMs) {
-          for (let i = pendingTabs.length - 1; i >= 0; i--) {
-            const tabId = pendingTabs[i];
-            const status = await this.getClaudeResponseStatus({ tabId });
-            
-            if (status.status === 'complete' || status.status === 'error') {
-              const response = await this.getClaudeResponse({ 
-                tabId, 
-                waitForCompletion: false,
-                timeoutMs: 5000 
-              });
-              
-              results.push({
-                tabId,
-                response,
-                status: status.status,
-                completedAt: Date.now(),
-                duration: Date.now() - startTime,
-                success: status.status === 'complete'
-              });
-              
-              pendingTabs.splice(i, 1);
-            }
-          }
-          
-          if (pendingTabs.length > 0) {
-            await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
-          }
         }
-        
-        // Add timeout results for remaining tabs
-        pendingTabs.forEach(tabId => {
-          results.push({
-            tabId,
-            response: null,
-            status: 'timeout',
-            completedAt: Date.now(),
-            duration: timeoutMs,
-            success: false,
-            error: 'Response timeout'
-          });
-        });
-      }
+      });
+      
+      const allResults = await Promise.all(promises);
+      results.push(...allResults);
       
       const summary = {
         total: tabIds.length,
@@ -2943,7 +2924,7 @@ class CCMExtensionHub {
         success: true,
         results,
         summary,
-        waitForAll,
+        mode: 'async_immediate',
         requestedTabs: tabIds.length
       };
       
@@ -3156,9 +3137,9 @@ class ContentScriptManager {
               window.fetch = async (...args) => {
                 const url = args[0];
                 
-                // Only monitor Claude API requests - broader matching to ensure we catch all endpoints
+                // Monitor Claude API requests with detailed logging
                 if (typeof url === 'string' && url.includes('claude.ai')) {
-                  console.log('[NetworkObserver] Claude API request detected:', url);
+                  console.log('[NetworkObserver] Claude API request detected:', url, args[1]);
                   
                   const response = await originalFetch.apply(window, args);
                   
@@ -3167,20 +3148,25 @@ class ContentScriptManager {
                     this.handleMessageSent();
                   }
                   
-                  // Monitor response completion via /latest endpoint (most reliable signal)
-                  if (response.ok && url.includes('/latest')) {
-                    console.log('[NetworkObserver] Response completion detected via /latest endpoint');
-                    // Give DOM time to update after /latest response
-                    setTimeout(() => this.checkResponseCompletion(), 500);
-                    setTimeout(() => this.checkResponseCompletion(), 1000);
-                  } else if (response.ok) {
-                    // For streaming responses, monitor completion
-                    if (response.headers.get('content-type')?.includes('stream')) {
-                      this.monitorStreamResponse(response);
-                    } else {
-                      // Non-streaming response completed immediately
-                      setTimeout(() => this.checkResponseCompletion(), 300);
+                  // Handle completion endpoint - this signals response is ready
+                  if (response.ok && url.includes('/completion')) {
+                    console.log('[NetworkObserver] /completion endpoint detected with streaming');
+                    if (response.body && response.headers.get('content-type')?.includes('event-stream')) {
+                      const clonedResponse = response.clone();
+                      const reader = clonedResponse.body.getReader();
+                      this.monitorStreamCompletion(reader);
                     }
+                  } 
+                  // Handle latest endpoint - this confirms response is complete
+                  else if (response.ok && url.includes('/latest')) {
+                    console.log('[NetworkObserver] /latest endpoint detected - response completed');
+                    // /latest endpoint means response is fully complete
+                    setTimeout(() => this.checkResponseCompletion(), 300);
+                  }
+                  // Fallback for other Claude API responses
+                  else if (response.ok) {
+                    console.log('[NetworkObserver] Other Claude API response:', url);
+                    setTimeout(() => this.checkResponseCompletion(), 500);
                   }
                   
                   return response;
@@ -3226,13 +3212,22 @@ class ContentScriptManager {
               console.log('[NetworkObserver] Network interception active (fetch + XHR)');
             }
 
-            monitorStreamResponse(response) {
-              // Monitor stream completion through periodic DOM checks
-              const checkTimes = [1000, 2000, 4000, 6000]; // Progressive delays
-              
-              checkTimes.forEach(delay => {
-                setTimeout(() => this.checkResponseCompletion(), delay);
-              });
+            async monitorStreamCompletion(reader) {
+              // Monitor actual stream completion by reading until done
+              try {
+                while (true) {
+                  const { done, value } = await reader.read();
+                  if (done) {
+                    console.log('[NetworkObserver] Stream completed - checking for response completion');
+                    setTimeout(() => this.checkResponseCompletion(), 500);
+                    break;
+                  }
+                }
+              } catch (error) {
+                console.log('[NetworkObserver] Stream monitoring error:', error);
+                // Fallback to timeout-based detection
+                setTimeout(() => this.checkResponseCompletion(), 2000);
+              }
             }
 
             handleMessageSent() {
@@ -3262,12 +3257,12 @@ class ContentScriptManager {
             }
 
             getLastResponse() {
-              // Use the reliable assistant message selector (same as working content scripts)
-              const assistantMessages = Array.from(document.querySelectorAll('[data-message-author-role="assistant"]'));
-              const lastAssistantMessage = assistantMessages[assistantMessages.length - 1];
+              // Use the current Claude message selector (.font-claude-message)
+              const claudeMessages = Array.from(document.querySelectorAll('.font-claude-message'));
+              const lastClaudeMessage = claudeMessages[claudeMessages.length - 1];
               
-              if (lastAssistantMessage && lastAssistantMessage.textContent?.trim()) {
-                const text = lastAssistantMessage.textContent.trim();
+              if (lastClaudeMessage && lastClaudeMessage.textContent?.trim()) {
+                const text = lastClaudeMessage.textContent.trim();
                 return {
                   text: text,
                   isAssistant: true,
@@ -3275,7 +3270,7 @@ class ContentScriptManager {
                   isUser: false,
                   success: true,
                   timestamp: Date.now(),
-                  totalMessages: document.querySelectorAll('[data-message-author-role]').length
+                  totalMessages: claudeMessages.length
                 };
               }
               return null;
