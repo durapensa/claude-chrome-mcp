@@ -44,4 +44,5 @@ Follow systematic debugging approach from [Troubleshooting Guide](TROUBLESHOOTIN
 - **Key Features**: Async operations, Claude-to-Claude forwarding, network detection, multi-hub coordination
 - **Modules**: WebSocketHub, AutoHubClient, MultiHubManager, ErrorTracker, OperationManager, ProcessLifecycleManager
 - **Version Management**: Centralized via VERSION file and scripts/update-versions.js
+- **Recent Changes**: Fixed MCP tool response format to include required 'content' array (requires restart)
 - **Known Limitations**: Manual polling required until Claude Code auto-resume implemented

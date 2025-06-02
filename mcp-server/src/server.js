@@ -249,7 +249,7 @@ class ChromeMCPServer {
 
   // Tool handlers that delegate to hub client
   async handleGetConnectionHealth(args) {
-    return {
+    const status = {
       hubClient: {
         connected: this.hubClient.connected,
         connectionState: this.hubClient.connectionState,
@@ -263,6 +263,13 @@ class ChromeMCPServer {
       },
       multiHub: this.multiHubManager.getHubStatus()
     };
+    
+    return {
+      content: [{
+        type: 'text',
+        text: JSON.stringify(status, null, 2)
+      }]
+    };
   }
 
   async handleSpawnTab(args) {
@@ -272,7 +279,12 @@ class ChromeMCPServer {
     const result = await this.hubClient.sendRequest('spawn_claude_dot_ai_tab', args);
     
     this.operationManager.updateOperation(operationId, 'completed', result);
-    return result;
+    return {
+      content: [{
+        type: 'text',
+        text: JSON.stringify(result, null, 2)
+      }]
+    };
   }
 
   async handleSendMessageAsync(args) {
@@ -282,7 +294,12 @@ class ChromeMCPServer {
     const result = await this.hubClient.sendRequest('send_message_async', args);
     
     this.operationManager.updateOperation(operationId, 'completed', result);
-    return result;
+    return {
+      content: [{
+        type: 'text',
+        text: JSON.stringify(result, null, 2)
+      }]
+    };
   }
 
   async handleGetResponse(args) {
@@ -292,7 +309,12 @@ class ChromeMCPServer {
     const result = await this.hubClient.sendRequest('get_claude_dot_ai_response', args);
     
     this.operationManager.updateOperation(operationId, 'completed', result);
-    return result;
+    return {
+      content: [{
+        type: 'text',
+        text: JSON.stringify(result, null, 2)
+      }]
+    };
   }
 
   async handleForwardResponse(args) {
@@ -302,7 +324,12 @@ class ChromeMCPServer {
     const result = await this.hubClient.sendRequest('forward_response_to_claude_dot_ai_tab', args);
     
     this.operationManager.updateOperation(operationId, 'completed', result);
-    return result;
+    return {
+      content: [{
+        type: 'text',
+        text: JSON.stringify(result, null, 2)
+      }]
+    };
   }
 
   async handleWaitForOperation(args) {
@@ -311,22 +338,36 @@ class ChromeMCPServer {
     try {
       const operation = await this.operationManager.waitForCompletion(operationId, timeoutMs);
       
-      return {
+      const result = {
         operationId,
         status: operation.status,
         milestones: operation.milestones,
         result: operation.milestones.find(m => m.milestone === 'completed')?.data || {},
         completedAt: operation.lastUpdated
       };
+      
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify(result, null, 2)
+        }]
+      };
     } catch (error) {
       const operation = this.operationManager.getOperation(operationId);
       
-      return {
+      const result = {
         operationId,
         status: operation ? operation.status : 'not_found',
         error: error.message,
         milestones: operation ? operation.milestones : [],
         failedAt: Date.now()
+      };
+      
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify(result, null, 2)
+        }]
       };
     }
   }

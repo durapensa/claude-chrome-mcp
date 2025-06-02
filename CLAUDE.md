@@ -8,7 +8,8 @@ Quick reference for Claude. See README.md for full documentation.
 - Structure: Modular architecture with separated components (utils/, hub/, lifecycle/)
 
 ## Important System Limitations
-- Claude Code cannot restart its own MPC servers. User must exit and re-run Claude Code if claude-chrome-mcp tools are not avilable
+- Claude Code cannot restart its own MCP servers. User must exit and re-run Claude Code if claude-chrome-mcp tools are not available
+- **RESTART REQUIRED**: After making changes to mcp-server code, user must manually exit and re-run Claude Code to reload the MCP server with updates
 
 ## Quick Commands
 ```bash
