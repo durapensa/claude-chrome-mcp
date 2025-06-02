@@ -4,7 +4,7 @@ Quick reference for Claude. See README.md for full documentation.
 
 ## System Status
 - Version: 2.4.1
-- Architecture: Extension-as-Hub with CustomEvent bridge for async operations
+- Architecture: MCP-Server-as-Hub with Chrome Extension as WebSocket client
 
 ## Important System Limitations
 - Claude Code cannot restart its own MPC servers. User must exit and re-run Claude Code if claude-chrome-mcp tools are not avilable
@@ -45,7 +45,8 @@ mcp__claude-chrome-mcp__forward_response_to_claude_dot_ai_tab --sourceTabId <sou
 - Roadmap: ROADMAP.md
 
 ## Architecture Overview
-- **Extension-as-Hub**: Chrome extension runs WebSocket server, MCP clients connect to it
+- **MCP-Server-as-Hub**: MCP server hosts WebSocket hub on port 54321, all clients connect to it
+- **Chrome Extension Client**: Extension connects as WebSocket client to MCP server hub
 - **CustomEvent Bridge**: MAIN/ISOLATED world communication for network detection
 - **Network-Level Detection**: Uses fetch interception + `/latest` endpoint for response completion
 - **Async Operations**: Full async workflow with operation registration and milestone tracking

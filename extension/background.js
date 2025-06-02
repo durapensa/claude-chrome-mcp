@@ -1,5 +1,5 @@
 // Chrome Extension Background Service Worker
-// Extension-as-Hub Architecture: Extension runs WebSocket server, MCP clients connect TO it
+// Hub-Client Architecture: Extension connects as WebSocket client to MCP server hub on port 54321
 
 const WEBSOCKET_PORT = 54321;
 const KEEPALIVE_INTERVAL = 20000;
@@ -75,10 +75,10 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     console.log('CCM Extension: Keep-alive alarm triggered');
     
     // Check WebSocket connection status
-    if (!ccmHub.isConnected()) {
+    if (!ccmHubClient.isConnected()) {
       console.log('CCM Extension: WebSocket not connected, attempting reconnection...');
       // Proactively attempt reconnection during alarm - this persists across service worker cycles
-      ccmHub.connectToHub();
+      ccmHubClient.connectToHub();
     } else {
       console.log('CCM Extension: WebSocket connection is healthy');
     }
@@ -86,10 +86,10 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     // Store connection state for recovery
     chrome.storage.local.set({
       lastAliveTime: Date.now(),
-      connectionState: ccmHub.hubConnection ? ccmHub.hubConnection.readyState : 'disconnected',
-      connectedClients: ccmHub.connectedClients.size,
-      reconnectAttempts: ccmHub.reconnectAttempts,
-      hasPersistentReconnect: !!ccmHub.persistentReconnectInterval
+      connectionState: ccmHubClient.hubConnection ? ccmHubClient.hubConnection.readyState : 'disconnected',
+      connectedClients: ccmHubClient.connectedClients.size,
+      reconnectAttempts: ccmHubClient.reconnectAttempts,
+      hasPersistentReconnect: !!ccmHubClient.persistentReconnectInterval
     });
   }
 });
@@ -217,7 +217,7 @@ class TabOperationLock {
   }
 }
 
-class CCMExtensionHub {
+class HubClient {
   constructor() {
     this.connectedClients = new Map(); // clientId -> client info from hub
     this.debuggerSessions = new Map(); // tabId -> debugger info
@@ -308,7 +308,7 @@ class CCMExtensionHub {
       };
       
       this.hubConnection.onclose = (event) => {
-        console.log('CCM Extension: Hub disconnected - clearing all client state (Fix 2)');
+        console.log('CCM Extension: Disconnected from MCP server hub - clearing all client state (Fix 2)');
         this.hubConnection = null;
         this.clearAllClients(); // Fix 2: Clear stale client data immediately
         this.updateBadge('hub-disconnected');
@@ -3466,7 +3466,7 @@ class ContentScriptManager {
 }
 
 // Initialize Extension Hub
-const ccmHub = new CCMExtensionHub();
+const ccmHubClient = new HubClient();
 
 // Initialize Content Script Manager
 contentScriptManager = new ContentScriptManager();
@@ -3482,14 +3482,14 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 // Ensure connection is established when service worker wakes up
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // Handle wake-up by ensuring WebSocket is connected
-  if (!ccmHub.hubConnection || ccmHub.hubConnection.readyState !== WebSocket.OPEN) {
+  if (!ccmHubClient.hubConnection || ccmHubClient.hubConnection.readyState !== WebSocket.OPEN) {
     console.log('CCM Extension: Service worker wake-up detected, WebSocket not connected, attempting reconnection...');
-    ccmHub.connectToHub();
+    ccmHubClient.connectToHub();
     
     // Set up persistent reconnection interval if not already active
-    if (!ccmHub.persistentReconnectInterval) {
+    if (!ccmHubClient.persistentReconnectInterval) {
       console.log('CCM Extension: Setting up persistent reconnection after wake-up');
-      ccmHub.scheduleReconnect();
+      ccmHubClient.scheduleReconnect();
     }
   }
   

@@ -3,8 +3,8 @@
 Browser automation tool enabling MCP clients (Claude Desktop, Claude Code, Cursor) to interact with claude.ai through Chrome extension and MCP server.
 
 ## Components
-- **Chrome Extension** - WebSocket hub providing claude.ai browser access
-- **MCP Server** - Exposes Chrome capabilities to MCP clients
+- **MCP Server** - Hosts WebSocket hub and exposes Chrome capabilities to MCP clients
+- **Chrome Extension** - WebSocket client providing claude.ai browser access
 - **CLI Tool** - Direct command-line browser control
 
 ## Quick Start
@@ -19,7 +19,7 @@ Browser automation tool enabling MCP clients (Claude Desktop, Claude Code, Curso
 - Claude-to-Claude response forwarding
 - Conversation management via Claude.ai API
 - Network inspection and debugging tools
-- Multi-client WebSocket hub architecture
+- MCP-Server-as-Hub: WebSocket hub hosted by MCP server
 
 ## Documentation
 
