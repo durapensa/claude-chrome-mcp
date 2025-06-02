@@ -261,7 +261,7 @@ class ChromeMCPServer {
         operationsCount: this.operationManager.operations.size,
         errorsCount: this.errorTracker.errors.length
       },
-      multiHub: this.multiHubManager.getStatus()
+      multiHub: this.multiHubManager.getHubStatus()
     };
   }
 
