@@ -547,7 +547,7 @@ class AutoHubClient {
   handleOperationMilestone(message) {
     const { operationId, milestone, timestamp, tabId, ...data } = message;
     
-    console.log(`[AutoHubClient] Received milestone: ${operationId} - ${milestone}`);
+    console.error(`[AutoHubClient] Received milestone: ${operationId} - ${milestone}`);
     
     // Update operation manager
     if (operationManager) {

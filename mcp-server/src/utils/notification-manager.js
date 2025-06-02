@@ -15,7 +15,7 @@ class NotificationManager {
       }
     };
     
-    console.log(`[NotificationManager] Sending progress: ${operationId} - ${milestone}`);
+    console.error(`[NotificationManager] Sending progress: ${operationId} - ${milestone}`);
     
     try {
       this.server.sendNotification('operation/progress', notification.params);
