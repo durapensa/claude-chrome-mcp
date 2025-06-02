@@ -7,7 +7,8 @@ const { MCPClientConnection } = require('./client-connection');
 const HUB_PORT = 54321;
 
 // Central WebSocket hub that manages all MCP client connections
-// This is the core component that Chrome extension and MCP clients connect toclass WebSocketHub extends EventEmitter {
+// This is the core component that Chrome extension and MCP clients connect to
+class WebSocketHub extends EventEmitter {
   constructor() {
     super();
     this.clients = new Map(); // clientId -> MCPClientConnection

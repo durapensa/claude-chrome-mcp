@@ -5,6 +5,7 @@ Quick reference for Claude. See README.md for full documentation.
 ## System Status
 - Version: 2.4.1
 - Architecture: MCP-Server-as-Hub with Chrome Extension as WebSocket client
+- Structure: Modular architecture with separated components (utils/, hub/, lifecycle/)
 
 ## Important System Limitations
 - Claude Code cannot restart its own MPC servers. User must exit and re-run Claude Code if claude-chrome-mcp tools are not avilable
@@ -33,8 +34,12 @@ mcp__claude-chrome-mcp__forward_response_to_claude_dot_ai_tab --sourceTabId <sou
 
 ## Project Structure
 - `extension/` - Chrome extension (WebSocket client)
-- `mcp-server/` - MCP server
-- `cli/` - Command-line tools
+- `mcp-server/` - MCP server (modular architecture)
+  - `src/server.js` - Main entry point (382 lines, modular)
+  - `src/hub/` - WebSocket hub, client management, multi-hub coordination
+  - `src/utils/` - Error tracking, operation management, debugging
+  - `src/lifecycle/` - Process lifecycle and graceful shutdown
+- `cli/` - Universal MCP CLI client
 - `tests/` - Test suites with lifecycle management
 - `docs/` - Documentation and development notes
 
