@@ -39,8 +39,9 @@ Follow systematic debugging approach from [Troubleshooting Guide](TROUBLESHOOTIN
 - **[GitHub Issue Script](create-claude-code-issue.sh)**: Claude Code integration utilities
 
 ## Current System Status
-- **Version**: 2.4.1 (MCP-Server-as-Hub architecture)
+- **Version**: 2.5.0 (MCP-Server-as-Hub architecture with centralized version management)
 - **Architecture**: Modular design with separated components (3669→382 lines in server.js)
 - **Key Features**: Async operations, Claude-to-Claude forwarding, network detection, multi-hub coordination
 - **Modules**: WebSocketHub, AutoHubClient, MultiHubManager, ErrorTracker, OperationManager, ProcessLifecycleManager
+- **Version Management**: Centralized via VERSION file and scripts/update-versions.js
 - **Known Limitations**: Manual polling required until Claude Code auto-resume implemented

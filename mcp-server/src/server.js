@@ -30,7 +30,7 @@ class ChromeMCPServer {
     // Initialize core components
     this.server = new Server({
       name: 'claude-chrome-mcp',
-      version: '2.4.1'
+      version: '2.5.0'
     }, {
       capabilities: {
         tools: {}

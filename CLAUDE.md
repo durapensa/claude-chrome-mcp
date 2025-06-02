@@ -3,7 +3,7 @@
 Quick reference for Claude. See README.md for full documentation.
 
 ## System Status
-- Version: 2.4.1
+- Version: 2.5.0 (centralized version management)
 - Architecture: MCP-Server-as-Hub with Chrome Extension as WebSocket client
 - Structure: Modular architecture with separated components (utils/, hub/, lifecycle/)
 
@@ -75,6 +75,7 @@ When you type 'continue', follow the standard workflow in docs/CONTINUATION.md
 - **Testing**: Use MCP tools first, then test suite for regression
 - **Commits**: Frequent commits after testing each granular change
 - **File Management**: One working version per component - use git for history
+- **Version Management**: Use `node scripts/get-version.js` for current version, `node scripts/update-versions.js` to sync all references
 
 ## Critical Directives
 - **MAINTAIN CODE HYGIENE**: Prevent file proliferation - "one-in-one-out" rule

@@ -113,7 +113,7 @@ class WebSocketHub extends EventEmitter {
       clientId: clientId,
       serverInfo: {
         name: 'Claude Chrome MCP Hub',
-        version: '2.3.0',
+        version: '2.5.0',
         port: HUB_PORT,
         startTime: this.startTime
       }
@@ -453,7 +453,7 @@ class WebSocketHub extends EventEmitter {
   getHubInfo() {
     return {
       name: 'Claude Chrome MCP Hub',
-      version: '2.3.0',
+      version: '2.5.0',
       port: HUB_PORT,
       startTime: this.startTime,
       clientCount: this.clients.size,
