@@ -1,6 +1,15 @@
 # Roadmap
 
-## Recently Completed (June 1, 2025) ✅
+## Recently Completed (June 3, 2025) ✅
+
+### Complete Response Capture & Stream Detection
+- ✅ Fixed partial response capture issue (was returning only first few characters)
+- ✅ Implemented streaming completion detection with content stability checks
+- ✅ Enhanced mutation observer for real-time content monitoring
+- ✅ Fixed Claude-to-Claude forwarding text extraction
+- ✅ Improved content extraction reliability for complex DOM structures
+
+## Previously Completed (June 1, 2025) ✅
 
 ### Advanced Async Workflows & Claude Code Integration
 - ✅ `forward_response_to_claude_dot_ai_tab` tool for Claude-to-Claude automation
@@ -24,6 +33,33 @@
 - ✅ Verified all MCP tools working correctly
 
 ## Immediate Priorities (Q2-Q3 2025)
+
+### Error Handling & Reliability
+- [ ] **Network Interruption Recovery**: Handle streaming failures gracefully
+  - Detect network disconnections during response streaming
+  - Implement retry logic for interrupted operations
+  - Preserve partial responses and resume where possible
+  
+- [ ] **Operation Timeout Recovery**: Prevent stuck operations
+  - Add configurable timeouts for 'receiving' state
+  - Automatic state recovery for orphaned operations
+  - Clear error reporting for timeout scenarios
+
+- [ ] **Tab Lifecycle Management**: Handle browser state changes
+  - Detect tab crashes or navigation during operations
+  - Clean up observers and resources on tab close
+  - Graceful degradation for interrupted workflows
+
+### Performance & Optimization
+- [ ] **Observer Memory Management**: Optimize resource usage
+  - Implement smart observer pooling and reuse
+  - Dynamic cleanup based on operation completion
+  - Memory profiling and leak detection tools
+
+- [ ] **Adaptive Polling**: Intelligent HTTP polling intervals
+  - Activity-based interval adjustment (500ms-5s)
+  - Exponential backoff during idle periods
+  - Burst mode for active operations
 
 ### Claude Code MCP Integration
 - [ ] **MCP Notification-Driven Auto-Resume**: Implement async operation completion triggers
@@ -80,6 +116,29 @@
   - Correlation IDs for request tracking
 
 ### New Features
+- [ ] **Conversation Context Preservation**: Maintain context between messages
+  - Link related messages in a conversation thread
+  - Context-aware response forwarding
+  - Conversation state management across operations
+  
+- [ ] **Enhanced Response Processing**: Extract structured data from responses
+  - Code block extraction with language detection
+  - Artifact parsing and collection
+  - Table and structured data extraction
+  - Response metadata and statistics
+  
+- [ ] **Operation History & Analytics**: Track and analyze operations
+  - Persistent operation history beyond last operation
+  - Operation success/failure analytics
+  - Performance metrics and bottleneck detection
+  - Export operation logs for debugging
+
+- [ ] **Developer Tools**: Enhanced debugging capabilities
+  - Toggle debug mode with verbose logging
+  - Network request inspection and replay
+  - Operation timeline visualization
+  - Performance profiling tools
+
 - [ ] Support for conversation search/filtering
 - [ ] Bulk conversation management (archive, delete multiple)
 - [ ] Conversation templates and quick starts

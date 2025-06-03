@@ -1,5 +1,38 @@
 # Changelog
 
+## 2025-06-03 - Version 2.5.0: Complete Response Capture & Stream Detection
+
+### Fixed
+- **Response Text Capture**: Complete fix for partial response capture issue
+  - DOM observer now waits for streaming completion before capturing text
+  - Added content stability detection with 5 consecutive no-change checks
+  - Simplified content extraction to use `textContent` for all nested elements
+  - Captures full responses including code blocks, formatted text, and multi-paragraph content
+  - Response length validation ensures meaningful content is captured
+
+- **Claude-to-Claude Forwarding**: Fixed text extraction from response objects
+  - `forward_response_to_claude_dot_ai_tab` now properly extracts text from response structure
+  - Handles both string responses and response objects with text property
+  - Ensures complete message content is forwarded between Claude instances
+
+### Technical Improvements
+- **Stream Detection**: Enhanced mutation observer for real-time content monitoring
+  - Tracks content changes every 200ms until stable
+  - Separate observer per message element prevents conflicts
+  - Automatic cleanup after 30 seconds prevents memory leaks
+  - Three-stage operation lifecycle: sending → receiving → completed
+
+- **Content Extraction**: Improved reliability of message text capture
+  - Single `textContent` call captures all nested elements (p, pre, code, div)
+  - No more partial captures or truncated responses
+  - Handles complex DOM structures with multiple nested elements
+
+### Developer Experience
+- **Better Logging**: Enhanced console logging for debugging
+  - Operation state transitions clearly logged
+  - Content length tracking during streaming
+  - Completion detection with character count
+
 ## 2025-06-01 - Version 2.4.1: Advanced Async Workflows & Claude Code Integration
 
 ### Added
