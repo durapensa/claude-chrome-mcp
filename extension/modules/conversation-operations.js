@@ -246,7 +246,28 @@ export const conversationOperationMethods = {
   },
 
   async getConversationMetadata(params) {
-    const { tabId, includeMessages = false } = params;
+    const { conversationId, includeMessages = false } = params;
+    
+    // If conversationId provided, find or open the tab
+    let tabId;
+    if (conversationId) {
+      // First check if conversation is already open
+      const tabs = await this.getClaudeTabs();
+      const existingTab = tabs.tabs?.find(tab => tab.url?.includes(`/chat/${conversationId}`));
+      
+      if (existingTab) {
+        tabId = existingTab.id;
+      } else {
+        // Open the conversation
+        const openResult = await this.openClaudeConversationTab({ conversationId });
+        if (!openResult.success) {
+          return { success: false, error: `Failed to open conversation: ${openResult.error}` };
+        }
+        tabId = openResult.tabId;
+      }
+    } else {
+      return { success: false, error: 'conversationId is required' };
+    }
     
     const script = `
       (function() {
@@ -346,7 +367,30 @@ export const conversationOperationMethods = {
   },
 
   async deleteClaudeConversation(params) {
-    const { tabId, conversationId } = params;
+    let { tabId, conversationId } = params;
+    
+    // If only conversationId provided, find or open the tab
+    if (!tabId && conversationId) {
+      const tabs = await this.getClaudeTabs();
+      const existingTab = tabs.tabs?.find(tab => tab.url?.includes(`/chat/${conversationId}`));
+      
+      if (existingTab) {
+        tabId = existingTab.id;
+      } else {
+        // Open the conversation
+        const openResult = await this.openClaudeConversationTab({ conversationId });
+        if (!openResult.success) {
+          return { success: false, error: `Failed to open conversation: ${openResult.error}` };
+        }
+        tabId = openResult.tabId;
+        // Wait a bit for page to load
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    }
+    
+    if (!tabId) {
+      return { success: false, error: 'Either tabId or conversationId is required' };
+    }
     
     // Ensure debugger is attached
     try {
@@ -476,6 +520,126 @@ export const conversationOperationMethods = {
         error: error.message 
       };
     }
+  },
+
+  async searchClaudeConversations(params) {
+    try {
+      // First get all conversations
+      const allConversations = await this.getClaudeConversations();
+      
+      if (!Array.isArray(allConversations)) {
+        return { success: false, error: 'Failed to retrieve conversations' };
+      }
+      
+      // Apply filters
+      let filtered = allConversations.filter(conv => {
+        // Title search
+        if (params.titleSearch) {
+          const title = conv.title || '';
+          if (!title.toLowerCase().includes(params.titleSearch.toLowerCase())) {
+            return false;
+          }
+        }
+        
+        // Title regex
+        if (params.titleRegex) {
+          try {
+            const regex = new RegExp(params.titleRegex, 'i');
+            if (!regex.test(conv.title || '')) {
+              return false;
+            }
+          } catch (e) {
+            // Invalid regex, skip
+          }
+        }
+        
+        // Date filters
+        if (params.createdAfter && new Date(conv.created_at) < new Date(params.createdAfter)) {
+          return false;
+        }
+        if (params.createdBefore && new Date(conv.created_at) > new Date(params.createdBefore)) {
+          return false;
+        }
+        
+        // Message count filters
+        if (params.minMessages !== undefined && (conv.message_count || 0) < params.minMessages) {
+          return false;
+        }
+        if (params.maxMessages !== undefined && (conv.message_count || 0) > params.maxMessages) {
+          return false;
+        }
+        
+        // Open status filter
+        if (params.openOnly && !conv.isOpen) {
+          return false;
+        }
+        
+        return true;
+      });
+      
+      // Apply limit
+      if (params.limit) {
+        filtered = filtered.slice(0, params.limit);
+      }
+      
+      return {
+        success: true,
+        conversations: filtered,
+        total: filtered.length
+      };
+      
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  },
+
+  async bulkDeleteConversations(params) {
+    const { conversationIds, batchSize = 5, delayMs = 1000 } = params;
+    
+    if (!Array.isArray(conversationIds) || conversationIds.length === 0) {
+      return { success: false, error: 'conversationIds array is required' };
+    }
+    
+    const results = {
+      deleted: [],
+      failed: [],
+      total: conversationIds.length
+    };
+    
+    // Process in batches
+    for (let i = 0; i < conversationIds.length; i += batchSize) {
+      const batch = conversationIds.slice(i, i + batchSize);
+      
+      // Process batch in parallel
+      const batchPromises = batch.map(async (convId) => {
+        try {
+          const result = await this.deleteClaudeConversation({ conversationId: convId });
+          if (result.success) {
+            results.deleted.push(convId);
+          } else {
+            results.failed.push({ id: convId, error: result.error });
+          }
+        } catch (error) {
+          results.failed.push({ id: convId, error: error.message });
+        }
+      });
+      
+      await Promise.all(batchPromises);
+      
+      // Delay between batches
+      if (i + batchSize < conversationIds.length) {
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    }
+    
+    return {
+      success: results.failed.length === 0,
+      deleted: results.deleted,
+      failed: results.failed,
+      deletedCount: results.deleted.length,
+      failedCount: results.failed.length,
+      totalProcessed: results.total
+    };
   },
 
   async openClaudeConversationTab(params) {
