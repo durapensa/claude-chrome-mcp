@@ -7,8 +7,10 @@ const { WebSocketHub, HUB_PORT } = require('./websocket-hub');
 // Supports multi-server architecture with automatic hub election
 
 class AutoHubClient {
-  constructor(clientInfo = {}) {
+  constructor(clientInfo = {}, operationManager = null, notificationManager = null) {
     this.clientInfo = this.mergeClientInfo(clientInfo);
+    this.operationManager = operationManager;
+    this.notificationManager = notificationManager;
     this.ws = null;
     this.connected = false;
     this.requestCounter = 0;
@@ -550,13 +552,13 @@ class AutoHubClient {
     console.error(`[AutoHubClient] Received milestone: ${operationId} - ${milestone}`);
     
     // Update operation manager
-    if (operationManager) {
-      operationManager.updateOperation(operationId, milestone, { tabId, ...data });
+    if (this.operationManager) {
+      this.operationManager.updateOperation(operationId, milestone, { tabId, ...data });
     }
     
     // Send MCP notification
-    if (notificationManager) {
-      notificationManager.sendProgress(operationId, milestone, { tabId, ...data });
+    if (this.notificationManager) {
+      this.notificationManager.sendProgress(operationId, milestone, { tabId, ...data });
     }
   }
 

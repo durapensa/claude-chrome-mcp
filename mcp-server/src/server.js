@@ -68,17 +68,16 @@ class ChromeMCPServer {
     // Initialize lifecycle manager
     this.lifecycleManager = new ProcessLifecycleManager();
     
+    // Set environment variable to force hub creation for MCP server
+    process.env.CCM_FORCE_HUB_CREATION = '1';
+    
     // Initialize hub client for multi-server coordination
     this.hubClient = new AutoHubClient({
-      clientInfo: {
-        id: 'claude-chrome-mcp',
-        name: 'Claude Chrome MCP',
-        type: 'automation_server',
-        capabilities: ['chrome_tabs', 'debugger', 'claude_automation']
-      },
-      operationManager: this.operationManager,
-      forceHubCreation: true // MCP server should always create its own hub
-    });
+      id: 'claude-chrome-mcp',
+      name: 'Claude Chrome MCP',
+      type: 'automation_server',
+      capabilities: ['chrome_tabs', 'debugger', 'claude_automation']
+    }, this.operationManager, this.notificationManager);
 
     // Initialize multi-hub manager for distributed coordination
     this.multiHubManager = new MultiHubManager(this.hubClient);
@@ -755,7 +754,7 @@ class ChromeMCPServer {
       await this.operationManager.loadState();
       
       // Connect hub client
-      await this.hubClient.connectOrStartHub();
+      await this.hubClient.connect();
       
       // Start multi-hub coordination
       await this.multiHubManager.start();
