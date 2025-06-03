@@ -15,22 +15,9 @@ let initializationComplete = false;
 // Register event listeners
 console.log('CCM: Registering event listeners...');
 
-// Create periodic check alarm
+// Event-driven extension - no periodic polling needed
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('CCM Extension: Installed/Updated');
-  chrome.alarms.create('periodicCheck', { periodInMinutes: 0.5 }); // Check every 30 seconds
-});
-
-// Handle alarms
-chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === 'periodicCheck') {
-    if (initializationComplete && hubClient && !hubClient.isConnected()) {
-      console.log('CCM Extension: Periodic connection check - attempting to connect');
-      hubClient.connectToHub().catch(err => {
-        console.error('CCM Extension: Periodic connection failed:', err);
-      });
-    }
-  }
+  console.log('CCM Extension: Installed/Updated - Event-driven mode');
 });
 
 // Message queue for early messages
@@ -47,13 +34,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 function handleMessage(request, sender, sendResponse) {
-  // Handle connection health check immediately
+  // Handle connection health check immediately (event-driven, no polling)
   if (request.type === 'mcp_tool_request' && request.tool === 'get_connection_health') {
+    const currentState = hubClient ? hubClient.getCurrentState() : {
+      hubConnected: false,
+      isReconnecting: false,
+      connectedClients: [],
+      extensionConnected: false,
+      timestamp: Date.now()
+    };
+
     sendResponse({
       success: true,
       health: {
-        hubConnected: hubClient ? hubClient.isConnected() : false,
-        connectedClients: hubClient ? Array.from(hubClient.connectedClients.values()) : [],
+        ...currentState,
         operationLocks: hubClient ? hubClient.operationLock.getAllLocks() : [],
         messageQueueSize: hubClient ? hubClient.messageQueue.size() : 0,
         contentScriptTabs: contentScriptManager ? Array.from(contentScriptManager.injectedTabs) : [],

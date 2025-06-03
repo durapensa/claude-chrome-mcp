@@ -42,6 +42,7 @@ export class HubClient {
     
     // IMPORTANT: Prevent concurrent connection attempts
     this.isConnecting = false;
+    this.isReconnecting = false;
     this.connectionTimeout = null;
     
     // IMPORTANT: Do NOT automatically connect in constructor
@@ -98,6 +99,7 @@ export class HubClient {
           this.hubConnection.close();
         }
         this.isConnecting = false;
+        this.isReconnecting = false;
         this.scheduleReconnect();
       }, 5000); // 5 second timeout
       
@@ -116,6 +118,7 @@ export class HubClient {
         }
         
         this.isConnecting = false;
+        this.isReconnecting = false;
         this.reconnectAttempts = 0;
         this.lastConnectionAttempt = Date.now();
         
@@ -168,12 +171,16 @@ export class HubClient {
         // Only schedule reconnect if it wasn't a manual close
         if (event.code !== 1000) {
           this.scheduleReconnect();
+        } else {
+          // Manual close - reset reconnecting state
+          this.isReconnecting = false;
         }
       };
       
       this.hubConnection.onerror = (error) => {
         console.error('CCM Extension: WebSocket error:', error);
         this.isConnecting = false;
+        this.isReconnecting = false;
       };
       
     } catch (error) {
@@ -222,6 +229,10 @@ export class HubClient {
     }
     
     this.reconnectAttempts++;
+    this.isReconnecting = true;
+    
+    // Update badge to show reconnecting status
+    updateBadge('reconnecting');
     
     // Calculate delay with exponential backoff
     const backoffDelay = Math.min(
@@ -288,6 +299,10 @@ export class HubClient {
       
       case MESSAGE_TYPES.OPERATION_UPDATE:
         this.handleOperationUpdate(message);
+        break;
+      
+      case 'hub_event':
+        this.handleHubEvent(message);
         break;
       
       default:
@@ -404,6 +419,119 @@ export class HubClient {
         console.warn(`CCM Extension: Failed to send operation update to tab ${data.tabId}`);
       });
     }
+  }
+
+  // ===== EVENT-DRIVEN STATUS UPDATES =====
+  // Handles real-time events from hub instead of polling
+  
+  handleHubEvent(message) {
+    const { eventType, data, hubInfo } = message;
+    console.log(`CCM Extension: Received hub event '${eventType}'`, data);
+    
+    // Store current state from hub (single source of truth)
+    this.currentHubState = hubInfo;
+    
+    // Update badge and internal state based on event type
+    switch (eventType) {
+      case 'connection_changed':
+        this.handleConnectionChanged(hubInfo);
+        break;
+        
+      case 'client_joined':
+        this.handleEventClientJoined(data.client);
+        break;
+        
+      case 'client_left':
+        this.handleEventClientLeft(data.client);
+        break;
+        
+      case 'extension_connected':
+        this.handleEventExtensionConnected();
+        break;
+        
+      case 'extension_disconnected':
+        this.handleEventExtensionDisconnected();
+        break;
+        
+      default:
+        console.log(`CCM Extension: Unknown event type: ${eventType}`);
+    }
+    
+    // Forward event to popup if it's open
+    this.forwardEventToPopup(eventType, data, hubInfo);
+  }
+
+  handleConnectionChanged(hubInfo) {
+    console.log('CCM Extension: Connection state changed');
+    this.updateBadgeFromState(hubInfo);
+  }
+
+  handleEventClientJoined(client) {
+    console.log(`CCM Extension: Client joined via event: ${client.name}`);
+    this.connectedClients.set(client.id, {
+      ...client,
+      connectedAt: Date.now()
+    });
+    this.updateBadgeFromClients();
+  }
+
+  handleEventClientLeft(client) {
+    console.log(`CCM Extension: Client left via event: ${client.name}`);
+    this.connectedClients.delete(client.id);
+    this.updateBadgeFromClients();
+  }
+
+  handleEventExtensionConnected() {
+    console.log('CCM Extension: Extension connected event');
+    updateBadge('hub-connected');
+  }
+
+  handleEventExtensionDisconnected() {
+    console.log('CCM Extension: Extension disconnected event');
+    updateBadge('hub-disconnected');
+  }
+
+  updateBadgeFromState(hubInfo) {
+    if (!hubInfo.hubConnected) {
+      updateBadge('hub-disconnected');
+    } else if (hubInfo.connectedClients && hubInfo.connectedClients.length > 0) {
+      updateBadge('mcp-connected');
+    } else {
+      updateBadge('hub-connected');
+    }
+  }
+
+  updateBadgeFromClients() {
+    if (this.connectedClients.size > 0) {
+      updateBadge('mcp-connected');
+    } else if (this.isConnected()) {
+      updateBadge('hub-connected');
+    } else {
+      updateBadge('hub-disconnected');
+    }
+  }
+
+  forwardEventToPopup(eventType, data, hubInfo) {
+    // Send real-time updates to popup if it's open
+    chrome.runtime.sendMessage({
+      type: 'hub_event_update',
+      eventType,
+      data,
+      hubInfo
+    }).catch(() => {
+      // Popup not open, no problem
+    });
+  }
+
+  // Get current state for popup requests (replaces health polling)
+  getCurrentState() {
+    return this.currentHubState || {
+      hubConnected: this.isConnected(),
+      isReconnecting: this.isReconnecting,
+      connectedClients: Array.from(this.connectedClients.values()),
+      extensionConnected: true,
+      timestamp: Date.now()
+    };
   }
 
   forwardToMCPClients(message) {

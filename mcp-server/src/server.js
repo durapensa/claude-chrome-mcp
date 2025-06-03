@@ -38,7 +38,6 @@ const { ErrorTracker } = require('./utils/error-tracker');
 const { DebugMode } = require('./utils/debug-mode');
 const { OperationManager } = require('./utils/operation-manager');
 const { NotificationManager } = require('./utils/notification-manager');
-const { ProcessLifecycleManager } = require('./lifecycle/process-manager');
 const { WebSocketHub } = require('./hub/websocket-hub');
 const { AutoHubClient } = require('./hub/hub-client');
 const { MultiHubManager } = require('./hub/multi-hub-manager');
@@ -63,10 +62,7 @@ class ChromeMCPServer {
     this.errorTracker = new ErrorTracker();
     this.debug = new DebugMode().createLogger('ChromeMCPServer');
     this.operationManager = new OperationManager();
-    this.notificationManager = new NotificationManager();
-    
-    // Initialize lifecycle manager
-    this.lifecycleManager = new ProcessLifecycleManager();
+    this.notificationManager = new NotificationManager(this.server, this.errorTracker);
     
     // Initialize hub client for multi-server coordination
     this.hubClient = new AutoHubClient({
@@ -78,19 +74,6 @@ class ChromeMCPServer {
 
     // Initialize multi-hub manager for distributed coordination
     this.multiHubManager = new MultiHubManager(this.hubClient);
-    
-    this.isShuttingDown = false;
-    
-    // Register cleanup tasks
-    this.lifecycleManager.addCleanupTask('hub-client', async () => {
-      await this.hubClient.disconnect();
-    });
-    
-    this.lifecycleManager.addCleanupTask('multi-hub-manager', async () => {
-      if (this.multiHubManager) {
-        await this.multiHubManager.shutdown();
-      }
-    });
 
     this.setupTools();
   }
@@ -566,7 +549,7 @@ class ChromeMCPServer {
             throw new Error(`Unknown tool: ${name}`);
         }
       } catch (error) {
-        this.errorTracker.recordError(error, { tool: name, args });
+        this.errorTracker.logError(error, { tool: name, args });
         throw error;
       }
     });
@@ -757,6 +740,19 @@ class ChromeMCPServer {
       
       // Connect to stdio transport
       const transport = new StdioServerTransport();
+      
+      // Handle transport closure (parent process exit)
+      transport.onclose = () => {
+        this.debug.info('CCM: Transport closed (parent process likely exited), shutting down gracefully');
+        process.exit(0);
+      };
+      
+      // Also monitor stdin end event directly for immediate detection
+      process.stdin.on('end', () => {
+        this.debug.info('CCM: stdin ended (parent process exited), shutting down');
+        process.exit(0);
+      });
+      
       await this.server.connect(transport);
       
       this.debug.info('ChromeMCPServer started successfully');
@@ -770,20 +766,25 @@ class ChromeMCPServer {
 // Main entry point
 async function main() {
   try {
-    // CRITICAL: Set up clean shutdown to prevent stdout pollution
-    process.on('SIGPIPE', () => {
-      // Just exit cleanly on SIGPIPE, don't output anything
-      process.exit(0);
-    });
+    // Set process title to identify which tool spawned this server
+    const spawner = process.env.MCP_SPAWNER || process.argv[2] || 'unknown';
+    const parentPid = process.ppid; // Get parent process ID
+    const myPid = process.pid;
+    
+    // Create detailed process title with spawner and parent PID
+    process.title = `claude-chrome-mcp[${spawner}:${parentPid}]`;
+    
+    // Log spawner info to stderr for debugging
+    console.error(`CCM: Started by ${spawner} (Parent PID: ${parentPid}, My PID: ${myPid})`);
+    console.error(`CCM: Process title set to: ${process.title}`);
+    
+    // MCP-compliant signal handling
+    process.on('SIGINT', () => process.exit(0));
+    process.on('SIGTERM', () => process.exit(0));
+    process.on('SIGPIPE', () => process.exit(0));
     
     const server = new ChromeMCPServer();
     await server.start();
-    
-    // Keep the process alive
-    process.on('SIGINT', () => {
-      // Exit cleanly without any output
-      process.exit(0);
-    });
     
   } catch (error) {
     console.error('CCM: Fatal error:', error);

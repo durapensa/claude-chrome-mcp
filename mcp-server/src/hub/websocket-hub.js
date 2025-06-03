@@ -254,7 +254,8 @@ class WebSocketHub extends EventEmitter {
       hubInfo: this.getHubInfo()
     });
 
-    this.broadcastClientListUpdate();
+    // Emit extension connected event
+    this.emitExtensionConnected();
   }
 
   registerMCPClient(ws, message) {
@@ -285,7 +286,8 @@ class WebSocketHub extends EventEmitter {
       hubInfo: this.getHubInfo()
     });
 
-    this.broadcastClientListUpdate();
+    // Emit client joined event
+    this.emitClientJoined(clientInfo);
   }
 
   handleDisconnection(ws, code, reason) {
@@ -298,6 +300,9 @@ class WebSocketHub extends EventEmitter {
       console.error('WebSocket Hub: Chrome extension disconnected');
       this.chromeExtensionConnection = null;
       
+      // Emit extension disconnected event
+      this.emitExtensionDisconnected();
+      
       // Notify all MCP clients about extension disconnect
       for (const [id, client] of this.clients) {
         this.sendToClient(client.ws, {
@@ -308,9 +313,10 @@ class WebSocketHub extends EventEmitter {
     } else if (ws.clientType === 'mcp_client' && clientInfo) {
       this.clients.delete(clientInfo.id);
       console.error(`WebSocket Hub: MCP client ${clientInfo.name} removed`);
+      
+      // Emit client left event
+      this.emitClientLeft(clientInfo);
     }
-
-    this.broadcastClientListUpdate();
 
     // Check if we should shut down
     this.checkShutdownConditions();
@@ -427,11 +433,29 @@ class WebSocketHub extends EventEmitter {
     this.sendToClient(client.ws, message);
   }
 
-  broadcastClientListUpdate() {
+  // ===== EVENT-DRIVEN NOTIFICATION SYSTEM =====
+  // Replaces complex polling/notification with simple event broadcasting
+  
+  broadcastEvent(eventType, eventData = {}) {
     if (!this.chromeExtensionConnection || this.chromeExtensionConnection.readyState !== WebSocket.OPEN) {
+      console.log(`Hub: Cannot broadcast ${eventType} - extension not connected`);
       return;
     }
 
+    const event = {
+      type: 'hub_event',
+      eventType,
+      data: eventData,
+      timestamp: Date.now(),
+      hubInfo: this.getConnectionState()
+    };
+
+    console.log(`Hub: Broadcasting event '${eventType}' to extension`);
+    this.sendToClient(this.chromeExtensionConnection, event);
+  }
+
+  // Get current connection state (single source of truth)
+  getConnectionState() {
     const clientList = Array.from(this.clients.values()).map(client => ({
       id: client.info.id,
       name: client.info.name,
@@ -443,11 +467,53 @@ class WebSocketHub extends EventEmitter {
       lastActivity: client.ws.lastActivity
     }));
 
-    this.sendToClient(this.chromeExtensionConnection, {
-      type: 'client_list_update',
-      clients: clientList,
+    return {
+      hubConnected: true,
+      isReconnecting: false,
+      connectedClients: clientList,
+      extensionConnected: !!this.chromeExtensionConnection,
+      hubUptime: Date.now() - this.startTime,
       timestamp: Date.now()
+    };
+  }
+
+  // Event types for different state changes
+  emitConnectionChanged() {
+    this.broadcastEvent('connection_changed', {
+      reason: 'hub_state_updated'
     });
+  }
+
+  emitClientJoined(clientInfo) {
+    this.broadcastEvent('client_joined', {
+      client: clientInfo,
+      reason: 'new_client_connected'
+    });
+  }
+
+  emitClientLeft(clientInfo) {
+    this.broadcastEvent('client_left', {
+      client: clientInfo,
+      reason: 'client_disconnected'
+    });
+  }
+
+  emitExtensionConnected() {
+    this.broadcastEvent('extension_connected', {
+      reason: 'chrome_extension_connected'
+    });
+  }
+
+  emitExtensionDisconnected() {
+    this.broadcastEvent('extension_disconnected', {
+      reason: 'chrome_extension_disconnected'
+    });
+  }
+
+  // Legacy method for backward compatibility (will be removed)
+  broadcastClientListUpdate() {
+    // Deprecated: Use emitConnectionChanged() instead
+    this.emitConnectionChanged();
   }
 
   getHubInfo() {

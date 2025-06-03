@@ -44,5 +44,23 @@ Follow systematic debugging approach from [Troubleshooting Guide](TROUBLESHOOTIN
 - **Key Features**: Async operations, Claude-to-Claude forwarding, network detection, multi-hub coordination
 - **Modules**: WebSocketHub, AutoHubClient, MultiHubManager, ErrorTracker, OperationManager, ProcessLifecycleManager
 - **Version Management**: Centralized via VERSION file and scripts/update-versions.js
-- **Recent Changes**: Fixed MCP tool response format to include required 'content' array (requires restart)
-- **Known Limitations**: Manual polling required until Claude Code auto-resume implemented
+
+## Recent Major Update: Event-Driven Architecture
+- **Status**: ✅ **COMPLETED** - Event-driven notification system refactor
+- **Changes**: Replaced complex polling system with real-time WebSocket events
+- **Benefits**: ~50% less code, no race conditions, immediate responsiveness
+- **Files Changed**: Hub event broadcasting, extension listeners, popup real-time updates
+- **Build Required**: Extension must be rebuilt with `cd extension && npm run build`
+- **Restart Required**: Claude Code must be restarted to load new MCP server changes
+
+## Pre-Restart Checklist Completed
+- ✅ Extension rebuilt with event-driven architecture
+- ✅ README.md updated with build instructions
+- ✅ All changes committed to git
+- ✅ Temporary files cleaned up
+- ✅ Event-driven system ready for testing
+
+## Post-Restart Testing Plan
+1. Verify event-driven notifications work (should be instant badge/popup updates)
+2. Test client connect/disconnect events trigger immediately
+3. Confirm no more "Checking connection..." persistence issues

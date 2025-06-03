@@ -17,6 +17,10 @@ export function updateBadge(status) {
       text = '';
       color = '#F44336'; // Red
       break;
+    case 'reconnecting':
+      text = 'R';
+      color = '#FF9800'; // Orange
+      break;
     default:
       text = '?';
       color = '#FF9800'; // Orange

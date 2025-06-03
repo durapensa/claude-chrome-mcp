@@ -1,9 +1,8 @@
-// Extension Popup Script - Modular Version
+// Extension Popup Script - Event-Driven Version
 
-document.addEventListener('DOMContentLoaded', async () => {
-  console.log('CCM Popup: Initializing...');
+async function getInitialState() {
+  console.log('CCM Popup: Getting initial state...');
   
-  // Get connection health
   try {
     const response = await chrome.runtime.sendMessage({
       type: 'mcp_tool_request',
@@ -14,14 +13,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (response && response.success) {
       updatePopupUI(response.health);
     } else {
-      showError('Failed to get connection status');
+      showError(response?.error || 'Failed to get connection status');
     }
   } catch (error) {
-    console.error('CCM Popup: Error getting health:', error);
-    showError('Extension not connected');
+    console.error('CCM Popup: Error getting initial state:', error);
+    showError('Extension connection error');
   }
+}
+
+// Listen for real-time events from extension
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'hub_event_update') {
+    console.log(`CCM Popup: Received real-time event '${message.eventType}'`);
+    updatePopupUI(message.hubInfo);
+  }
+});
+
+document.addEventListener('DOMContentLoaded', async () => {
+  console.log('CCM Popup: Initializing event-driven popup...');
   
-  // Set up button handlers
+  // Get initial state once
+  await getInitialState();
+  
+  // Set up button handlers  
   setupButtonHandlers();
 });
 
@@ -37,6 +51,16 @@ function updatePopupUI(health) {
     }
     if (statusDetail) {
       statusDetail.textContent = 'Connected to WebSocket Hub';
+    }
+    if (helpSection) {
+      helpSection.style.display = 'none';
+    }
+  } else if (health.isReconnecting) {
+    if (statusDot) {
+      statusDot.className = 'status-dot connecting';
+    }
+    if (statusDetail) {
+      statusDetail.textContent = 'Reconnecting to hub...';
     }
     if (helpSection) {
       helpSection.style.display = 'none';
@@ -168,26 +192,14 @@ function setupButtonHandlers() {
       // Send message to background to attempt reconnection
       chrome.runtime.sendMessage({ type: 'force_reconnect' });
       
-      // Reload popup after a moment
-      setTimeout(() => {
-        location.reload();
+      // Refresh status after a moment
+      setTimeout(async () => {
+        await getInitialState();
+        reconnectBtn.disabled = false;
+        reconnectBtn.textContent = 'Reconnect';
       }, 1500);
     });
   }
   
-  // Refresh on popup open
-  // Get fresh data every time popup opens
-  setTimeout(() => {
-    chrome.runtime.sendMessage({
-      type: 'mcp_tool_request',
-      tool: 'get_connection_health',
-      params: {}
-    }).then(response => {
-      if (response && response.success) {
-        updatePopupUI(response.health);
-      }
-    }).catch(err => {
-      console.error('CCM Popup: Refresh error:', err);
-    });
-  }, 500);
+  // Event-driven popup - no polling needed
 }

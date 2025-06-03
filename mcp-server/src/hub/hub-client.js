@@ -40,9 +40,7 @@ class AutoHubClient {
   }
 
   setupProcessMonitoring() {
-    // DISABLED: Parent monitoring is handled by ProcessLifecycleManager
-    // Having it in multiple places causes premature shutdowns
-    console.error('CCM: AutoHubClient parent monitoring disabled (handled by ProcessLifecycleManager)');
+    // Process monitoring removed - handled by MCP stdio events
     return;
   }
 
@@ -581,14 +579,6 @@ class AutoHubClient {
     if (this.connectionHealthInterval) {
       clearInterval(this.connectionHealthInterval);
       this.connectionHealthInterval = null;
-    }
-    if (this.parentCheckInterval) {
-      clearInterval(this.parentCheckInterval);
-      this.parentCheckInterval = null;
-    }
-    if (this.parentMonitor) {
-      clearInterval(this.parentMonitor);
-      this.parentMonitor = null;
     }
     
     // Close connection
