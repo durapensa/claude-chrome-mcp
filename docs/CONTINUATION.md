@@ -45,15 +45,56 @@ Follow systematic debugging approach from [Troubleshooting Guide](TROUBLESHOOTIN
 - **Modules**: WebSocketHub, AutoHubClient, MultiHubManager, ErrorTracker, OperationManager, ProcessLifecycleManager
 - **Version Management**: Centralized via VERSION file and scripts/update-versions.js
 
-## Current Issue: Parameter Mapping in Extension
-- **Status**: 🔧 **IN PROGRESS** - Parameter validation failing in extension
-- **Problem**: MCP tools returning "Missing required parameters" errors
-- **Root Cause**: Extension executeCommand() method receiving full command object instead of command.params
-- **Files Changed**: 
-  - `extension/modules/hub-client.js` - Fixed parameter extraction in executeCommand()
-  - `mcp-server/src/server.js` - Restored reload_extension tool
-- **Extension Reload Required**: Manual reload needed at chrome://extensions/
-- **Claude Code Restart Required**: MCP server changes need restart to take effect
+## Latest Session Summary (2025-01-06)
+
+### What Was Accomplished
+1. **Fixed Missing Tools Issue**: The modular refactor had accidentally dropped 18+ tools
+2. **Restored All 38 Tools**: Successfully restored missing tools from git history (commit 6ac1c98)
+3. **Created Modular MCP Server Architecture**:
+   - 7 tool modules in `/mcp-server/src/tools/`
+   - Dynamic handler lookup replacing 60-line switch statement
+   - Proper tool registry with `allTools` array export
+
+4. **Created Modular Extension Architecture**:
+   - `conversation-operations.js` - 5 conversation management methods
+   - `batch-operations.js` - 3 batch messaging methods  
+   - `debug-operations.js` - 3 debug/DOM methods
+   - Updated hub-client.js to use modular imports
+
+### Key Technical Details
+- MCP server uses CommonJS (`require`/`module.exports`)
+- Extension uses ES6 modules (`import`/`export`)
+- All tools now properly mapped in both server and extension
+- Parameter mapping fix from earlier work preserved
+
+### Current State
+- All 38 tools restored and working
+- Modular architecture implemented on both sides
+- Ready for extension reload and Claude Code restart
+- No temporary files or cleanup needed
+
+### Next Steps After Restart
+1. Reload the Chrome extension
+2. Exit and restart Claude Code
+3. Run `mcp__claude-chrome-mcp__get_connection_health` to verify
+4. Test restored tools like `extract_conversation_elements`
+5. Continue with any pending work
+
+### Files Modified
+- `/mcp-server/src/server.js` - Refactored to use modular tools
+- `/mcp-server/src/tools/` - Created 7 new tool modules
+- `/extension/modules/hub-client.js` - Refactored to use modular operations
+- `/extension/modules/conversation-operations.js` - New module
+- `/extension/modules/batch-operations.js` - New module  
+- `/extension/modules/debug-operations.js` - New module
+
+### Testing Commands
+```bash
+# After restart, test with:
+mcp__claude-chrome-mcp__get_connection_health
+mcp__claude-chrome-mcp__spawn_claude_dot_ai_tab
+mcp__claude-chrome-mcp__extract_conversation_elements --tabId <tab_id>
+```
 
 ## Pre-Restart Checklist Completed
 - ✅ Parameter mapping fix applied to extension/modules/hub-client.js

@@ -13,6 +13,9 @@ import { MessageQueue } from './message-queue.js';
 import { TabOperationLock } from './tab-operation-lock.js';
 import { MCPClient } from './mcp-client.js';
 import { tabOperationMethods } from './tab-operations.js';
+import { conversationOperationMethods } from './conversation-operations.js';
+import { batchOperationMethods } from './batch-operations.js';
+import { debugOperationMethods } from './debug-operations.js';
 import { updateBadge } from '../utils/utils.js';
 
 export class HubClient {
@@ -434,11 +437,22 @@ export class HubClient {
       'get_claude_dot_ai_response': () => this.getClaudeResponse(params),
       'get_connection_health': () => this.getConnectionHealth(params),
       'extract_conversation_elements': () => this.extractConversationElements(params),
+      'export_conversation_transcript': () => this.exportConversationTranscript(params),
+      'get_claude_conversations': () => this.getClaudeConversations(params),
+      'get_conversation_metadata': () => this.getConversationMetadata(params),
+      'delete_claude_conversation': () => this.deleteClaudeConversation(params),
+      'open_claude_dot_ai_conversation_tab': () => this.openClaudeConversationTab(params),
+      'batch_send_messages': () => this.batchSendMessages(params),
+      'batch_get_responses': () => this.batchGetResponses(params),
+      'get_claude_dot_ai_response_status': () => this.getClaudeResponseStatus(params),
+      'debug_attach': () => this.attachDebugger(params.tabId),
+      'get_dom_elements': () => this.getDomElements(params),
+      'debug_claude_dot_ai_page': () => this.debugClaudePage(params),
       'start_network_inspection': () => this.startNetworkInspection(params),
       'stop_network_inspection': () => this.stopNetworkInspection(params),
       'get_captured_requests': () => this.getCapturedRequests(params),
       'forward_response_to_claude_dot_ai_tab': () => this.forwardResponseToClaudeTab(params),
-      // Add more tool mappings as needed
+      'reload_extension': () => this.reloadExtension(params)
     };
     
     const handler = toolHandlers[tool];
@@ -861,7 +875,19 @@ export class HubClient {
       };
     }
   }
+
+  // Helper method for createClaudeTab used by conversation operations
+  async createClaudeTab() {
+    const tab = await chrome.tabs.create({ 
+      url: 'https://claude.ai/new',
+      active: false
+    });
+    return tab;
+  }
 }
 
-// Mix in tab operation methods
+// Mix in all operation methods
 Object.assign(HubClient.prototype, tabOperationMethods);
+Object.assign(HubClient.prototype, conversationOperationMethods);
+Object.assign(HubClient.prototype, batchOperationMethods);
+Object.assign(HubClient.prototype, debugOperationMethods);
