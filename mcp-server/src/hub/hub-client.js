@@ -1,4 +1,5 @@
 const WebSocket = require('ws');
+const EventEmitter = require('events');
 const { ErrorTracker } = require('../utils/error-tracker');
 const { DebugMode } = require('../utils/debug-mode');
 const { WebSocketHub, HUB_PORT } = require('./websocket-hub');
@@ -6,8 +7,9 @@ const { WebSocketHub, HUB_PORT } = require('./websocket-hub');
 // Hub client that can connect to existing hub or create its own
 // Supports multi-server architecture with automatic hub election
 
-class AutoHubClient {
+class AutoHubClient extends EventEmitter {
   constructor(clientInfo = {}, operationManager = null, notificationManager = null) {
+    super();
     this.clientInfo = this.mergeClientInfo(clientInfo);
     this.operationManager = operationManager;
     this.notificationManager = notificationManager;
@@ -183,10 +185,11 @@ class AutoHubClient {
 
     this.connectionState = 'connecting';
     
-    // Check if hub creation is forced
+    // Check if hub creation is forced or if we should auto-create
     const forceHubCreation = process.env.CCM_FORCE_HUB_CREATION === '1';
+    const autoCreateHub = process.env.CCM_NO_AUTO_HUB !== '1'; // Default to auto-create
     
-    if (!forceHubCreation) {
+    if (!forceHubCreation && autoCreateHub) {
       try {
         // Try existing hub first with shorter timeout
         console.error('CCM: Checking for existing hub...');
@@ -195,10 +198,22 @@ class AutoHubClient {
         console.error(`CCM: Connected to existing hub as ${this.clientInfo.name}`);
         return;
       } catch (error) {
-        console.error('CCM: No existing hub found:', error.message);
+        console.error('CCM: No existing hub found, will create new one:', error.message);
       }
-    } else {
+    } else if (forceHubCreation) {
       console.error('CCM: Forced hub creation mode - skipping existing hub check');
+    } else {
+      console.error('CCM: Auto-hub creation disabled - will only connect to existing hub');
+      try {
+        await this.connectToExistingHub(5000);
+        this.onConnectionSuccess();
+        console.error(`CCM: Connected to existing hub as ${this.clientInfo.name}`);
+        return;
+      } catch (error) {
+        this.connectionState = 'disconnected';
+        console.error('CCM: Failed to connect to existing hub and auto-creation disabled:', error);
+        throw error;
+      }
     }
 
     try {
@@ -600,32 +615,19 @@ class AutoHubClient {
     this.connectionState = 'reconnecting';
     this.reconnectAttempts++;
     
-    // Smart exponential backoff with jitter
-    const baseDelay = Math.min(
-      this.baseReconnectDelay * Math.pow(1.5, this.reconnectAttempts),
-      this.maxReconnectDelay
-    );
-    const jitter = Math.random() * 1000; // Add up to 1s jitter
-    const delay = baseDelay + jitter;
-    
-    console.error(`CCM: Reconnecting in ${Math.round(delay)}ms (attempt ${this.reconnectAttempts})`);
+    console.error('CCM: Hub connection lost - notifying MultiHubManager for simplified failover');
     
     this.connectionHistory.push({
       timestamp: Date.now(),
-      event: 'reconnect_scheduled',
-      attempt: this.reconnectAttempts,
-      delay
+      event: 'connection_lost',
+      attempt: this.reconnectAttempts
     });
     
-    setTimeout(async () => {
-      try {
-        await this.connect();
-        console.error('CCM: Reconnection successful');
-      } catch (error) {
-        console.error('CCM: Reconnection failed:', error.message);
-        // scheduleReconnect will be called again via the close handler
-      }
-    }, delay);
+    // Emit event for simplified MultiHubManager to handle
+    this.emit('connection_lost', {
+      reconnectAttempts: this.reconnectAttempts,
+      timestamp: Date.now()
+    });
   }
 
   async close() {

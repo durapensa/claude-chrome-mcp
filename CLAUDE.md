@@ -34,7 +34,7 @@ mcp__claude-chrome-mcp__forward_response_to_claude_dot_ai_tab --sourceTabId <sou
 - **ALL claude-chrome-mcp tools should operate in async mode by default, with waitForCompletion flags added only if applicable and only for optional use**
 
 ## Project Structure
-- `extension/` - Chrome extension (WebSocket client)
+- `extension/` - Chrome extension (HTTP polling client with adaptive intervals)
 - `mcp-server/` - MCP server (modular architecture)
   - `src/server.js` - Main entry point (382 lines, modular)
   - `src/hub/` - WebSocket hub, client management, multi-hub coordination
@@ -51,8 +51,9 @@ mcp__claude-chrome-mcp__forward_response_to_claude_dot_ai_tab --sourceTabId <sou
 - Roadmap: ROADMAP.md
 
 ## Architecture Overview
-- **MCP-Server-as-Hub**: MCP server hosts WebSocket hub on port 54321, all clients connect to it
-- **Chrome Extension Client**: Extension connects as WebSocket client to MCP server hub
+- **MCP-Server-as-Hub**: MCP server hosts hybrid WebSocket + HTTP hub on port 54321
+- **Chrome Extension Client**: Extension uses adaptive HTTP polling (500ms-2s intervals, reduced network load)
+- **Simplified Hub Election**: First-come-first-served port binding, immediate failover on connection loss
 - **CustomEvent Bridge**: MAIN/ISOLATED world communication for network detection
 - **Network-Level Detection**: Uses fetch interception + `/latest` endpoint for response completion
 - **Async Operations**: Full async workflow with operation registration and milestone tracking
@@ -84,9 +85,12 @@ When you type 'continue', follow the standard workflow in docs/CONTINUATION.md
 - **GIT FOR HISTORY**: Don't keep backup files in filesystem
 - **TEST AS YOU GO**: Each change should be immediately testable
 - **CLEAN REFERENCES**: Update doc links when files are moved/deleted
+- **Do not be overconfident about treating fixes and new work as 'production-ready' or 'enterprise-grade' etc.**
 
 ## Essential Workflows
 - Change code → Reload extension → Test
 
 ## Tool Usage Directive
 - Use all of the claude-chrome-mcp tools available to debug, test, and develop
+
+```

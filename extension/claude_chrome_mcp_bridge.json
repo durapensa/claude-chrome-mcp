@@ -1,0 +1,10 @@
+{
+  "name": "claude_chrome_mcp_bridge",
+  "description": "Native messaging bridge for Claude Chrome MCP extension",
+  "path": "/Users/dp/.nvm/versions/node/v22.16.0/bin/node",
+  "type": "stdio",
+  "args": ["/Users/dp/claude-chrome-mcp/extension/native-bridge.js"],
+  "allowed_origins": [
+    "chrome-extension://afnmaicegmhfmlmljelaglpfeilhinle/"
+  ]
+}

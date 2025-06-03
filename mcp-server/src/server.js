@@ -74,6 +74,11 @@ class ChromeMCPServer {
 
     // Initialize multi-hub manager for distributed coordination
     this.multiHubManager = new MultiHubManager(this.hubClient);
+    
+    // Set up simplified hub failover - MultiHubManager handles connection loss
+    this.hubClient.on('connection_lost', () => {
+      this.multiHubManager.onHubConnectionLost();
+    });
 
     this.setupTools();
   }
@@ -488,6 +493,51 @@ class ChromeMCPServer {
             required: ['stateKey'],
             additionalProperties: false
           }
+        },
+        {
+          name: 'start_network_inspection',
+          description: 'Start network request monitoring on a tab',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              tabId: {
+                type: 'number',
+                description: 'The tab ID to monitor network requests'
+              }
+            },
+            required: ['tabId'],
+            additionalProperties: false
+          }
+        },
+        {
+          name: 'stop_network_inspection',
+          description: 'Stop network request monitoring on a tab',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              tabId: {
+                type: 'number',
+                description: 'The tab ID to stop monitoring'
+              }
+            },
+            required: ['tabId'],
+            additionalProperties: false
+          }
+        },
+        {
+          name: 'get_captured_requests',
+          description: 'Get captured network requests from monitoring',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              tabId: {
+                type: 'number',
+                description: 'The tab ID to get captured requests for'
+              }
+            },
+            required: ['tabId'],
+            additionalProperties: false
+          }
         }
       ]
     }));
@@ -545,6 +595,15 @@ class ChromeMCPServer {
           case 'delete_workflow_state':
             return await this.deleteWorkflowState(args);
 
+          case 'start_network_inspection':
+            return await this.forwardToExtension('start_network_inspection', args);
+
+          case 'stop_network_inspection':
+            return await this.forwardToExtension('stop_network_inspection', args);
+
+          case 'get_captured_requests':
+            return await this.forwardToExtension('get_captured_requests', args);
+
           default:
             throw new Error(`Unknown tool: ${name}`);
         }
@@ -575,7 +634,7 @@ class ChromeMCPServer {
   }
 
   async forwardToExtension(toolName, params) {
-    const result = await this.hubClient.sendToolRequest(toolName, params);
+    const result = await this.hubClient.sendRequest(toolName, params);
     
     if (result.error) {
       throw new Error(result.error);

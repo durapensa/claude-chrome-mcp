@@ -2,8 +2,8 @@
 // Safe initialization but more aggressive connection attempts
 
 import { MESSAGE_TYPES } from './modules/config.js';
-// Import HubClient directly - ContentScriptManager will be loaded lazily
 import { HubClient } from './modules/hub-client.js';
+import { ContentScriptManager } from './modules/content-script-manager.js';
 
 console.log('CCM: Balanced background script starting...');
 
@@ -15,32 +15,23 @@ let initializationComplete = false;
 // Register event listeners
 console.log('CCM: Registering event listeners...');
 
-// Event-driven extension - no periodic polling needed
+// Event-driven extension with HTTP polling
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('CCM Extension: Installed/Updated - Event-driven mode');
+  console.log('CCM Extension: Installed/Updated - HTTP polling mode');
 });
 
 // Message queue for early messages
 const messageQueue = [];
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (!initializationComplete) {
-    console.log('CCM Extension: Queuing message - not initialized yet');
-    messageQueue.push({ request, sender, sendResponse });
-    return true;
-  }
-  
-  return handleMessage(request, sender, sendResponse);
-});
-
-function handleMessage(request, sender, sendResponse) {
-  // Handle connection health check immediately (event-driven, no polling)
+  // Always handle health checks immediately, even during initialization
   if (request.type === 'mcp_tool_request' && request.tool === 'get_connection_health') {
     const currentState = hubClient ? hubClient.getCurrentState() : {
       hubConnected: false,
       isReconnecting: false,
       connectedClients: [],
       extensionConnected: false,
+      initialized: initializationComplete,
       timestamp: Date.now()
     };
 
@@ -56,6 +47,18 @@ function handleMessage(request, sender, sendResponse) {
     });
     return false;
   }
+  
+  if (!initializationComplete) {
+    console.log('CCM Extension: Queuing message - not initialized yet');
+    messageQueue.push({ request, sender, sendResponse });
+    return true;
+  }
+  
+  return handleMessage(request, sender, sendResponse);
+});
+
+function handleMessage(request, sender, sendResponse) {
+  // Health checks are now handled at the top level
   
   if (!hubClient || !contentScriptManager) {
     sendResponse({ success: false, error: 'Extension not fully initialized' });
@@ -79,6 +82,19 @@ function handleMessage(request, sender, sendResponse) {
     return true;
   }
   
+  // Handle force reconnect from popup
+  if (request.type === 'force_reconnect') {
+    console.log('CCM Extension: Force reconnect requested from popup');
+    hubClient.connectToHub().then(() => {
+      console.log('CCM Extension: Force reconnect succeeded');
+      sendResponse({ success: true });
+    }).catch(error => {
+      console.error('CCM Extension: Force reconnect failed:', error);
+      sendResponse({ success: false, error: error.message });
+    });
+    return true;
+  }
+  
   return false;
 }
 
@@ -89,9 +105,6 @@ setTimeout(async () => {
   try {
     // Create HubClient first (no DOM dependencies)
     hubClient = new HubClient();
-    
-    // Dynamically import ContentScriptManager only when needed
-    const { ContentScriptManager } = await import('./modules/content-script-manager.js');
     
     // Create ContentScriptManager
     contentScriptManager = new ContentScriptManager();
@@ -105,9 +118,6 @@ setTimeout(async () => {
     globalThis.ccmHubClient = hubClient;
     globalThis.contentScriptManager = contentScriptManager;
     
-    // Start keepalive
-    hubClient.startKeepalive();
-    
     initializationComplete = true;
     console.log('CCM Extension: Initialization complete');
     
@@ -117,24 +127,17 @@ setTimeout(async () => {
       handleMessage(request, sender, sendResponse);
     }
     
-    // Try connecting immediately
-    console.log('CCM Extension: Attempting initial connection...');
-    hubClient.connectToHub().then(() => {
-      console.log('CCM Extension: Initial connection succeeded');
-    }).catch(err => {
-      console.error('CCM Extension: Initial connection failed:', err);
-      // Schedule retry sooner
-      setTimeout(() => {
-        console.log('CCM Extension: Retrying connection...');
-        hubClient.connectToHub().catch(e => console.error('Retry failed:', e));
-      }, 2000);
+    // Try connecting immediately after initialization
+    console.log('CCM Extension: Attempting immediate WebSocket connection...');
+    hubClient.connectToHub().catch(err => {
+      console.log('CCM Extension: Initial connection failed, will retry via alarms:', err.message);
     });
     
   } catch (error) {
     console.error('CCM Extension: Initialization failed:', error);
     initializationComplete = false;
   }
-}, 1000); // Only 1 second delay
+}, 100); // Minimal delay for service worker stability
 
 // Handle tab cleanup
 chrome.tabs.onRemoved.addListener((tabId) => {
@@ -146,14 +149,20 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   }
 });
 
-// Also try to connect when popup is opened
+// Also try to connect when popup is opened (backup activation method)
 chrome.action.onClicked.addListener(() => {
-  if (hubClient && !hubClient.isConnected()) {
-    console.log('CCM Extension: Popup clicked - attempting connection');
+  console.log('CCM Extension: Extension icon clicked - activating service worker');
+  if (!initializationComplete) {
+    console.log('CCM Extension: Icon click triggered initialization');
+  } else if (hubClient && !hubClient.isConnected()) {
+    console.log('CCM Extension: Icon click triggered connection attempt');
     hubClient.connectToHub().catch(err => {
-      console.error('CCM Extension: Popup-triggered connection failed:', err);
+      console.error('CCM Extension: Icon-triggered connection failed:', err);
     });
   }
 });
+
+// Try immediate connection on service worker startup
+console.log('CCM Extension: Service worker starting - attempting immediate connection');
 
 console.log('CCM Extension: Balanced background script loaded');
