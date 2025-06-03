@@ -979,6 +979,43 @@ export class HubClient {
     });
     return tab;
   }
+
+  // Offscreen WebSocket relay methods
+  handleRelayStatus(status) {
+    console.log('CCM HubClient: Relay status update:', status);
+    if (status.status === 'connected') {
+      console.log('CCM HubClient: WebSocket relay connected');
+      // TODO: Transition from HTTP polling to WebSocket mode
+    } else if (status.status === 'disconnected') {
+      console.log('CCM HubClient: WebSocket relay disconnected');
+      // TODO: Fall back to HTTP polling if needed
+    }
+  }
+
+  handleRelayMessage(message) {
+    console.log('CCM HubClient: Message from relay:', message.type);
+    // TODO: Route messages based on type
+    // For now, treat it like a command from the hub
+    if (message.type && message.data) {
+      this.executeCommand(message).catch(error => {
+        console.error('CCM HubClient: Error executing relay message:', error);
+      });
+    }
+  }
+
+  // Send message via offscreen WebSocket relay
+  async sendToRelay(message) {
+    try {
+      await chrome.runtime.sendMessage({
+        type: 'send_to_relay',
+        data: message
+      });
+    } catch (error) {
+      console.error('CCM HubClient: Failed to send to relay:', error);
+      // Fall back to HTTP if relay is not available
+      throw error;
+    }
+  }
 }
 
 // Mix in all operation methods

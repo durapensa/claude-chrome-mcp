@@ -11,6 +11,7 @@ console.log('CCM: Balanced background script starting...');
 let hubClient = null;
 let contentScriptManager = null;
 let initializationComplete = false;
+let offscreenCreated = false;
 
 // Register event listeners
 console.log('CCM: Registering event listeners...');
@@ -23,7 +24,60 @@ chrome.runtime.onInstalled.addListener(() => {
 // Message queue for early messages
 const messageQueue = [];
 
+// Offscreen document management
+async function ensureOffscreenDocument() {
+  if (offscreenCreated) return;
+  
+  try {
+    // Check if offscreen document already exists
+    const existingContexts = await chrome.runtime.getContexts({
+      contextTypes: ['OFFSCREEN_DOCUMENT']
+    });
+    
+    if (existingContexts.length === 0) {
+      console.log('CCM: Creating offscreen document for WebSocket connection...');
+      await chrome.offscreen.createDocument({
+        url: 'offscreen.html',
+        reasons: ['WEBSOCKET'],
+        justification: 'Maintain persistent WebSocket connection to relay server'
+      });
+      offscreenCreated = true;
+      console.log('CCM: Offscreen document created successfully');
+    } else {
+      console.log('CCM: Offscreen document already exists');
+      offscreenCreated = true;
+    }
+  } catch (error) {
+    console.error('CCM: Failed to create offscreen document:', error);
+    throw error;
+  }
+}
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  // Handle messages from offscreen document
+  if (request.type === 'relay_connection_status') {
+    console.log('CCM: Relay connection status:', request.status);
+    // Forward status to hub client if available
+    if (hubClient) {
+      hubClient.handleRelayStatus(request);
+    }
+    return false;
+  }
+  
+  if (request.type === 'relay_message') {
+    console.log('CCM: Message from relay:', request.data.type);
+    // Forward message to hub client
+    if (hubClient) {
+      hubClient.handleRelayMessage(request.data);
+    }
+    return false;
+  }
+  
+  if (request.type === 'offscreen_heartbeat') {
+    // Acknowledge heartbeat from offscreen document
+    return false;
+  }
+  
   // Always handle health checks immediately, even during initialization
   if (request.type === 'mcp_tool_request' && request.tool === 'get_connection_health') {
     const currentState = hubClient ? hubClient.getCurrentState() : {
@@ -109,6 +163,9 @@ setTimeout(async () => {
     // Create ContentScriptManager
     contentScriptManager = new ContentScriptManager();
     console.log('CCM Extension: ContentScriptManager created');
+    
+    // Create offscreen document for WebSocket connection
+    await ensureOffscreenDocument();
     
     // Set the content script manager reference
     hubClient.contentScriptManager = contentScriptManager;

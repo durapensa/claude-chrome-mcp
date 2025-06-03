@@ -11,7 +11,8 @@
     "storage",
     "webNavigation",
     "notifications",
-    "alarms"
+    "alarms",
+    "offscreen"
   ],
   "host_permissions": [
     "https://claude.ai/*"
