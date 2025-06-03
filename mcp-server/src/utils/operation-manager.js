@@ -1,11 +1,14 @@
 const fs = require('fs');
 const path = require('path');
+const { EventEmitter } = require('events');
 
 // Manages async operations with state persistence for MCP operations
-class OperationManager {
+class OperationManager extends EventEmitter {
   constructor() {
+    super();
     this.operations = new Map();
     this.stateFile = path.join(__dirname, '../../.operations-state.json');
+    this.pendingCompletions = new Map(); // Track completion promises
     this.loadState();
   }
 
@@ -47,9 +50,16 @@ class OperationManager {
       operation.status = 'in_progress';
     } else if (milestone === 'completed' || milestone === 'response_completed') {
       operation.status = 'completed';
+      // Emit completion event
+      this.emit('operation:completed', { operationId, operation });
     } else if (milestone === 'error') {
       operation.status = 'failed';
+      // Emit failure event
+      this.emit('operation:failed', { operationId, operation, error: data });
     }
+    
+    // Emit general update event
+    this.emit('operation:updated', { operationId, operation, milestone, data });
     
     this.saveState();
     
@@ -68,36 +78,66 @@ class OperationManager {
 
   waitForCompletion(operationId, timeoutMs = 30000) {
     return new Promise((resolve, reject) => {
-      const startTime = Date.now();
+      const operation = this.operations.get(operationId);
       
-      const checkCompletion = () => {
-        const operation = this.operations.get(operationId);
-        
-        if (!operation) {
-          reject(new Error(`Operation ${operationId} not found`));
-          return;
+      if (!operation) {
+        reject(new Error(`Operation ${operationId} not found`));
+        return;
+      }
+      
+      // Check if already completed
+      if (operation.status === 'completed') {
+        resolve(operation);
+        return;
+      }
+      
+      if (operation.status === 'failed') {
+        reject(new Error(`Operation ${operationId} failed`));
+        return;
+      }
+      
+      // Set up timeout
+      const timeoutHandle = setTimeout(() => {
+        cleanup();
+        reject(new Error(`Operation ${operationId} timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+      
+      // Event handlers
+      const onCompleted = ({ operationId: id, operation: op }) => {
+        if (id === operationId) {
+          cleanup();
+          resolve(op);
         }
-        
-        if (operation.status === 'completed') {
-          resolve(operation);
-          return;
-        }
-        
-        if (operation.status === 'failed') {
-          reject(new Error(`Operation ${operationId} failed`));
-          return;
-        }
-        
-        if (Date.now() - startTime > timeoutMs) {
-          reject(new Error(`Operation ${operationId} timed out after ${timeoutMs}ms`));
-          return;
-        }
-        
-        setTimeout(checkCompletion, 100);
       };
       
-      checkCompletion();
+      const onFailed = ({ operationId: id, operation: op, error }) => {
+        if (id === operationId) {
+          cleanup();
+          reject(new Error(`Operation ${operationId} failed: ${error?.message || 'Unknown error'}`));
+        }
+      };
+      
+      // Cleanup function to remove listeners and timeout
+      const cleanup = () => {
+        clearTimeout(timeoutHandle);
+        this.removeListener('operation:completed', onCompleted);
+        this.removeListener('operation:failed', onFailed);
+      };
+      
+      // Listen for completion or failure events
+      this.on('operation:completed', onCompleted);
+      this.on('operation:failed', onFailed);
     });
+  }
+
+  getPendingOperations() {
+    const pending = [];
+    for (const [id, operation] of this.operations) {
+      if (operation.status === 'pending' || operation.status === 'in_progress') {
+        pending.push({ id, ...operation });
+      }
+    }
+    return pending;
   }
 
   cleanup(maxAge = 3600000) { // 1 hour
