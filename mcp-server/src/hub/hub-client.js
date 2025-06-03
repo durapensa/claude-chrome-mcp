@@ -185,9 +185,8 @@ class AutoHubClient {
 
     this.connectionState = 'connecting';
     
-    // Force hub creation in Claude Code environment
-    const forceHubCreation = process.env.CCM_FORCE_HUB_CREATION === '1' || 
-                            process.env.ANTHROPIC_ENVIRONMENT === 'claude_code';
+    // Check if hub creation is forced
+    const forceHubCreation = process.env.CCM_FORCE_HUB_CREATION === '1';
     
     if (!forceHubCreation) {
       try {

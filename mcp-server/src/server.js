@@ -68,9 +68,6 @@ class ChromeMCPServer {
     // Initialize lifecycle manager
     this.lifecycleManager = new ProcessLifecycleManager();
     
-    // Set environment variable to force hub creation for MCP server
-    process.env.CCM_FORCE_HUB_CREATION = '1';
-    
     // Initialize hub client for multi-server coordination
     this.hubClient = new AutoHubClient({
       id: 'claude-chrome-mcp',
