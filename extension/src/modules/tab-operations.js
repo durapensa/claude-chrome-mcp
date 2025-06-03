@@ -149,7 +149,7 @@ export const tabOperationMethods = {
     try {
       const results = await chrome.scripting.executeScript({
         target: { tabId: tabId },
-        func: () => {
+        func: function() {
           // Extract conversation elements from the page
           const elements = {
             messages: [],
@@ -234,7 +234,7 @@ export const tabOperationMethods = {
       // Execute message sending
       const results = await chrome.scripting.executeScript({
         target: { tabId: tabId },
-        func: (message, waitForReady) => {
+        func: function(message, waitForReady) {
           return new Promise((resolve) => {
             const sendMessage = () => {
               const inputField = document.querySelector('textarea[placeholder*="Reply"]') ||
@@ -308,7 +308,7 @@ export const tabOperationMethods = {
       while (Date.now() - startTime < timeoutMs) {
         const results = await chrome.scripting.executeScript({
           target: { tabId: tabId },
-          func: (opId) => {
+          func: function(opId) {
             if (!window.conversationObserver) {
               return { status: 'no_observer' };
             }

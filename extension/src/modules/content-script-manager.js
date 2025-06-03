@@ -207,7 +207,8 @@ export class ContentScriptManager {
 
   getCrossWorldCommunicationScript() {
     // Return the function that sets up cross-world communication
-    return () => {
+    // This function will be stringified and executed in the content script context
+    return function() {
       // Listen for registration CustomEvents from ISOLATED world
       document.addEventListener('ccm_register_operation', (event) => {
         const { operationId, operationType, params } = event.detail;

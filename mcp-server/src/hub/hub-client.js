@@ -671,6 +671,11 @@ class AutoHubClient {
     this.pendingRequests.clear();
   }
 
+  async disconnect() {
+    // Alias for close() to match expected interface
+    return this.close();
+  }
+
   getConnectionStats() {
     return {
       state: this.connectionState,
