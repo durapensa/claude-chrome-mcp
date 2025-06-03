@@ -48,7 +48,7 @@ Browser automation tool enabling MCP clients (Claude Desktop, Claude Code, Curso
    ```
 2. Navigate to `chrome://extensions/` in Chrome
 3. Enable "Developer mode" 
-4. Click "Load unpacked" and select `extension/` directory
+4. Click "Load unpacked" and select `extension/dist/` directory
 
 ### MCP Server
 ```bash
