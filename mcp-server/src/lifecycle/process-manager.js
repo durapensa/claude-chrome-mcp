@@ -170,7 +170,7 @@ class ProcessLifecycleManager {
       if (this.parentPid && this.parentPid !== 1) {
         process.kill(this.parentPid, 0);
         this.lastParentCheck = Date.now();
-        console.log(`CCM: Parent process ${this.parentPid} still alive`);
+        console.error(`CCM: Parent process ${this.parentPid} still alive`);
       }
     } catch (error) {
       if (error.code === 'ESRCH') {
