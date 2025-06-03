@@ -159,6 +159,60 @@ export class ContentScriptManager {
         }
       };
 
+      // DOM Observer for message detection
+      const messageObserver = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+          if (mutation.type === 'childList') {
+            mutation.addedNodes.forEach(node => {
+              if (node.nodeType === Node.ELEMENT_NODE) {
+                // Check for Claude messages using new selectors
+                const isClaudeMessage = node.classList?.contains('font-claude-message') ||
+                                       node.querySelector?.('.font-claude-message');
+                
+                if (isClaudeMessage) {
+                  console.log('CCM: Claude message detected');
+                  
+                  // Mark any waiting operations as completed
+                  for (const [operationId, operation] of window.conversationObserver.operationRegistry) {
+                    if (operation.status === 'sending' || operation.status === 'waiting_response') {
+                      const messageText = node.textContent || node.querySelector('.font-claude-message')?.textContent;
+                      
+                      operation.status = 'completed';
+                      operation.completedAt = Date.now();
+                      operation.response = { text: messageText };
+                      window.conversationObserver.lastObservedResponse = {
+                        operationId,
+                        response: { text: messageText },
+                        timestamp: Date.now()
+                      };
+                      
+                      console.log(`CCM: Operation ${operationId} completed via DOM observation`);
+                    }
+                  }
+                }
+              }
+            });
+          }
+        }
+      });
+
+      // Start observing once DOM is ready
+      if (document.body) {
+        messageObserver.observe(document.body, {
+          childList: true,
+          subtree: true
+        });
+        console.log('CCM: DOM observer started');
+      } else {
+        document.addEventListener('DOMContentLoaded', () => {
+          messageObserver.observe(document.body, {
+            childList: true,
+            subtree: true
+          });
+          console.log('CCM: DOM observer started after DOMContentLoaded');
+        });
+      }
+
       console.log('CCM: Conversation observer ready in MAIN world');
       return 'Observer initialized in MAIN world';
     };

@@ -286,6 +286,23 @@ export const tabOperationMethods = {
       
       const result = results[0].result;
       if (result.success) {
+        // Update operation status to waiting_response
+        await chrome.scripting.executeScript({
+          target: { tabId: tabId },
+          world: 'MAIN',
+          func: function(opId) {
+            if (window.conversationObserver) {
+              const operation = window.conversationObserver.operationRegistry.get(opId);
+              if (operation) {
+                operation.status = 'waiting_response';
+                operation.lastUpdate = Date.now();
+                console.log(`CCM: Operation ${opId} status updated to waiting_response`);
+              }
+            }
+          },
+          args: [operationId]
+        });
+        
         return {
           success: true,
           operationId: operationId,
