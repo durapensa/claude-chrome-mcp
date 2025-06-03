@@ -316,6 +316,7 @@ export const tabOperationMethods = {
       while (Date.now() - startTime < timeoutMs) {
         const results = await chrome.scripting.executeScript({
           target: { tabId: tabId },
+          world: 'MAIN',
           func: function(opId) {
             if (!window.conversationObserver) {
               return { status: 'no_observer' };
