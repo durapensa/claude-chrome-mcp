@@ -1,5 +1,7 @@
 const WebSocket = require('ws');
 const EventEmitter = require('events');
+const express = require('express');
+const http = require('http');
 const { ErrorTracker } = require('../utils/error-tracker');
 const { DebugMode } = require('../utils/debug-mode');
 const { MCPClientConnection } = require('./client-connection');
@@ -13,7 +15,16 @@ class WebSocketHub extends EventEmitter {
     super();
     this.clients = new Map(); // clientId -> MCPClientConnection
     this.server = null;
+    this.httpServer = null;
+    this.wsServer = null;
+    this.app = null;
+    
+    // Chrome extension HTTP communication
     this.chromeExtensionConnection = null;
+    this.chromeExtensionHealth = { lastSeen: null, active: false };
+    this.commandQueue = []; // Commands waiting for Chrome extension
+    this.responseCallbacks = new Map(); // requestId -> callback for command responses
+    
     this.requestCounter = 0;
     this.isShuttingDown = false;
     this.startTime = Date.now();
@@ -48,28 +59,128 @@ class WebSocketHub extends EventEmitter {
 
   async startServer() {
     return new Promise((resolve, reject) => {
-      this.server = new WebSocket.Server({ 
-        port: HUB_PORT,
+      // Create Express app for HTTP endpoints
+      this.app = express();
+      this.app.use(express.json());
+      
+      // Enable CORS for Chrome extension
+      this.app.use((req, res, next) => {
+        res.header('Access-Control-Allow-Origin', '*');
+        res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+        res.header('Access-Control-Allow-Headers', 'Content-Type');
+        if (req.method === 'OPTIONS') {
+          res.sendStatus(200);
+        } else {
+          next();
+        }
+      });
+      
+      // Set up HTTP endpoints for Chrome extension
+      this.setupHttpEndpoints();
+      
+      // Create HTTP server
+      this.httpServer = http.createServer(this.app);
+      
+      // Attach WebSocket server to HTTP server
+      this.wsServer = new WebSocket.Server({ 
+        server: this.httpServer,
         clientTracking: true
       });
 
-      this.server.on('listening', () => {
-        console.error(`WebSocket Hub: Listening on port ${HUB_PORT}`);
+      this.httpServer.listen(HUB_PORT, () => {
+        console.error(`Hybrid Hub: HTTP + WebSocket listening on port ${HUB_PORT}`);
         resolve();
       });
 
-      this.server.on('error', (error) => {
+      this.httpServer.on('error', (error) => {
         if (error.code === 'EADDRINUSE') {
-          console.error(`WebSocket Hub: Port ${HUB_PORT} already in use`);
+          console.error(`Hybrid Hub: Port ${HUB_PORT} already in use`);
           reject(new Error(`Port ${HUB_PORT} already in use`));
         } else {
-          console.error('WebSocket Hub: Server error:', error);
+          console.error('Hybrid Hub: Server error:', error);
           reject(error);
         }
       });
 
-      this.server.on('connection', (ws, req) => {
+      this.wsServer.on('connection', (ws, req) => {
         this.handleNewConnection(ws, req);
+      });
+      
+      // Keep reference for shutdown
+      this.server = this.wsServer;
+    });
+  }
+
+  setupHttpEndpoints() {
+    // Chrome extension heartbeat endpoint
+    this.app.post('/heartbeat', (req, res) => {
+      this.chromeExtensionHealth.lastSeen = Date.now();
+      this.chromeExtensionHealth.active = true;
+      this.chromeExtensionHealth.extensionId = req.body.extensionId;
+      
+      console.error(`Hybrid Hub: Chrome extension heartbeat from ${req.body.extensionId}`);
+      
+      res.json({ 
+        status: 'alive',
+        timestamp: Date.now(),
+        queuedCommands: this.commandQueue.length
+      });
+    });
+
+    // Chrome extension command polling endpoint
+    this.app.get('/poll-commands', (req, res) => {
+      const commands = this.commandQueue.splice(0); // Get all and clear queue
+      
+      if (commands.length > 0) {
+        console.error(`Hybrid Hub: Delivering ${commands.length} commands to Chrome extension`);
+      }
+      
+      res.json({
+        commands: commands,
+        timestamp: Date.now()
+      });
+    });
+
+    // Chrome extension command response endpoint
+    this.app.post('/command-response', (req, res) => {
+      const { requestId, result, error } = req.body;
+      
+      console.error(`Hybrid Hub: Received command response for ${requestId}`);
+      
+      // Find and call the waiting callback
+      const callback = this.responseCallbacks.get(requestId);
+      if (callback) {
+        this.responseCallbacks.delete(requestId);
+        if (error) {
+          callback.reject(new Error(error));
+        } else {
+          callback.resolve(result);
+        }
+      }
+      
+      res.json({ status: 'received' });
+    });
+
+    // Health check endpoint - includes WebSocket client info for extension
+    this.app.get('/health', (req, res) => {
+      // Convert WebSocket clients to array for HTTP extension
+      const clientList = Array.from(this.clients.values()).map(client => ({
+        id: client.info.id,
+        name: client.info.name,
+        type: client.info.type,
+        capabilities: client.info.capabilities || [],
+        connectedAt: client.registeredAt,
+        lastActivity: client.ws.lastActivity
+      }));
+
+      res.json({
+        status: 'healthy',
+        uptime: Date.now() - this.startTime,
+        chromeExtensionActive: this.chromeExtensionHealth.active,
+        chromeExtensionLastSeen: this.chromeExtensionHealth.lastSeen,
+        connectedClients: clientList,
+        clientCount: this.clients.size,
+        queuedCommands: this.commandQueue.length
       });
     });
   }
@@ -343,18 +454,25 @@ class WebSocketHub extends EventEmitter {
   }
 
   checkShutdownConditions() {
-    // Enhanced shutdown condition handling (Fix 3)
-    // Shut down if no MCP clients remain and we're not the extension
-    if (this.clients.size === 0 && !this.chromeExtensionConnection) {
-      console.error('WebSocket Hub: No clients remaining, scheduling graceful shutdown...');
+    // Enhanced shutdown condition handling
+    // Shut down if no MCP clients remain and Chrome extension hasn't been seen recently
+    const extensionActive = this.chromeExtensionHealth.active && 
+                           (Date.now() - (this.chromeExtensionHealth.lastSeen || 0)) < 30000;
+    
+    if (this.clients.size === 0 && !extensionActive) {
+      console.error('Hybrid Hub: No clients remaining, scheduling graceful shutdown...');
       
       // Use graceful shutdown with proper cleanup sequencing
       setTimeout(() => {
-        if (this.clients.size === 0 && !this.chromeExtensionConnection) {
-          console.error('WebSocket Hub: Confirming graceful shutdown - no clients remain');
+        const stillNoClients = this.clients.size === 0;
+        const stillNoExtension = !this.chromeExtensionHealth.active || 
+                                (Date.now() - (this.chromeExtensionHealth.lastSeen || 0)) > 30000;
+                                
+        if (stillNoClients && stillNoExtension) {
+          console.error('Hybrid Hub: Confirming graceful shutdown - no clients remain');
           this.shutdown('no_clients_remaining');
         } else {
-          console.error('WebSocket Hub: Shutdown cancelled - clients reconnected');
+          console.error('Hybrid Hub: Shutdown cancelled - clients reconnected');
         }
       }, 5000); // 5 second grace period for reconnections
     }
@@ -385,25 +503,65 @@ class WebSocketHub extends EventEmitter {
       return;
     }
 
-    if (!this.chromeExtensionConnection || this.chromeExtensionConnection.readyState !== WebSocket.OPEN) {
+    // Check if Chrome extension is active via HTTP heartbeat
+    const extensionTimeout = 15000; // 15 seconds
+    const timeSinceLastSeen = Date.now() - (this.chromeExtensionHealth.lastSeen || 0);
+    
+    if (!this.chromeExtensionHealth.active || timeSinceLastSeen > extensionTimeout) {
       this.sendToClient(ws, {
         type: 'error',
         requestId: message.requestId,
-        error: 'Chrome extension not connected',
+        error: 'Chrome extension not available (no recent heartbeat)',
         timestamp: Date.now()
       });
       return;
     }
 
-    // Add source information and forward
+    // Add source information and queue for HTTP polling
     const forwardedMessage = {
       ...message,
       sourceClientId: ws.clientInfo.id,
       sourceClientName: ws.clientInfo.name,
-      hubMessageId: ++this.messageCounter
+      hubMessageId: ++this.messageCounter,
+      timestamp: Date.now()
     };
 
-    this.sendToClient(this.chromeExtensionConnection, forwardedMessage);
+    // Queue command for Chrome extension to pick up via HTTP polling
+    this.commandQueue.push(forwardedMessage);
+    
+    // Set up callback to wait for response (with timeout)
+    const timeout = setTimeout(() => {
+      this.responseCallbacks.delete(message.requestId);
+      this.sendToClient(ws, {
+        type: 'error',
+        requestId: message.requestId,
+        error: 'Command timeout - Chrome extension did not respond',
+        timestamp: Date.now()
+      });
+    }, 30000); // 30 second timeout
+    
+    this.responseCallbacks.set(message.requestId, {
+      resolve: (result) => {
+        clearTimeout(timeout);
+        this.sendToClient(ws, {
+          type: 'response',
+          requestId: message.requestId,
+          result: result,
+          timestamp: Date.now()
+        });
+      },
+      reject: (error) => {
+        clearTimeout(timeout);
+        this.sendToClient(ws, {
+          type: 'error',
+          requestId: message.requestId,
+          error: error.message,
+          timestamp: Date.now()
+        });
+      }
+    });
+
+    console.error(`Hybrid Hub: Queued command ${message.type} (requestId: ${message.requestId}) for Chrome extension`);
 
     // Update client stats
     const client = this.clients.get(ws.clientInfo.id);
@@ -616,23 +774,10 @@ class WebSocketHub extends EventEmitter {
       clearInterval(this.healthCheckInterval);
     }
 
-    // Enhanced shutdown sequencing (Fix 3)
-    // STEP 1: Notify extension BEFORE closing connections
-    if (this.chromeExtensionConnection && this.chromeExtensionConnection.readyState === WebSocket.OPEN) {
-      try {
-        this.sendToClient(this.chromeExtensionConnection, {
-          type: 'hub_shutdown',
-          reason: reason,
-          timestamp: Date.now()
-        });
-        
-        // Give extension time to process the shutdown message
-        console.error('WebSocket Hub: Notified extension, waiting for processing...');
-        await new Promise(resolve => setTimeout(resolve, 100));
-      } catch (error) {
-        console.error('WebSocket Hub: Error notifying extension of shutdown:', error);
-      }
-    }
+    // Enhanced shutdown sequencing
+    // STEP 1: Mark extension as inactive for HTTP polling
+    this.chromeExtensionHealth.active = false;
+    console.error('Hybrid Hub: Marked Chrome extension as inactive for shutdown');
 
     // STEP 2: Notify all MCP clients
     for (const [id, client] of this.clients) {
@@ -663,15 +808,25 @@ class WebSocketHub extends EventEmitter {
         }
       });
       
-      // STEP 5: Close server with timeout
+      // STEP 5: Close servers with timeout
       await Promise.race([
         new Promise((resolve) => {
+          // Close WebSocket server
           this.server.close(() => {
-            console.error('WebSocket Hub: Server closed');
-            resolve();
+            console.error('Hybrid Hub: WebSocket server closed');
+            
+            // Close HTTP server
+            if (this.httpServer) {
+              this.httpServer.close(() => {
+                console.error('Hybrid Hub: HTTP server closed');
+                resolve();
+              });
+            } else {
+              resolve();
+            }
           });
         }),
-        new Promise(resolve => setTimeout(resolve, 1000)) // 1 second timeout
+        new Promise(resolve => setTimeout(resolve, 2000)) // 2 second timeout
       ]);
     }
 
@@ -684,7 +839,11 @@ class WebSocketHub extends EventEmitter {
       startTime: this.startTime,
       uptime: Date.now() - this.startTime,
       clientCount: this.clients.size,
-      extensionConnected: !!this.chromeExtensionConnection,
+      extensionConnected: this.chromeExtensionHealth.active,
+      extensionLastSeen: this.chromeExtensionHealth.lastSeen,
+      extensionId: this.chromeExtensionHealth.extensionId,
+      queuedCommands: this.commandQueue.length,
+      pendingResponses: this.responseCallbacks.size,
       messageCount: this.messageCounter,
       isShuttingDown: this.isShuttingDown
     };
