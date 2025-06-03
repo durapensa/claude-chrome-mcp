@@ -12,7 +12,6 @@ import {
 import { MessageQueue } from './message-queue.js';
 import { TabOperationLock } from './tab-operation-lock.js';
 import { MCPClient } from './mcp-client.js';
-import { ContentScriptManager } from './content-script-manager.js';
 import { tabOperationMethods } from './tab-operations.js';
 import { updateBadge } from '../utils/utils.js';
 
@@ -28,7 +27,8 @@ export class HubClient {
     this.baseReconnectDelay = 500;
     this.messageQueue = new MessageQueue();
     this.operationLock = new TabOperationLock();
-    this.contentScriptManager = new ContentScriptManager();
+    // ContentScriptManager will be passed in from background script
+    this.contentScriptManager = null;
     
     // Client timeout tracking properties
     this.clientTimeouts = new Map();
@@ -451,7 +451,7 @@ export class HubClient {
         })),
         operationLocks: this.operationLock.getAllLocks(),
         messageQueueSize: this.messageQueue.size(),
-        contentScriptTabs: Array.from(this.contentScriptManager.injectedTabs)
+        contentScriptTabs: this.contentScriptManager ? Array.from(this.contentScriptManager.injectedTabs) : []
       }
     };
   }

@@ -2,7 +2,8 @@
 // Safe initialization but more aggressive connection attempts
 
 import { MESSAGE_TYPES } from './modules/config.js';
-import { ContentScriptManager } from './modules/content-script-manager.js';
+// Import HubClient directly - ContentScriptManager will be loaded lazily
+import { HubClient } from './modules/hub-client-fixed.js';
 
 console.log('CCM: Balanced background script starting...');
 
@@ -92,13 +93,18 @@ setTimeout(async () => {
   console.log('CCM Extension: Starting initialization...');
   
   try {
-    // Create ContentScriptManager first
+    // Create HubClient first (no DOM dependencies)
+    hubClient = new HubClient();
+    
+    // Dynamically import ContentScriptManager only when needed
+    const { ContentScriptManager } = await import('./modules/content-script-manager.js');
+    
+    // Create ContentScriptManager
     contentScriptManager = new ContentScriptManager();
     console.log('CCM Extension: ContentScriptManager created');
     
-    // Import and create HubClient
-    const { HubClient } = await import('./modules/hub-client-fixed.js');
-    hubClient = new HubClient();
+    // Set the content script manager reference
+    hubClient.contentScriptManager = contentScriptManager;
     await hubClient.init();
     
     // Make globally accessible

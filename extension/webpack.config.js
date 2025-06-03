@@ -35,7 +35,11 @@ module.exports = {
     // Don't minimize to make debugging easier
     minimize: false,
     // Keep function names for better stack traces
-    concatenateModules: false
+    concatenateModules: false,
+    // Disable code splitting completely for Chrome extensions
+    splitChunks: false,
+    // Keep runtime in the main chunk
+    runtimeChunk: false
   },
   // Source maps for easier debugging
   devtool: 'inline-source-map',
