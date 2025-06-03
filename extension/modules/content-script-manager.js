@@ -159,6 +159,76 @@ export class ContentScriptManager {
         }
       };
 
+      // Observer for individual message content changes
+      const observeMessageContent = (messageElement, operationId) => {
+        let lastContent = '';
+        let noChangeCount = 0;
+        let checkCount = 0;
+        
+        const getFullContent = (element) => {
+          // Simply get all text content from the message element
+          // This will include all nested p, pre, code, etc.
+          return element.textContent?.trim() || '';
+        };
+        
+        const checkCompletion = () => {
+          const currentContent = getFullContent(messageElement);
+          checkCount++;
+          
+          if (currentContent === lastContent && currentContent.length > 0) {
+            noChangeCount++;
+            // Wait for more consecutive no-changes and ensure we've checked at least 5 times
+            if (noChangeCount >= 5 && checkCount >= 5) {
+              const operation = window.conversationObserver.operationRegistry.get(operationId);
+              if (operation && operation.status === 'receiving') {
+                operation.status = 'completed';
+                operation.completedAt = Date.now();
+                operation.response = { text: currentContent };
+                window.conversationObserver.lastObservedResponse = {
+                  operationId,
+                  response: { text: currentContent },
+                  timestamp: Date.now()
+                };
+                console.log(`CCM: Operation ${operationId} completed with ${currentContent.length} chars`);
+                return true;
+              }
+            }
+          } else if (currentContent !== lastContent) {
+            noChangeCount = 0;
+            lastContent = currentContent;
+            console.log(`CCM: Content still changing for ${operationId}, length: ${currentContent.length}`);
+          }
+          return false;
+        };
+        
+        const contentObserver = new MutationObserver(() => {
+          if (checkCompletion()) {
+            contentObserver.disconnect();
+          }
+        });
+        
+        contentObserver.observe(messageElement, {
+          childList: true,
+          subtree: true,
+          characterData: true,
+          characterDataOldValue: true
+        });
+        
+        // Check periodically as well
+        const checkInterval = setInterval(() => {
+          if (checkCompletion()) {
+            contentObserver.disconnect();
+            clearInterval(checkInterval);
+          }
+        }, 200); // Check more frequently
+        
+        // Clear interval after 30 seconds to prevent memory leak
+        setTimeout(() => {
+          clearInterval(checkInterval);
+          contentObserver.disconnect();
+        }, 30000);
+      };
+
       // DOM Observer for message detection
       const messageObserver = new MutationObserver((mutations) => {
         for (const mutation of mutations) {
@@ -172,21 +242,19 @@ export class ContentScriptManager {
                 if (isClaudeMessage) {
                   console.log('CCM: Claude message detected');
                   
-                  // Mark any waiting operations as completed
+                  // Find the actual message content
+                  let messageElement = node.classList?.contains('font-claude-message') ? node : node.querySelector('.font-claude-message');
+                  if (!messageElement) return;
+                  
+                  // Update operations with streaming status
                   for (const [operationId, operation] of window.conversationObserver.operationRegistry) {
                     if (operation.status === 'sending' || operation.status === 'waiting_response') {
-                      const messageText = node.textContent || node.querySelector('.font-claude-message')?.textContent;
+                      operation.status = 'receiving';
+                      operation.messageElement = messageElement;
+                      console.log(`CCM: Operation ${operationId} now receiving stream`);
                       
-                      operation.status = 'completed';
-                      operation.completedAt = Date.now();
-                      operation.response = { text: messageText };
-                      window.conversationObserver.lastObservedResponse = {
-                        operationId,
-                        response: { text: messageText },
-                        timestamp: Date.now()
-                      };
-                      
-                      console.log(`CCM: Operation ${operationId} completed via DOM observation`);
+                      // Start observing this specific message for content changes
+                      observeMessageContent(messageElement, operationId);
                     }
                   }
                 }

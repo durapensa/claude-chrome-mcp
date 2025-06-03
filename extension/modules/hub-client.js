@@ -688,10 +688,13 @@ export class HubClient {
       return { success: false, error: 'Failed to get response from source tab' };
     }
 
+    // Extract text from response object
+    const responseText = sourceResponse.response?.text || sourceResponse.response || '';
+    
     // Transform response if template provided
-    let messageToSend = sourceResponse.response;
+    let messageToSend = responseText;
     if (transformTemplate) {
-      messageToSend = transformTemplate.replace('${response}', sourceResponse.response);
+      messageToSend = transformTemplate.replace('${response}', responseText);
     }
 
     // Send to target tab
@@ -699,7 +702,7 @@ export class HubClient {
     
     return {
       success: sendResult.success,
-      sourceResponse: sourceResponse.response,
+      sourceResponse: responseText,
       transformedMessage: messageToSend,
       sendResult: sendResult
     };
