@@ -40,36 +40,10 @@ class AutoHubClient {
   }
 
   setupProcessMonitoring() {
-    // Skip parent monitoring if disabled
-    if (process.env.CCM_NO_PARENT_MONITOR === '1') {
-      console.error('CCM: Parent monitoring disabled');
-      return;
-    }
-    
-    // Enhanced parent process monitoring
-    if (process.ppid) {
-      this.parentCheckInterval = setInterval(() => {
-        try {
-          process.kill(process.ppid, 0);
-        } catch (e) {
-          console.error('CCM: Parent process no longer exists, shutting down');
-          this.gracefulShutdown();
-        }
-      }, 2000);
-    }
-
-    // Monitor for orphaned processes
-    if (process.env.CCM_PARENT_PID) {
-      const parentPid = parseInt(process.env.CCM_PARENT_PID);
-      this.parentMonitor = setInterval(() => {
-        try {
-          process.kill(parentPid, 0);
-        } catch (e) {
-          console.error('CCM: Specified parent process no longer exists');
-          this.gracefulShutdown();
-        }
-      }, 3000);
-    }
+    // DISABLED: Parent monitoring is handled by ProcessLifecycleManager
+    // Having it in multiple places causes premature shutdowns
+    console.error('CCM: AutoHubClient parent monitoring disabled (handled by ProcessLifecycleManager)');
+    return;
   }
 
   mergeClientInfo(clientInfo) {
