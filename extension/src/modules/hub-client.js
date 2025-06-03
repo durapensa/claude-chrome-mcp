@@ -1,4 +1,5 @@
-// WebSocket Hub Client for Chrome Extension
+// WebSocket Hub Client for Chrome Extension - FIXED VERSION
+// Prevents Chrome freezing by deferring connection and preventing concurrent attempts
 
 import { 
   WEBSOCKET_PORT, 
@@ -11,39 +12,45 @@ import {
 import { MessageQueue } from './message-queue.js';
 import { TabOperationLock } from './tab-operation-lock.js';
 import { MCPClient } from './mcp-client.js';
-import { ContentScriptManager } from './content-script-manager.js';
 import { tabOperationMethods } from './tab-operations.js';
 import { updateBadge } from '../utils/utils.js';
 
 export class HubClient {
   constructor() {
-    this.connectedClients = new Map(); // clientId -> client info from hub
-    this.debuggerSessions = new Map(); // tabId -> debugger info
-    this.hubConnection = null; // WebSocket connection to hub
+    this.connectedClients = new Map();
+    this.debuggerSessions = new Map();
+    this.hubConnection = null;
     this.serverPort = WEBSOCKET_PORT;
     this.requestCounter = 0;
     this.reconnectAttempts = 0;
-    this.maxReconnectDelay = 5000; // Max 5 seconds for quick recovery
-    this.baseReconnectDelay = 500; // Start with 500ms
-    this.messageQueue = new MessageQueue(); // Add message queue
-    this.operationLock = new TabOperationLock(); // Add operation lock
-    this.contentScriptManager = new ContentScriptManager(); // Add content script manager
+    this.maxReconnectDelay = 5000;
+    this.baseReconnectDelay = 500;
+    this.messageQueue = new MessageQueue();
+    this.operationLock = new TabOperationLock();
+    // ContentScriptManager will be passed in from background script
+    this.contentScriptManager = null;
     
     // Client timeout tracking properties
-    this.clientTimeouts = new Map(); // Track client heartbeat timeouts
-    this.CLIENT_TIMEOUT_MS = 60000; // 1 minute timeout
+    this.clientTimeouts = new Map();
+    this.CLIENT_TIMEOUT_MS = 60000;
     
     // Enhanced reconnection settings
     this.lastConnectionAttempt = 0;
-    this.resetAttemptsAfter = 300000; // Reset after 5 minutes
+    this.resetAttemptsAfter = 300000;
     this.persistentReconnectInterval = null;
-    this.maxReconnectAttempts = -1; // Infinite attempts
+    this.maxReconnectAttempts = -1;
     
-    this.init();
+    // IMPORTANT: Prevent concurrent connection attempts
+    this.isConnecting = false;
+    this.connectionTimeout = null;
+    
+    // IMPORTANT: Do NOT automatically connect in constructor
+    // Let the background script control when to connect
+    console.log('CCM Extension: HubClient created (not connected)');
   }
 
   async init() {
-    console.log('CCM Extension: Initializing...');
+    console.log('CCM Extension: Initializing HubClient...');
     
     // Check for previous connection state
     const previousState = await chrome.storage.local.get(['lastAliveTime', 'connectionState']);
@@ -53,10 +60,9 @@ export class HubClient {
       console.log(`CCM Extension: Previous connection state: ${previousState.connectionState}`);
     }
     
-    await this.connectToHub();
+    // Setup listeners but don't connect yet
     this.setupEventListeners();
-    this.startKeepalive();
-    console.log('CCM Extension: Extension-as-Hub client initialized');
+    console.log('CCM Extension: HubClient initialized (ready to connect)');
   }
 
   isConnected() {
@@ -64,10 +70,37 @@ export class HubClient {
   }
 
   async connectToHub() {
+    // Prevent concurrent connection attempts
+    if (this.isConnecting) {
+      console.log('CCM Extension: Connection already in progress, skipping...');
+      return;
+    }
+    
+    if (this.isConnected()) {
+      console.log('CCM Extension: Already connected, skipping...');
+      return;
+    }
+    
+    this.isConnecting = true;
+    
     try {
       console.log('CCM Extension: Connecting to WebSocket Hub on port', WEBSOCKET_PORT);
       
-      // Use 127.0.0.1 instead of localhost to avoid potential DNS issues
+      // Clear any existing connection timeout
+      if (this.connectionTimeout) {
+        clearTimeout(this.connectionTimeout);
+      }
+      
+      // Set a timeout for the connection attempt
+      this.connectionTimeout = setTimeout(() => {
+        console.log('CCM Extension: Connection attempt timed out');
+        if (this.hubConnection && this.hubConnection.readyState === WebSocket.CONNECTING) {
+          this.hubConnection.close();
+        }
+        this.isConnecting = false;
+        this.scheduleReconnect();
+      }, 5000); // 5 second timeout
+      
       const wsUrl = `ws://127.0.0.1:${WEBSOCKET_PORT}`;
       console.log('CCM Extension: Attempting connection to', wsUrl);
       
@@ -76,7 +109,13 @@ export class HubClient {
       this.hubConnection.onopen = () => {
         console.log('CCM Extension: Connected to WebSocket Hub');
         
-        // Reset reconnection attempts on successful connection
+        // Clear connection timeout
+        if (this.connectionTimeout) {
+          clearTimeout(this.connectionTimeout);
+          this.connectionTimeout = null;
+        }
+        
+        this.isConnecting = false;
         this.reconnectAttempts = 0;
         this.lastConnectionAttempt = Date.now();
         
@@ -94,6 +133,9 @@ export class HubClient {
           timestamp: Date.now()
         }));
         
+        // Update message queue
+        this.messageQueue.setConnected(true);
+        
         updateBadge('hub-connected');
       };
       
@@ -107,31 +149,43 @@ export class HubClient {
       };
       
       this.hubConnection.onclose = (event) => {
-        console.log('CCM Extension: Disconnected from MCP server hub - clearing all client state');
+        console.log('CCM Extension: Disconnected from MCP server hub');
+        
+        // Clear connection timeout
+        if (this.connectionTimeout) {
+          clearTimeout(this.connectionTimeout);
+          this.connectionTimeout = null;
+        }
+        
+        this.isConnecting = false;
         this.hubConnection = null;
         this.clearAllClients();
         updateBadge('hub-disconnected');
         
-        // Immediately try to reconnect if it was a clean shutdown (hub restarting)
-        if (event.code === 1000 || event.code === 1001) {
-          console.log('CCM Extension: Clean shutdown detected, attempting immediate reconnection');
-          setTimeout(() => this.connectToHub(), 100);
-        } else {
-          // Schedule reconnection for unexpected disconnections
+        // Update message queue
+        this.messageQueue.setConnected(false);
+        
+        // Only schedule reconnect if it wasn't a manual close
+        if (event.code !== 1000) {
           this.scheduleReconnect();
         }
-        
-        // Update message queue connection status
-        this.messageQueue.setConnected(false);
       };
       
       this.hubConnection.onerror = (error) => {
         console.error('CCM Extension: WebSocket error:', error);
-        // Don't set to null here, let onclose handle cleanup
+        this.isConnecting = false;
       };
       
     } catch (error) {
       console.error('CCM Extension: Failed to connect to hub:', error);
+      
+      // Clear connection timeout
+      if (this.connectionTimeout) {
+        clearTimeout(this.connectionTimeout);
+        this.connectionTimeout = null;
+      }
+      
+      this.isConnecting = false;
       this.hubConnection = null;
       this.scheduleReconnect();
       
@@ -155,6 +209,11 @@ export class HubClient {
   }
 
   scheduleReconnect() {
+    // Don't schedule if already connecting
+    if (this.isConnecting) {
+      return;
+    }
+    
     // Check if too much time has passed and reset attempts
     const timeSinceLastAttempt = Date.now() - this.lastConnectionAttempt;
     if (timeSinceLastAttempt > this.resetAttemptsAfter) {
@@ -175,23 +234,12 @@ export class HubClient {
     setTimeout(() => {
       this.connectToHub();
     }, backoffDelay);
-    
-    // Set up persistent reconnection interval if not already active
-    if (!this.persistentReconnectInterval) {
-      console.log('CCM Extension: Setting up persistent reconnection interval');
-      this.persistentReconnectInterval = setInterval(() => {
-        if (!this.isConnected()) {
-          console.log('CCM Extension: Persistent reconnection check - attempting to reconnect');
-          this.connectToHub();
-        }
-      }, 30000); // Check every 30 seconds
-    }
   }
 
   startKeepalive() {
     // Regular keepalive interval
     setInterval(() => {
-      if (this.hubConnection && this.hubConnection.readyState === WebSocket.OPEN) {
+      if (this.isConnected()) {
         this.hubConnection.send(JSON.stringify({ 
           type: MESSAGE_TYPES.PING, 
           timestamp: Date.now() 
@@ -200,11 +248,24 @@ export class HubClient {
     }, KEEPALIVE_INTERVAL);
   }
 
-
+  // ... rest of the methods remain the same ...
+  
   handleHubMessage(message) {
     console.log('CCM Extension: Received hub message:', message.type);
     
     switch (message.type) {
+      case 'welcome':
+        console.log('CCM Extension: Received welcome message from hub');
+        // Update badge to show we're connected
+        updateBadge('hub-connected');
+        break;
+        
+      case 'registration_confirmed':
+        console.log('CCM Extension: Registration confirmed by hub');
+        // Update badge based on role
+        updateBadge('hub-connected');
+        break;
+      
       case MESSAGE_TYPES.CLIENT_CONNECTED:
         this.handleClientConnected(message);
         break;
@@ -233,9 +294,6 @@ export class HubClient {
         // Forward to MCP clients
         this.forwardToMCPClients(message);
     }
-    
-    // Update extension state to show we're connected
-    updateBadge('mcp-connected');
   }
 
   handleClientConnected(message) {
@@ -249,19 +307,6 @@ export class HubClient {
     
     // Set up client timeout monitoring
     this.setupClientTimeout(clientId);
-    
-    // Notify all tabs about the new connection
-    chrome.tabs.query({}, (tabs) => {
-      tabs.forEach(tab => {
-        chrome.tabs.sendMessage(tab.id, {
-          type: 'MCP_CLIENT_CONNECTED',
-          clientId: clientId,
-          clientInfo: clientInfo
-        }).catch(() => {
-          // Tab might not have content script
-        });
-      });
-    });
   }
 
   handleClientDisconnected(message) {
@@ -285,20 +330,33 @@ export class HubClient {
 
   handleClientListUpdate(message) {
     const { clients } = message;
-    console.log(`CCM Extension: Received client list update with ${Object.keys(clients).length} clients`);
+    console.log(`CCM Extension: Received client list update with ${clients ? clients.length : 0} clients`);
     
     // Clear existing clients and timeouts
     this.clearAllClients();
     
-    // Update with new client list
-    for (const [clientId, clientInfo] of Object.entries(clients)) {
-      this.connectedClients.set(clientId, {
-        ...clientInfo,
-        connectedAt: clientInfo.connectedAt || Date.now()
-      });
-      
-      // Set up timeout monitoring for each client
-      this.setupClientTimeout(clientId);
+    // Handle array format from WebSocket hub
+    if (Array.isArray(clients)) {
+      for (const clientInfo of clients) {
+        this.connectedClients.set(clientInfo.id, {
+          ...clientInfo,
+          connectedAt: clientInfo.registeredAt || clientInfo.connectedAt || Date.now()
+        });
+        
+        // Set up timeout monitoring for each client
+        this.setupClientTimeout(clientInfo.id);
+      }
+    } else if (clients && typeof clients === 'object') {
+      // Handle object format for backward compatibility
+      for (const [clientId, clientInfo] of Object.entries(clients)) {
+        this.connectedClients.set(clientId, {
+          ...clientInfo,
+          connectedAt: clientInfo.connectedAt || Date.now()
+        });
+        
+        // Set up timeout monitoring for each client
+        this.setupClientTimeout(clientId);
+      }
     }
     
     // Update badge based on client count
@@ -402,7 +460,7 @@ export class HubClient {
         })),
         operationLocks: this.operationLock.getAllLocks(),
         messageQueueSize: this.messageQueue.size(),
-        contentScriptTabs: Array.from(this.contentScriptManager.injectedTabs)
+        contentScriptTabs: this.contentScriptManager ? Array.from(this.contentScriptManager.injectedTabs) : []
       }
     };
   }

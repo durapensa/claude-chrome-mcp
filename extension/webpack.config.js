@@ -4,7 +4,7 @@ const CopyWebpackPlugin = require('copy-webpack-plugin');
 module.exports = {
   mode: 'production',
   entry: {
-    background: './src/background-balanced.js',
+    background: './src/background.js',
     popup: './src/popup.js',
     'content-script': './src/content-script.js'
   },
