@@ -577,13 +577,13 @@ class ChromeMCPServer {
 
   async getConnectionHealth() {
     const health = {
-      hubClient: this.hubClient.getConnectionInfo(),
+      hubClient: this.hubClient.getConnectionStats(),
       server: {
         uptime: Date.now() - this.startTime,
-        operationsCount: this.operationManager.getOperationCount(),
-        errorsCount: this.errorTracker.getErrorCount()
+        operationsCount: this.operationManager.operations.size,
+        errorsCount: this.errorTracker.errors ? this.errorTracker.errors.length : 0
       },
-      multiHub: this.multiHubManager.getStatus()
+      multiHub: this.multiHubManager.getHubStatus()
     };
 
     return {
@@ -756,8 +756,7 @@ class ChromeMCPServer {
       // Connect hub client
       await this.hubClient.connect();
       
-      // Start multi-hub coordination
-      await this.multiHubManager.start();
+      // Multi-hub coordination starts automatically in constructor
       
       // Connect to stdio transport
       const transport = new StdioServerTransport();
