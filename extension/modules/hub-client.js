@@ -283,25 +283,28 @@ export class HubClient {
       
       switch (command.type) {
         case 'spawn_claude_dot_ai_tab':
-          result = await this.spawnClaudeTab(command);
+          result = await this.spawnClaudeTab(command.params || {});
           break;
         case 'send_message_async':
-          result = await this.sendMessageAsync(command);
+          result = await this.sendMessageAsync(command.params || {});
           break;
         case 'get_claude_dot_ai_response':
-          result = await this.getClaudeResponse(command);
+          result = await this.getClaudeResponse(command.params || {});
           break;
         case 'start_network_inspection':
-          result = await this.startNetworkInspection(command);
+          result = await this.startNetworkInspection(command.params || {});
           break;
         case 'stop_network_inspection':
-          result = await this.stopNetworkInspection(command);
+          result = await this.stopNetworkInspection(command.params || {});
           break;
         case 'get_captured_requests':
-          result = await this.getCapturedRequests(command);
+          result = await this.getCapturedRequests(command.params || {});
           break;
         case 'forward_response_to_claude_dot_ai_tab':
-          result = await this.forwardResponseToClaudeTab(command);
+          result = await this.forwardResponseToClaudeTab(command.params || {});
+          break;
+        case 'reload_extension':
+          result = await this.reloadExtension(command.params || {});
           break;
         default:
           throw new Error(`Unknown command type: ${command.type}`);
@@ -465,9 +468,11 @@ export class HubClient {
 
   // Async message sending
   async sendMessageAsync(params) {
+    console.log('CCM Extension: sendMessageAsync called with params:', JSON.stringify(params, null, 2));
     const { tabId, message } = params;
     
     if (!tabId || !message) {
+      console.log('CCM Extension: Missing required parameters - tabId:', tabId, 'message:', message);
       return { success: false, error: 'Missing required parameters' };
     }
     
@@ -605,6 +610,26 @@ export class HubClient {
         }
       });
     });
+  }
+
+  async reloadExtension(params = {}) {
+    console.log('CCM Extension: Reloading extension as requested');
+    
+    try {
+      // Use Chrome runtime API to reload the extension
+      chrome.runtime.reload();
+      
+      return {
+        success: true,
+        message: 'Extension reload initiated'
+      };
+    } catch (error) {
+      console.error('CCM Extension: Failed to reload extension:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
   }
 }
 

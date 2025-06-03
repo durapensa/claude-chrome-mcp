@@ -495,6 +495,15 @@ class ChromeMCPServer {
           }
         },
         {
+          name: 'reload_extension',
+          description: 'Reload the Chrome extension to apply code changes',
+          inputSchema: {
+            type: 'object',
+            properties: {},
+            additionalProperties: false
+          }
+        },
+        {
           name: 'start_network_inspection',
           description: 'Start network request monitoring on a tab',
           inputSchema: {
@@ -594,6 +603,9 @@ class ChromeMCPServer {
 
           case 'delete_workflow_state':
             return await this.deleteWorkflowState(args);
+
+          case 'reload_extension':
+            return await this.forwardToExtension('reload_extension', args);
 
           case 'start_network_inspection':
             return await this.forwardToExtension('start_network_inspection', args);
