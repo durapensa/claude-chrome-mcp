@@ -309,6 +309,96 @@ export class HubClient {
         case 'reload_extension':
           result = await this.reloadExtension(command.params || {});
           break;
+        case 'get_claude_dot_ai_tabs':
+          result = await this.getClaudeTabs(command.params || {});
+          break;
+        case 'close_claude_dot_ai_tab':
+          result = await this.closeClaudeTab(command.params || {});
+          break;
+        case 'open_claude_dot_ai_conversation_tab':
+          result = await this.openClaudeConversationTab(command.params || {});
+          break;
+        case 'send_message_to_claude_dot_ai_tab':
+          result = await this.sendMessageToClaudeTab(command.params || {});
+          break;
+        case 'batch_send_messages':
+          result = await this.batchSendMessages(command.params || {});
+          break;
+        case 'batch_get_responses':
+          result = await this.batchGetResponses(command.params || {});
+          break;
+        case 'get_claude_dot_ai_response_status':
+          result = await this.getClaudeResponseStatus(command.params || {});
+          break;
+        case 'extract_conversation_elements':
+          result = await this.extractConversationElements(command.params || {});
+          break;
+        case 'export_conversation_transcript':
+          result = await this.exportConversationTranscript(command.params || {});
+          break;
+        case 'get_claude_conversations':
+          result = await this.getClaudeConversations(command.params || {});
+          break;
+        case 'get_conversation_metadata':
+          result = await this.getConversationMetadata(command.params || {});
+          break;
+        case 'delete_claude_conversation':
+          result = await this.deleteClaudeConversation(command.params || {});
+          break;
+        case 'search_claude_conversations':
+          result = await this.searchClaudeConversations(command.params || {});
+          break;
+        case 'bulk_delete_conversations':
+          result = await this.bulkDeleteConversations(command.params || {});
+          break;
+        case 'debug_attach':
+          result = await this.attachDebugger((command.params || {}).tabId);
+          break;
+        case 'execute_script':
+          result = await this.executeScript(command.params || {});
+          break;
+        case 'get_dom_elements':
+          result = await this.getDomElements(command.params || {});
+          break;
+        case 'debug_claude_dot_ai_page':
+          result = await this.debugClaudePage(command.params || {});
+          break;
+        case 'execute_workflow_template':
+          result = await this.executeWorkflowTemplate(command.params || {});
+          break;
+        case 'list_workflow_templates':
+          result = await this.listWorkflowTemplates(command.params || {});
+          break;
+        case 'create_workflow_template':
+          result = await this.createWorkflowTemplate(command.params || {});
+          break;
+        case 'execute_workflow_orchestration':
+          result = await this.executeWorkflowOrchestration(command.params || {});
+          break;
+        case 'create_workflow_orchestration':
+          result = await this.createWorkflowOrchestration(command.params || {});
+          break;
+        case 'list_workflow_orchestrations':
+          result = await this.listWorkflowOrchestrations(command.params || {});
+          break;
+        case 'save_workflow_state':
+          result = await this.saveWorkflowState(command.params || {});
+          break;
+        case 'load_workflow_state':
+          result = await this.loadWorkflowState(command.params || {});
+          break;
+        case 'list_workflow_states':
+          result = await this.listWorkflowStates(command.params || {});
+          break;
+        case 'delete_workflow_state':
+          result = await this.deleteWorkflowState(command.params || {});
+          break;
+        case 'wait_for_operation':
+          result = await this.waitForOperation(command.params || {});
+          break;
+        case 'get_connection_health':
+          result = await this.getConnectionHealth(command.params || {});
+          break;
         default:
           throw new Error(`Unknown command type: ${command.type}`);
       }
