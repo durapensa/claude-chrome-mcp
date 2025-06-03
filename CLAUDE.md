@@ -93,4 +93,5 @@ When you type 'continue', follow the standard workflow in docs/CONTINUATION.md
 ## Tool Usage Directive
 - Use all of the claude-chrome-mcp tools available to debug, test, and develop
 
-```
+## Key Troubleshooting Memory
+- If you encounter missing or broken tools, functions, etc. check git history, including pre-refactor source file content, as they may have been removed during refactor

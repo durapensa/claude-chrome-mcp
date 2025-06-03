@@ -631,6 +631,236 @@ export class HubClient {
       };
     }
   }
+
+  async ensureDebuggerAttached(tabId) {
+    const maxRetries = 3;
+    let retries = 0;
+    
+    while (retries < maxRetries) {
+      try {
+        // Check if debugger is already attached
+        const tabs = await chrome.tabs.query({});
+        const tab = tabs.find(t => t.id === tabId);
+        
+        if (!tab) {
+          throw new Error(`Tab ${tabId} not found`);
+        }
+        
+        // First test if debugger is already working
+        try {
+          await new Promise((resolve, reject) => {
+            chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
+              expression: 'true',
+              returnByValue: true
+            }, (result) => {
+              if (chrome.runtime.lastError) {
+                reject(new Error(chrome.runtime.lastError.message));
+                return;
+              }
+              resolve(result);
+            });
+          });
+          console.log(`Debugger already working on tab ${tabId}`);
+          this.debuggerSessions.set(tabId, { attached: Date.now() });
+          return; // Success - debugger is already functional
+        } catch (testError) {
+          // Debugger not working, try to attach
+        }
+        
+        // Try to attach debugger
+        await new Promise((resolve, reject) => {
+          chrome.debugger.attach({ tabId }, '1.0', () => {
+            if (chrome.runtime.lastError) {
+              // Already attached is not an error if it's working
+              if (chrome.runtime.lastError.message?.includes('already attached')) {
+                resolve();
+                return;
+              }
+              reject(new Error(chrome.runtime.lastError.message));
+              return;
+            }
+            resolve();
+          });
+        });
+        
+        console.log(`Debugger attached to tab ${tabId}`);
+        this.debuggerSessions.set(tabId, { attached: Date.now() });
+        return;
+        
+      } catch (error) {
+        retries++;
+        console.log(`Failed to attach debugger to tab ${tabId} (attempt ${retries}/${maxRetries}):`, error.message);
+        
+        if (retries >= maxRetries) {
+          throw new Error(`Failed to attach debugger after ${maxRetries} attempts: ${error.message}`);
+        }
+        
+        // Wait before retry
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+  }
+
+  async executeScript(params) {
+    const { tabId, script } = params;
+    
+    if (!this.debuggerSessions.has(tabId)) {
+      await this.ensureDebuggerAttached(tabId);
+    }
+
+    return new Promise((resolve, reject) => {
+      chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
+        expression: script,
+        returnByValue: true,
+        awaitPromise: true
+      }, (result) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          resolve(result);
+        }
+      });
+    });
+  }
+
+  async extractConversationElements(params) {
+    const { tabId } = params;
+    
+    try {
+      await this.ensureDebuggerAttached(tabId);
+      
+      const script = `
+        (function() {
+          const artifacts = [];
+          const codeBlocks = [];
+          const toolUsage = [];
+          
+          // Extract artifacts with multiple selector strategies
+          const artifactSelectors = [
+            'iframe[title*="artifact"]',
+            'iframe[src*="artifact"]', 
+            '[data-testid*="artifact"]',
+            '.artifact',
+            '[class*="artifact"]',
+            'iframe[sandbox]',
+            '[data-component*="artifact"]'
+          ];
+          
+          artifactSelectors.forEach(selector => {
+            document.querySelectorAll(selector).forEach((element, index) => {
+              let content = '';
+              let type = 'unknown';
+              
+              if (element.tagName === 'IFRAME') {
+                try {
+                  // Try to access iframe content if same-origin
+                  content = element.contentDocument?.documentElement?.outerHTML || 
+                           element.outerHTML;
+                  type = 'html';
+                } catch (e) {
+                  // Cross-origin iframe, get what we can
+                  content = element.outerHTML;
+                  type = 'iframe';
+                }
+              } else {
+                content = element.outerHTML;
+                type = element.dataset.type || 'unknown';
+              }
+              
+              // Avoid duplicates
+              const isDuplicate = artifacts.some(a => 
+                a.content === content || 
+                (element.id && a.id === element.id)
+              );
+              
+              if (!isDuplicate) {
+                artifacts.push({
+                  id: element.id || 'artifact_' + artifacts.length,
+                  selector: selector,
+                  type: type,
+                  title: element.title || element.getAttribute('aria-label') || 'Untitled',
+                  content: content.substring(0, 2000), // Limit size
+                  elementType: element.tagName.toLowerCase(),
+                  attributes: Object.fromEntries(
+                    Array.from(element.attributes).map(attr => [attr.name, attr.value])
+                  )
+                });
+              }
+            });
+          });
+          
+          // Extract code blocks
+          const codeSelectors = [
+            'pre code',
+            '.highlight',
+            '[class*="code-block"]',
+            '[data-language]'
+          ];
+          
+          codeSelectors.forEach(selector => {
+            document.querySelectorAll(selector).forEach((element, index) => {
+              const content = element.textContent;
+              
+              // Avoid duplicates
+              const isDuplicate = codeBlocks.some(cb => cb.content === content);
+              
+              if (!isDuplicate && content && content.trim()) {
+                codeBlocks.push({
+                  id: 'code_' + codeBlocks.length,
+                  language: element.className.match(/language-(\\w+)/)?.[1] || 
+                           element.dataset.language || 'text',
+                  content: content,
+                  html: element.outerHTML.substring(0, 500) // Truncate HTML
+                });
+              }
+            });
+          });
+          
+          // Extract tool usage indicators
+          const toolIndicators = document.querySelectorAll(
+            '[data-testid*="search"], [class*="search"], ' +
+            '[data-testid*="repl"], [class*="repl"], ' + 
+            '[data-testid*="tool"], [class*="tool-usage"]'
+          );
+          
+          toolIndicators.forEach((element, index) => {
+            const content = element.textContent?.trim();
+            if (content) {
+              toolUsage.push({
+                id: 'tool_' + toolUsage.length,
+                type: element.dataset.testid || element.className,
+                content: content.substring(0, 500),
+                html: element.outerHTML.substring(0, 500)
+              });
+            }
+          });
+          
+          return {
+            artifacts,
+            codeBlocks,
+            toolUsage,
+            extractedAt: new Date().toISOString(),
+            totalElements: artifacts.length + codeBlocks.length + toolUsage.length
+          };
+        })()
+      `;
+      
+      const result = await this.executeScript({ tabId, script });
+      
+      return {
+        success: true,
+        data: result.result?.value || { artifacts: [], codeBlocks: [], toolUsage: [] },
+        tabId: tabId
+      };
+      
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+        tabId: tabId
+      };
+    }
+  }
 }
 
 // Mix in tab operation methods
