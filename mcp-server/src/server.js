@@ -9,7 +9,11 @@
 
 // CRITICAL: Redirect all console output to stderr to keep stdout clean for JSON-RPC
 const originalConsoleLog = console.log;
+const originalConsoleWarn = console.warn;
+const originalConsoleInfo = console.info;
 console.log = console.error;
+console.warn = console.error;
+console.info = console.error;
 
 // Also ensure stdout doesn't get any debug output
 if (process.stdout.write.bind) {
