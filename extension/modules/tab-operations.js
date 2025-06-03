@@ -167,19 +167,17 @@ export const tabOperationMethods = {
           });
           
           // Find input field
-          const inputField = document.querySelector('textarea[placeholder*="Reply"]') ||
-                           document.querySelector('textarea[placeholder*="Message"]');
+          const inputField = document.querySelector('div[contenteditable="true"]');
           if (inputField) {
             elements.inputField = {
               found: true,
-              placeholder: inputField.placeholder,
-              value: inputField.value
+              placeholder: inputField.getAttribute('data-placeholder') || 'Type a message',
+              value: inputField.textContent || ''
             };
           }
           
           // Find submit button
-          const submitButton = document.querySelector('button[aria-label*="Send"]') ||
-                             document.querySelector('button[type="submit"]');
+          const submitButton = document.querySelector('button[aria-label*="Send"], button:has(svg[stroke])');
           if (submitButton) {
             elements.submitButton = {
               found: true,
@@ -237,25 +235,35 @@ export const tabOperationMethods = {
         func: function(message, waitForReady) {
           return new Promise((resolve) => {
             const sendMessage = () => {
-              const inputField = document.querySelector('textarea[placeholder*="Reply"]') ||
-                               document.querySelector('textarea[placeholder*="Message"]');
-              const submitButton = document.querySelector('button[aria-label*="Send"]') ||
-                                 document.querySelector('button[type="submit"]');
+              const inputField = document.querySelector('div[contenteditable="true"]');
+              const submitButton = document.querySelector('button[aria-label*="Send"], button:has(svg[stroke])');
               
               if (!inputField || !submitButton) {
                 resolve({ success: false, error: 'Could not find input elements' });
                 return;
               }
               
-              // Set the message
-              inputField.value = message;
+              // Set the message in contenteditable div
+              inputField.focus();
+              inputField.textContent = message;
+              
+              // Dispatch input event to trigger React updates
               inputField.dispatchEvent(new Event('input', { bubbles: true }));
               
-              // Click submit
+              // Also dispatch a more complete set of events that Claude.ai might expect
+              const inputEvent = new InputEvent('beforeinput', {
+                data: message,
+                inputType: 'insertText',
+                bubbles: true,
+                cancelable: true
+              });
+              inputField.dispatchEvent(inputEvent);
+              
+              // Click submit after a brief delay
               setTimeout(() => {
                 submitButton.click();
                 resolve({ success: true, timestamp: Date.now() });
-              }, 100);
+              }, 200);
             };
             
             if (waitForReady) {
