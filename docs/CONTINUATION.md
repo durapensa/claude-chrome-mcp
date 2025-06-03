@@ -39,52 +39,65 @@ Follow systematic debugging approach from [Troubleshooting Guide](TROUBLESHOOTIN
 - **[GitHub Issue Script](create-claude-code-issue.sh)**: Claude Code integration utilities
 
 ## Current System Status
-- **Version**: 2.5.0 (Event-driven architecture with offscreen documents planned)
-- **Architecture**: Transitioning to offscreen documents + WebSocket
+- **Version**: 2.5.0 (Event-driven architecture with offscreen documents in progress)
+- **Architecture**: Phase 1 complete - Offscreen document infrastructure ready
 - **Key Features**: Async operations, Claude-to-Claude forwarding, network detection, multi-hub coordination
-- **Next Phase**: Implementing persistent WebSocket via offscreen documents
+- **Next Phase**: Phase 2 - WebSocket relay server implementation
+- **Important**: Extension needs manual reload, Claude Code needs restart after MCP server changes
 
-## Latest Session Summary (2025-01-06 - Part 6: Architecture Design)
+## Latest Session Summary (2025-01-06 - Part 7: Offscreen Document Implementation)
 
 ### What Was Accomplished
-1. **Architecture Analysis**:
-   - Identified that hub contains too much business logic
-   - Recognized extension HTTP polling as a bottleneck
-   - Discovered offscreen documents as solution for persistent connections
+1. **Phase 1 Completed - Offscreen Document Infrastructure**:
+   - Added `offscreen` permission to manifest.json
+   - Created offscreen.html and offscreen.js for persistent WebSocket
+   - Implemented RelayConnection class with auto-reconnection and message queuing
+   - Updated background.js to create and manage offscreen document
+   - Added message bridging between service worker and offscreen
+   - Extended HubClient with relay methods (handleRelayStatus, handleRelayMessage, sendToRelay)
 
-2. **New Architecture Designed**:
-   - Offscreen documents for persistent WebSocket (12+ hours)
-   - Simple message relay replacing complex hub
-   - All coordination logic moved to extension
-   - Event-driven messaging replacing polling
+2. **Architecture Foundation Laid**:
+   - Offscreen document can maintain WebSocket connections for 12+ hours
+   - Message queuing ensures no data loss during reconnections
+   - Exponential backoff for reconnection attempts (1s → 30s max)
+   - Heartbeat mechanism keeps service worker aware of connection state
 
-3. **Documentation Updated**:
-   - Complete rewrite of ARCHITECTURE.md
-   - Clear migration path defined
-   - Implementation phases outlined
+3. **Code Committed**:
+   - All changes committed with message: "Implement Phase 1: Offscreen document infrastructure for WebSocket"
+   - 5 files changed, 258 insertions
+   - Git status clean
 
-### Next Session: Implementation Phase 1
+### Next Session: Implementation Phase 2 - Hub to Relay Refactor
 
-1. **Create Offscreen Document**:
-   - Add offscreen permission to manifest
-   - Create offscreen.html and offscreen.js
-   - Implement WebSocket connection
+1. **Create Minimal WebSocket Relay** (Port 54321):
+   - Implement pure message routing relay server
+   - Remove all business logic from hub
+   - Support multiple client connections
+   - Add relay election for multi-instance support
 
-2. **Update Extension Architecture**:
-   - Add offscreen document creation logic
-   - Bridge service worker ↔ offscreen messaging
-   - Maintain backward compatibility
+2. **Update MCP Server Integration**:
+   - Add WebSocket client to connect to relay
+   - Route all extension communication through relay
+   - Maintain backward compatibility with HTTP polling
 
-3. **Test New Connection**:
-   - Verify persistent WebSocket
-   - Test message flow both directions
-   - Confirm no keepalive needed
+3. **Add Feature Flags**:
+   - `USE_WEBSOCKET_RELAY` environment variable
+   - Gradual migration from HTTP to WebSocket
+   - Easy rollback if issues arise
+
+4. **Test WebSocket Flow**:
+   - Extension → Offscreen → Relay → MCP Server
+   - Verify message routing in both directions
+   - Test reconnection scenarios
+   - Monitor connection persistence (1+ hour test)
 
 ### Key Implementation Files
-- `/extension/manifest.json` - Add offscreen permission
-- `/extension/offscreen.html` - Minimal HTML for offscreen context
-- `/extension/offscreen.js` - WebSocket connection logic
-- `/extension/background.js` - Offscreen document management
+- `/extension/manifest.json` - ✅ Offscreen permission added
+- `/extension/offscreen.html` - ✅ Created
+- `/extension/offscreen.js` - ✅ WebSocket connection implemented
+- `/extension/background.js` - ✅ Offscreen document management added
+- `/mcp-server/src/relay/message-relay.js` - 🔲 To be created in Phase 2
+- `/mcp-server/src/hub/websocket-hub.js` - 🔲 To be refactored in Phase 2
 
 ### Testing Commands After Implementation
 ```bash
