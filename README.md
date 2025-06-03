@@ -42,13 +42,10 @@ Browser automation tool enabling MCP clients (Claude Desktop, Claude Code, Curso
 ## Installation
 
 ### Chrome Extension
-1. Build the extension:
-   ```bash
-   cd extension && npm install && npm run build
-   ```
-2. Navigate to `chrome://extensions/` in Chrome
-3. Enable "Developer mode" 
-4. Click "Load unpacked" and select `extension/dist/` directory
+1. Navigate to `chrome://extensions/` in Chrome
+2. Enable "Developer mode" 
+3. Click "Load unpacked" and select `extension/` directory
+   (No build step required - native ES6 modules)
 
 ### MCP Server
 ```bash

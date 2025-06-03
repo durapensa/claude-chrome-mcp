@@ -45,22 +45,25 @@ Follow systematic debugging approach from [Troubleshooting Guide](TROUBLESHOOTIN
 - **Modules**: WebSocketHub, AutoHubClient, MultiHubManager, ErrorTracker, OperationManager, ProcessLifecycleManager
 - **Version Management**: Centralized via VERSION file and scripts/update-versions.js
 
-## Recent Major Update: Event-Driven Architecture
-- **Status**: ✅ **COMPLETED** - Event-driven notification system refactor
-- **Changes**: Replaced complex polling system with real-time WebSocket events
-- **Benefits**: ~50% less code, no race conditions, immediate responsiveness
-- **Files Changed**: Hub event broadcasting, extension listeners, popup real-time updates
-- **Build Required**: Extension must be rebuilt with `cd extension && npm run build`
-- **Restart Required**: Claude Code must be restarted to load new MCP server changes
+## Current Issue: Parameter Mapping in Extension
+- **Status**: 🔧 **IN PROGRESS** - Parameter validation failing in extension
+- **Problem**: MCP tools returning "Missing required parameters" errors
+- **Root Cause**: Extension executeCommand() method receiving full command object instead of command.params
+- **Files Changed**: 
+  - `extension/modules/hub-client.js` - Fixed parameter extraction in executeCommand()
+  - `mcp-server/src/server.js` - Restored reload_extension tool
+- **Extension Reload Required**: Manual reload needed at chrome://extensions/
+- **Claude Code Restart Required**: MCP server changes need restart to take effect
 
 ## Pre-Restart Checklist Completed
-- ✅ Extension rebuilt with event-driven architecture
-- ✅ README.md updated with build instructions
+- ✅ Parameter mapping fix applied to extension/modules/hub-client.js
+- ✅ reload_extension tool restored to MCP server
+- ✅ README.md updated to remove outdated build instructions
 - ✅ All changes committed to git
 - ✅ Temporary files cleaned up
-- ✅ Event-driven system ready for testing
 
 ## Post-Restart Testing Plan
-1. Verify event-driven notifications work (should be instant badge/popup updates)
-2. Test client connect/disconnect events trigger immediately
-3. Confirm no more "Checking connection..." persistence issues
+1. **System Health**: Verify hub connection with `get_connection_health`
+2. **Extension Reload**: Test `reload_extension` tool (should work after restart)
+3. **Parameter Validation**: Test `send_message_async` and `get_claude_dot_ai_response`
+4. **Full Workflow**: spawn_claude_dot_ai_tab → send_message_async → get_claude_dot_ai_response → forward_response_to_claude_dot_ai_tab
