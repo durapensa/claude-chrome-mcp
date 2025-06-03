@@ -321,20 +321,33 @@ export class HubClient {
 
   handleClientListUpdate(message) {
     const { clients } = message;
-    console.log(`CCM Extension: Received client list update with ${Object.keys(clients).length} clients`);
+    console.log(`CCM Extension: Received client list update with ${clients ? clients.length : 0} clients`);
     
     // Clear existing clients and timeouts
     this.clearAllClients();
     
-    // Update with new client list
-    for (const [clientId, clientInfo] of Object.entries(clients)) {
-      this.connectedClients.set(clientId, {
-        ...clientInfo,
-        connectedAt: clientInfo.connectedAt || Date.now()
-      });
-      
-      // Set up timeout monitoring for each client
-      this.setupClientTimeout(clientId);
+    // Handle array format from WebSocket hub
+    if (Array.isArray(clients)) {
+      for (const clientInfo of clients) {
+        this.connectedClients.set(clientInfo.id, {
+          ...clientInfo,
+          connectedAt: clientInfo.registeredAt || clientInfo.connectedAt || Date.now()
+        });
+        
+        // Set up timeout monitoring for each client
+        this.setupClientTimeout(clientInfo.id);
+      }
+    } else if (clients && typeof clients === 'object') {
+      // Handle object format for backward compatibility
+      for (const [clientId, clientInfo] of Object.entries(clients)) {
+        this.connectedClients.set(clientId, {
+          ...clientInfo,
+          connectedAt: clientInfo.connectedAt || Date.now()
+        });
+        
+        // Set up timeout monitoring for each client
+        this.setupClientTimeout(clientId);
+      }
     }
     
     // Update badge based on client count
