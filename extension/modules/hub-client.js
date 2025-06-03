@@ -531,6 +531,8 @@ export class HubClient {
       'get_claude_conversations': () => this.getClaudeConversations(params),
       'get_conversation_metadata': () => this.getConversationMetadata(params),
       'delete_claude_conversation': () => this.deleteClaudeConversation(params),
+      'search_claude_conversations': () => this.searchClaudeConversations(params),
+      'bulk_delete_conversations': () => this.bulkDeleteConversations(params),
       'open_claude_dot_ai_conversation_tab': () => this.openClaudeConversationTab(params),
       'batch_send_messages': () => this.batchSendMessages(params),
       'batch_get_responses': () => this.batchGetResponses(params),

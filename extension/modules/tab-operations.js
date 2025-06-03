@@ -349,7 +349,7 @@ export const tabOperationMethods = {
                 operation.completedAt - operation.registeredAt : null
             };
           },
-          args: [operationId]
+          args: [operationId || null]
         });
         
         const result = results[0].result;

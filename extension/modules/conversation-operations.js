@@ -5,17 +5,20 @@ export const conversationOperationMethods = {
   async getClaudeConversations() {
     try {
       // First get current Claude tabs to match with conversations
-      const claudeTabs = await this.getClaudeTabs();
+      const claudeTabsResult = await this.getClaudeTabs();
+      const claudeTabs = claudeTabsResult.tabs || [];
       const tabsByConversationId = new Map();
       
       claudeTabs.forEach(tab => {
-        if (tab.conversationId) {
-          tabsByConversationId.set(tab.conversationId, tab.id);
+        // Extract conversation ID from URL if available
+        const urlMatch = tab.url?.match(/\/chat\/([a-f0-9-]+)/);
+        if (urlMatch) {
+          tabsByConversationId.set(urlMatch[1], tab.id);
         }
       });
 
       // Find a Claude tab to execute the API call from
-      let claudeTab = claudeTabs.find(tab => tab.url.includes('claude.ai'));
+      let claudeTab = claudeTabs.find(tab => tab.url?.includes('claude.ai'));
       
       if (!claudeTab) {
         // Create a temporary Claude tab for the API call
@@ -177,8 +180,8 @@ export const conversationOperationMethods = {
         assistantMessages: messageData.messages.filter(m => m.role === 'assistant').length,
         totalCharacters: messageData.messages.reduce((sum, m) => sum + m.length, 0),
         estimatedTokens: Math.round(messageData.messages.reduce((sum, m) => sum + m.length, 0) / 4),
-        artifactCount: elements.success ? elements.data.artifacts.length : 0,
-        codeBlockCount: elements.success ? elements.data.codeBlocks.length : 0
+        artifactCount: 0, // TODO: Implement artifact extraction
+        codeBlockCount: 0 // TODO: Implement code block extraction
       };
       
       // Format output
@@ -206,27 +209,7 @@ export const conversationOperationMethods = {
           markdown += `---\n\n`;
         });
         
-        // Add artifacts section if present
-        if (elements.success && elements.data.artifacts.length > 0) {
-          markdown += `## Artifacts (${elements.data.artifacts.length})\n\n`;
-          elements.data.artifacts.forEach((artifact, idx) => {
-            markdown += `### Artifact ${idx + 1}: ${artifact.title}\n`;
-            markdown += `**Type:** ${artifact.type}\n`;
-            markdown += `**Element:** ${artifact.elementType}\n\n`;
-            markdown += '```\n' + artifact.content.substring(0, 500) + '\n```\n\n';
-          });
-        }
-        
-        // Add code blocks section if present
-        if (elements.success && elements.data.codeBlocks.length > 0) {
-          markdown += `## Code Blocks (${elements.data.codeBlocks.length})\n\n`;
-          elements.data.codeBlocks.forEach((block, idx) => {
-            markdown += `### Code Block ${idx + 1}\n`;
-            markdown += `\`\`\`${block.language}\n`;
-            markdown += block.content + '\n';
-            markdown += '```\n\n';
-          });
-        }
+        // TODO: Add artifacts and code blocks sections when extraction is implemented
         
         return {
           success: true,
@@ -244,8 +227,8 @@ export const conversationOperationMethods = {
           content: {
             metadata: messageData.metadata,
             messages: messageData.messages,
-            artifacts: elements.success ? elements.data.artifacts : [],
-            codeBlocks: elements.success ? elements.data.codeBlocks : [],
+            artifacts: [], // TODO: Implement artifact extraction
+            codeBlocks: [], // TODO: Implement code block extraction
             statistics: statistics
           },
           metadata: messageData.metadata,
