@@ -4,8 +4,9 @@ Quick reference for Claude. See README.md for full documentation.
 
 ## System Status
 - Version: 2.5.0 (centralized version management)
-- Architecture: MCP-Server-as-Hub with Chrome Extension as WebSocket client
+- Architecture: Transitioning to Offscreen Documents + WebSocket (from HTTP polling)
 - Structure: Modular architecture with separated components (utils/, hub/, lifecycle/)
+- Next Phase: Implementing persistent connections via Chrome offscreen documents
 
 ## Important System Limitations
 - Claude Code cannot restart its own MCP servers. User must exit and re-run Claude Code if claude-chrome-mcp tools are not available
@@ -34,10 +35,13 @@ mcp__claude-chrome-mcp__forward_response_to_claude_dot_ai_tab --sourceTabId <sou
 - **ALL claude-chrome-mcp tools should operate in async mode by default, with waitForCompletion flags added only if applicable and only for optional use**
 
 ## Project Structure
-- `extension/` - Chrome extension (HTTP polling client with adaptive intervals)
+- `extension/` - Chrome extension (transitioning from HTTP polling to WebSocket)
+  - `offscreen.html` - (planned) Offscreen document for persistent WebSocket
+  - `offscreen.js` - (planned) WebSocket connection management
+  - `background.js` - Service worker with coordination logic
 - `mcp-server/` - MCP server (modular architecture)
   - `src/server.js` - Main entry point (382 lines, modular)
-  - `src/hub/` - WebSocket hub, client management, multi-hub coordination
+  - `src/relay/` - (planned) Simple message relay replacing complex hub
   - `src/utils/` - Error tracking, operation management, debugging
   - `src/lifecycle/` - Process lifecycle and graceful shutdown
 - `cli/` - Universal MCP CLI client
@@ -50,13 +54,13 @@ mcp__claude-chrome-mcp__forward_response_to_claude_dot_ai_tab --sourceTabId <sou
 - TypeScript: docs/TYPESCRIPT.md
 - Roadmap: ROADMAP.md
 
-## Architecture Overview
-- **MCP-Server-as-Hub**: MCP server hosts hybrid WebSocket + HTTP hub on port 54321
-- **Chrome Extension Client**: Extension uses adaptive HTTP polling (500ms-2s intervals, reduced network load)
-- **Simplified Hub Election**: First-come-first-served port binding, immediate failover on connection loss
-- **CustomEvent Bridge**: MAIN/ISOLATED world communication for network detection
-- **Network-Level Detection**: Uses fetch interception + `/latest` endpoint for response completion
-- **Async Operations**: Full async workflow with operation registration and milestone tracking
+## Architecture Overview (New Design - In Progress)
+- **Message Relay**: Simple WebSocket relay on port 54321 (replacing complex hub)
+- **Offscreen Documents**: Persistent WebSocket connection (12+ hours without keepalives)
+- **Extension as Brain**: All coordination, locking, and conflict resolution in extension
+- **Event-Driven**: Pure push messaging (replacing HTTP polling)
+- **Multi-Agent Support**: Multiple MCP servers coordinate through extension
+- **Fast Failover**: Next relay takes over in <2 seconds when active relay exits
 
 ## Continuation Workflow  
 When you type 'continue', follow the standard workflow in docs/CONTINUATION.md

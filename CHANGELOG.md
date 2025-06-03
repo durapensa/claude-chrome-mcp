@@ -1,5 +1,46 @@
 # Changelog
 
+## 2025-01-06 - Architecture Refactor & Design
+
+### Completed
+- **EventEmitter Refactor**: Replaced OperationManager polling with events
+  - Removed 100ms setTimeout polling loop
+  - Implemented proper EventEmitter pattern
+  - Added events: operation:completed, operation:failed, operation:updated
+  - Tested and verified working correctly
+
+- **Code Cleanup**: Improved code hygiene
+  - Removed backup files (server-original.js, server-pre-tools-refactor.js)
+  - Installed Winston for future centralized logging
+  - Created architecture refactor tracking document
+
+### Designed
+- **New Architecture**: Complete redesign using Chrome offscreen documents
+  - Offscreen documents provide persistent WebSocket connections (12+ hours)
+  - Message relay replaces complex hub (pure routing, no business logic)
+  - All coordination logic moves to extension (lock management, queuing)
+  - Event-driven push messaging replaces HTTP polling
+  - No external libraries needed - native WebSocket is sufficient
+
+### Documented
+- **Architecture Rewrite**: Complete overhaul of architecture documentation
+  - Detailed component descriptions and interaction flows
+  - Clear migration path from current implementation
+  - Implementation phases with testing strategies
+  - Removed legacy ARCHITECTURE-V2.md (consolidated)
+
+### Analyzed
+- **Connection Options**: Comprehensive evaluation of alternatives
+  - WebSocket with Chrome 116+ keepalive
+  - Server-Sent Events (SSE) + HTTP hybrid
+  - Native messaging and WebTransport
+  - Offscreen documents selected as optimal solution
+
+### Next Steps
+- Phase 1: Implement offscreen document with WebSocket
+- Phase 2: Refactor hub to simple message relay
+- Phase 3: Move coordination logic to extension
+
 ## 2025-06-03 - Version 2.5.0: Complete Response Capture & Stream Detection
 
 ### Fixed

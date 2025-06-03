@@ -32,7 +32,26 @@
 - ✅ Comprehensive test documentation
 - ✅ Verified all MCP tools working correctly
 
-## Immediate Priorities (Q2-Q3 2025)
+## Immediate Priorities (January 2025)
+
+### Offscreen Documents + WebSocket Architecture
+- [ ] **Phase 1: Implement Offscreen Document** (High Priority)
+  - Add offscreen permission to manifest.json
+  - Create persistent WebSocket connection (12+ hours)
+  - Bridge messaging between offscreen ↔ service worker
+  - Remove HTTP polling from extension
+  
+- [ ] **Phase 2: Refactor Hub to Message Relay**
+  - Strip all business logic from hub
+  - Implement pure message routing
+  - Maintain port 54321 for compatibility
+  - Test fast failover (<2 seconds)
+
+- [ ] **Phase 3: Extension Coordination Engine**
+  - Move all lock management to extension
+  - Implement operation queuing per tab
+  - Add client health monitoring
+  - Create conflict resolution policies
 
 ### Error Handling & Reliability
 - [ ] **Network Interruption Recovery**: Handle streaming failures gracefully

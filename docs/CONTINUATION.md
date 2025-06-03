@@ -39,159 +39,84 @@ Follow systematic debugging approach from [Troubleshooting Guide](TROUBLESHOOTIN
 - **[GitHub Issue Script](create-claude-code-issue.sh)**: Claude Code integration utilities
 
 ## Current System Status
-- **Version**: 2.5.0 (MCP-Server-as-Hub architecture with centralized version management)
-- **Architecture**: Modular design with separated components (3669→382 lines in server.js)
+- **Version**: 2.5.0 (Event-driven architecture with offscreen documents planned)
+- **Architecture**: Transitioning to offscreen documents + WebSocket
 - **Key Features**: Async operations, Claude-to-Claude forwarding, network detection, multi-hub coordination
-- **Modules**: WebSocketHub, AutoHubClient, MultiHubManager, ErrorTracker, OperationManager, ProcessLifecycleManager
-- **Version Management**: Centralized via VERSION file and scripts/update-versions.js
+- **Next Phase**: Implementing persistent WebSocket via offscreen documents
 
-## Latest Session Summary (2025-01-06 - Part 5: Architecture Refactor)
-
-### What Was Accomplished
-- **Architecture Analysis**: Comprehensive review of MCP server and Chrome extension
-  - Identified polling patterns that violate async-first principles
-  - Found backup files violating code hygiene rules
-  - Discovered 10+ TODO comments in production code
-  - Located duplicate functionality in tab modules
-
-- **Refactoring Started**:
-  - ✅ Deleted backup files: `server-original.js`, `server-pre-tools-refactor.js`
-  - ✅ Converted OperationManager from polling to EventEmitter architecture
-  - Created `ARCHITECTURE-REFACTOR-LOG.md` for multi-session tracking
-
-### REQUIRES RESTART
-**The OperationManager EventEmitter changes need MCP server restart to test!**
-
-### Next Session Instructions
-1. **Exit Claude Code completely**
-2. **Restart Claude Code**
-3. **Run**: `continue` to resume architecture refactor
-4. **Test EventEmitter changes** using commands in ARCHITECTURE-REFACTOR-LOG.md
-5. **Continue with**: Centralized logging implementation
-
-### Architecture Issues Remaining
-- Console.log statements throughout codebase
-- TODO items in production code
-- Tab module duplication (tab-management vs tab-operations)
-- Hardcoded timeouts and intervals
-- Missing centralized configuration
-- Polling still used in hub-client.js and other modules
-
-## Previous Session Summary (2025-01-06 - Part 2)
+## Latest Session Summary (2025-01-06 - Part 6: Architecture Design)
 
 ### What Was Accomplished
-1. **Fixed Missing Tools Issue**: The modular refactor had accidentally dropped 18+ tools
-2. **Restored All 38 Tools**: Successfully restored missing tools from git history (commit 6ac1c98)
-3. **Created Modular MCP Server Architecture**:
-   - 7 tool modules in `/mcp-server/src/tools/`
-   - Dynamic handler lookup replacing 60-line switch statement
-   - Proper tool registry with `allTools` array export
+1. **Architecture Analysis**:
+   - Identified that hub contains too much business logic
+   - Recognized extension HTTP polling as a bottleneck
+   - Discovered offscreen documents as solution for persistent connections
 
-4. **Created Modular Extension Architecture**:
-   - `conversation-operations.js` - 5 conversation management methods
-   - `batch-operations.js` - 3 batch messaging methods  
-   - `debug-operations.js` - 3 debug/DOM methods
-   - Updated hub-client.js to use modular imports
+2. **New Architecture Designed**:
+   - Offscreen documents for persistent WebSocket (12+ hours)
+   - Simple message relay replacing complex hub
+   - All coordination logic moved to extension
+   - Event-driven messaging replacing polling
 
-### Key Technical Details
-- MCP server uses CommonJS (`require`/`module.exports`)
-- Extension uses ES6 modules (`import`/`export`)
-- All tools now properly mapped in both server and extension
-- Parameter mapping fix from earlier work preserved
+3. **Documentation Updated**:
+   - Complete rewrite of ARCHITECTURE.md
+   - Clear migration path defined
+   - Implementation phases outlined
 
-### Current State
-- All 38 tools restored and working
-- Modular architecture implemented on both sides
-- Ready for extension reload and Claude Code restart
-- No temporary files or cleanup needed
+### Next Session: Implementation Phase 1
 
-### Next Steps After Restart
-1. Reload the Chrome extension
-2. Exit and restart Claude Code
-3. Run `mcp__claude-chrome-mcp__get_connection_health` to verify
-4. Test restored tools like `extract_conversation_elements`
-5. Continue with any pending work
+1. **Create Offscreen Document**:
+   - Add offscreen permission to manifest
+   - Create offscreen.html and offscreen.js
+   - Implement WebSocket connection
 
-### Files Modified
-- `/mcp-server/src/server.js` - Refactored to use modular tools
-- `/mcp-server/src/tools/` - Created 7 new tool modules
-- `/extension/modules/hub-client.js` - Refactored to use modular operations
-- `/extension/modules/conversation-operations.js` - New module
-- `/extension/modules/batch-operations.js` - New module  
-- `/extension/modules/debug-operations.js` - New module
+2. **Update Extension Architecture**:
+   - Add offscreen document creation logic
+   - Bridge service worker ↔ offscreen messaging
+   - Maintain backward compatibility
 
-### Testing Commands
+3. **Test New Connection**:
+   - Verify persistent WebSocket
+   - Test message flow both directions
+   - Confirm no keepalive needed
+
+### Key Implementation Files
+- `/extension/manifest.json` - Add offscreen permission
+- `/extension/offscreen.html` - Minimal HTML for offscreen context
+- `/extension/offscreen.js` - WebSocket connection logic
+- `/extension/background.js` - Offscreen document management
+
+### Testing Commands After Implementation
 ```bash
-# After restart, test with:
+# Test new WebSocket connection
 mcp__claude-chrome-mcp__get_connection_health
+
+# Verify event-driven messaging
 mcp__claude-chrome-mcp__spawn_claude_dot_ai_tab
-mcp__claude-chrome-mcp__extract_conversation_elements --tabId <tab_id>
+mcp__claude-chrome-mcp__send_message_async --message "Test offscreen: 7*8" --tabId <id>
+
+# Monitor for polling removal
+# Should see WebSocket events, not HTTP polls
 ```
 
-## Pre-Restart Checklist Completed
-- ✅ Parameter mapping fix applied to extension/modules/hub-client.js
-- ✅ reload_extension tool restored to MCP server
-- ✅ README.md updated to remove outdated build instructions
-- ✅ All changes committed to git
-- ✅ Temporary files cleaned up
+## Previous Sessions
 
-## Post-Restart Testing Plan
-1. **System Health**: Verify hub connection with `get_connection_health`
-2. **Extension Reload**: Test `reload_extension` tool (should work after restart)
-3. **Parameter Validation**: Test `send_message_async` and `get_claude_dot_ai_response`
-4. **Full Workflow**: spawn_claude_dot_ai_tab → send_message_async → get_claude_dot_ai_response → forward_response_to_claude_dot_ai_tab
+### Session 5: Architecture Refactor
+- Replaced OperationManager polling with EventEmitter
+- Started centralized logging implementation
+- Identified need for better connection architecture
 
----
+### Session 4: Response Capture Fix
+- Fixed DOM observer to wait for streaming completion
+- Added content stability detection
+- Simplified content extraction
 
-## Session Summary (2025-01-06 - Part 3)
+### Session 3: Tool Restoration
+- Fixed missing tool command routing
+- Updated Claude.ai DOM selectors
+- Implemented missing conversation methods
 
-### Additional Fixes Completed
-1. **Fixed Missing Tool Command Routing**:
-   - Added all missing cases to executeCommand switch statement in hub-client.js
-   - Fixed `get_claude_dot_ai_tabs`, `get_claude_dot_ai_response_status`, and 20+ other tools
-   - Added missing workflow tools to handleMCPToolRequest
-
-2. **Updated Claude.ai DOM Selectors**:
-   - Changed from `textarea` to `div[contenteditable="true"]` for input field
-   - Updated submit button selector to `button[aria-label*="Send"], button:has(svg[stroke])`
-   - Fixed message sending with proper contenteditable event handling
-
-3. **Implemented Missing Methods**:
-   - Added `searchClaudeConversations` with title/date/message filters
-   - Added `bulkDeleteConversations` with batch processing
-   - Fixed `getClaudeConversations` to handle result structure properly
-   - Fixed `getConversationMetadata` to use conversationId parameter
-
-4. **Fixed Script Execution**:
-   - Added `world: 'MAIN'` to get_claude_dot_ai_response executeScript
-   - Fixed undefined serialization by converting to null
-   - Content script observer now accessible from MAIN world
-
-### Known Issues to Address After Restart
-1. **Observer Response Detection**: The content script observer is registering operations but not detecting response completion
-2. **Extension Reload Timeout**: The reload_extension tool times out but still works
-3. **Artifact/Code Block Extraction**: Not yet implemented in extractConversationElements
-
-### Git Commits Made
-- Fixed missing tool command routing in extension hub-client
-- Updated Claude.ai DOM selectors to current working versions
-- Fixed runtime errors in extension tools
-- Added missing conversation search and bulk delete implementations
-- Fixed get_claude_dot_ai_response by executing in MAIN world
-
-### Pre-Restart Checklist
-- ✅ All code changes committed
-- ✅ No temporary files to clean up
-- ✅ Documentation updated
-- ✅ Ready for extension reload and Claude Code restart
-- ✅ Parameter mapping fix applied to extension/modules/hub-client.js
-- ✅ reload_extension tool restored to MCP server
-- ✅ README.md updated to remove outdated build instructions
-- ✅ All changes committed to git
-- ✅ Temporary files cleaned up
-
-## Post-Restart Testing Plan
-1. **System Health**: Verify hub connection with `get_connection_health`
-2. **Extension Reload**: Test `reload_extension` tool (should work after restart)
-3. **Parameter Validation**: Test `send_message_async` and `get_claude_dot_ai_response`
-4. **Full Workflow**: spawn_claude_dot_ai_tab → send_message_async → get_claude_dot_ai_response → forward_response_to_claude_dot_ai_tab
+### Session 2: Modular Architecture
+- Created modular tool structure
+- Fixed 18+ missing tools
+- Established clean separation of concerns
