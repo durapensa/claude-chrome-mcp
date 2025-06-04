@@ -71,8 +71,9 @@ class ChromeMCPServer {
     
     // Initialize with minimal client info, will be updated after MCP initialization
     this.relayClient = new MCPRelayClient({
-      // This will be replaced with actual client info after initialization
-      name: 'Initializing...',
+      // This will be replaced with actual MCP client info after initialization
+      type: 'mcp-client',
+      name: 'Awaiting MCP Client',
       version: '2.6.0',
       capabilities: ['chrome_tabs', 'debugger', 'claude_automation']
     }, this.operationManager, this.notificationManager);
@@ -93,14 +94,15 @@ class ChromeMCPServer {
         result = await originalHandler.call(this.server, params);
       }
       
-      // After initialization, update relay client with actual client info
+      // After initialization, update relay client with MCP client info
       const clientInfo = this.server.getClientVersion();
       if (clientInfo) {
-        this.debug.info('CCM: Received client info from MCP protocol:', clientInfo);
+        this.debug.info('CCM: MCP client connected:', clientInfo);
         
-        // Update relay client with actual client info
+        // Update relay to identify as the MCP client that spawned us
         this.relayClient.updateClientInfo({
-          name: clientInfo.name,
+          type: 'mcp-client',
+          name: clientInfo.name || 'Unknown MCP Client',
           version: clientInfo.version,
           capabilities: ['chrome_tabs', 'debugger', 'claude_automation']
         });

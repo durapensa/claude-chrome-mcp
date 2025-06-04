@@ -102,8 +102,9 @@ class EmbeddedRelayManager extends EventEmitter {
       // Re-identify with new client info
       this.client.send({
         type: 'identify',
-        clientId: this.client.clientId,
-        clientInfo: this.clientInfo
+        clientType: clientInfo.type || 'mcp-server',
+        name: clientInfo.name || 'Claude Chrome MCP',
+        capabilities: clientInfo.capabilities
       });
     }
   }
