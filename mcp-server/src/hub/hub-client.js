@@ -656,7 +656,7 @@ class AutoHubClient extends EventEmitter {
           id: requestId,
           type,
           params,
-          from: this.clientInfo.name,
+          from: this.relayClient.clientId || this.clientInfo.name,
           timestamp: Date.now()
         });
         

@@ -150,7 +150,15 @@ class RelayConnection {
 }
 
 // Initialize relay connection
+console.log('[Offscreen] Initializing relay connection...');
 const relayConnection = new RelayConnection();
+
+// Send initial status
+chrome.runtime.sendMessage({ 
+  type: 'offscreen_status',
+  status: 'initialized',
+  timestamp: Date.now()
+}).catch(err => console.error('[Offscreen] Failed to send init status:', err));
 
 // Keep service worker alive by responding to periodic pings
 setInterval(() => {

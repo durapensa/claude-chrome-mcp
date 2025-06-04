@@ -15,7 +15,9 @@
     "offscreen"
   ],
   "host_permissions": [
-    "https://claude.ai/*"
+    "https://claude.ai/*",
+    "ws://localhost:*/*",
+    "http://localhost:*/*"
   ],
   "background": {
     "service_worker": "background.js",

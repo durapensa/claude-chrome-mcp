@@ -78,6 +78,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return false;
   }
   
+  if (request.type === 'offscreen_status') {
+    console.log('CCM: Offscreen document status:', request.status);
+    return false;
+  }
+  
   // Always handle health checks immediately, even during initialization
   if (request.type === 'mcp_tool_request' && request.tool === 'get_connection_health') {
     const currentState = hubClient ? hubClient.getCurrentState() : {

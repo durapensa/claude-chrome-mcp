@@ -166,7 +166,12 @@ class MessageRelay extends EventEmitter {
   multicast(targetType, data, excludeClientId = null) {
     this.clients.forEach((client, clientId) => {
       if (clientId !== excludeClientId && client.info.type === targetType) {
-        this.sendToClient(client.ws, data);
+        // Wrap the data in relay_message format
+        this.sendToClient(client.ws, {
+          type: 'relay_message',
+          from: excludeClientId,
+          data: data
+        });
       }
     });
   }
