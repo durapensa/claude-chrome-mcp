@@ -125,6 +125,53 @@ export interface GetConnectionHealthParams {
   // No parameters
 }
 
+export interface SystemWaitOperationParams {
+  operationId: string;
+  timeoutMs?: number;
+}
+
+export interface TabForwardResponseParams {
+  sourceTabId: number;
+  targetTabId: number;
+  transformTemplate?: string;
+}
+
+export interface TabBatchOperationsParams {
+  operation: 'send_messages' | 'get_responses' | 'send_and_get';
+  messages?: Array<{
+    tabId: number;
+    message: string;
+  }>;
+  tabIds?: number[];
+  sequential?: boolean;
+  delayMs?: number;
+  maxConcurrent?: number;
+  timeoutMs?: number;
+  waitForAll?: boolean;
+  pollIntervalMs?: number;
+}
+
+export interface ApiSearchConversationsParams {
+  titleSearch?: string;
+  titleRegex?: string;
+  createdAfter?: string;
+  createdBefore?: string;
+  minMessages?: number;
+  maxMessages?: number;
+  openOnly?: boolean;
+  limit?: number;
+}
+
+export interface ApiGetConversationUrlParams {
+  conversationId: string;
+}
+
+export interface ApiDeleteConversationsParams {
+  conversationIds: string[];
+  batchSize?: number;
+  delayMs?: number;
+}
+
 // Tab Pool specific parameters
 export interface GetTabPoolStatsParams {
   // No parameters
@@ -416,11 +463,61 @@ export interface TabPoolStats {
   }>;
 }
 
+export interface TabBatchOperationsResponse {
+  sendResult?: BatchSendResponse;
+  getResult?: BatchResponseResult;
+  success?: boolean;
+  error?: string;
+}
+
+export interface ApiSearchConversationsResponse {
+  success: boolean;
+  conversations: Array<{
+    id: string;
+    title: string;
+    created_at: string;
+    updated_at: string;
+    message_count: number;
+    tabId: number | null;
+    isOpen: boolean;
+  }>;
+  search_metadata: {
+    total_found: number;
+    returned: number;
+    filters_applied: number;
+    search_criteria: ApiSearchConversationsParams;
+  };
+}
+
+export interface ApiGetConversationUrlResponse {
+  success: boolean;
+  conversationId: string;
+  url: string;
+}
+
+export interface ApiDeleteConversationsResponse {
+  success: boolean;
+  deleted: number;
+  errors: string[];
+  total_processed: number;
+  deletion_summary: {
+    successful: number;
+    failed: number;
+    success_rate: string;
+  };
+  deleted_conversations: Array<{
+    id: string;
+    title: string;
+  }>;
+  message: string;
+}
+
 // ============================================================================
 // Union Types for Generic Handling
 // ============================================================================
 
 export type ToolParams = 
+  // LEGACY TOOLS (backward compatibility)
   | { tool: 'spawn_claude_dot_ai_tab'; params: SpawnClaudeDotAiTabParams }
   | { tool: 'get_claude_dot_ai_tabs'; params: GetClaudeDotAiTabsParams }
   | { tool: 'get_claude_conversations'; params: GetClaudeConversationsParams }
@@ -446,9 +543,40 @@ export type ToolParams =
   | { tool: 'get_connection_health'; params: GetConnectionHealthParams }
   | { tool: 'get_tab_pool_stats'; params: GetTabPoolStatsParams }
   | { tool: 'release_tab_to_pool'; params: ReleaseTabToPoolParams }
-  | { tool: 'configure_tab_pool'; params: ConfigureTabPoolParams };
+  | { tool: 'configure_tab_pool'; params: ConfigureTabPoolParams }
+  // NEW REORGANIZED TOOLS (pure domain separation)
+  // System tools
+  | { tool: 'system_health'; params: GetConnectionHealthParams }
+  | { tool: 'system_wait_operation'; params: SystemWaitOperationParams }
+  // Chrome tools  
+  | { tool: 'chrome_reload_extension'; params: ReloadExtensionParams }
+  | { tool: 'chrome_debug_attach'; params: DebugAttachParams }
+  | { tool: 'chrome_execute_script'; params: ExecuteScriptParams }
+  | { tool: 'chrome_get_dom_elements'; params: GetDomElementsParams }
+  | { tool: 'chrome_start_network_monitoring'; params: StartNetworkInspectionParams }
+  | { tool: 'chrome_stop_network_monitoring'; params: StopNetworkInspectionParams }
+  | { tool: 'chrome_get_network_requests'; params: GetCapturedRequestsParams }
+  // Tab tools
+  | { tool: 'tab_create'; params: SpawnClaudeDotAiTabParams }
+  | { tool: 'tab_list'; params: GetClaudeDotAiTabsParams }
+  | { tool: 'tab_close'; params: CloseClaudeDotAiTabParams }
+  | { tool: 'tab_send_message'; params: SendMessageToClaudeDotAiTabParams }
+  | { tool: 'tab_get_response'; params: GetClaudeDotAiResponseParams }
+  | { tool: 'tab_get_response_status'; params: GetClaudeDotAiResponseStatusParams }
+  | { tool: 'tab_forward_response'; params: TabForwardResponseParams }
+  | { tool: 'tab_extract_elements'; params: ExtractConversationElementsParams }
+  | { tool: 'tab_export_conversation'; params: ExportConversationTranscriptParams }
+  | { tool: 'tab_debug_page'; params: DebugClaudeDotAiPageParams }
+  | { tool: 'tab_batch_operations'; params: TabBatchOperationsParams }
+  // API tools
+  | { tool: 'api_list_conversations'; params: GetClaudeConversationsParams }
+  | { tool: 'api_search_conversations'; params: ApiSearchConversationsParams }
+  | { tool: 'api_get_conversation_metadata'; params: GetConversationMetadataParams }
+  | { tool: 'api_get_conversation_url'; params: ApiGetConversationUrlParams }
+  | { tool: 'api_delete_conversations'; params: ApiDeleteConversationsParams };
 
 export type ToolResponse =
+  // LEGACY TOOLS (backward compatibility)
   | { tool: 'spawn_claude_dot_ai_tab'; result: SpawnClaudeDotAiTabResponse }
   | { tool: 'get_claude_dot_ai_tabs'; result: ClaudeDotAiTab[] }
   | { tool: 'get_claude_conversations'; result: ClaudeConversation[] }
@@ -474,13 +602,43 @@ export type ToolResponse =
   | { tool: 'get_connection_health'; result: ConnectionHealth }
   | { tool: 'get_tab_pool_stats'; result: TabPoolStats }
   | { tool: 'release_tab_to_pool'; result: { success: boolean; message: string } }
-  | { tool: 'configure_tab_pool'; result: { success: boolean; config: any } };
+  | { tool: 'configure_tab_pool'; result: { success: boolean; config: any } }
+  // NEW REORGANIZED TOOLS (pure domain separation)
+  // System tools
+  | { tool: 'system_health'; result: ConnectionHealth }
+  | { tool: 'system_wait_operation'; result: { success: boolean; message?: string } }
+  // Chrome tools
+  | { tool: 'chrome_reload_extension'; result: { success: boolean } }
+  | { tool: 'chrome_debug_attach'; result: { success: boolean } }
+  | { tool: 'chrome_execute_script'; result: any }
+  | { tool: 'chrome_get_dom_elements'; result: any[] }
+  | { tool: 'chrome_start_network_monitoring'; result: { success: boolean } }
+  | { tool: 'chrome_stop_network_monitoring'; result: { success: boolean } }
+  | { tool: 'chrome_get_network_requests'; result: NetworkRequest[] }
+  // Tab tools
+  | { tool: 'tab_create'; result: SpawnClaudeDotAiTabResponse }
+  | { tool: 'tab_list'; result: ClaudeDotAiTab[] }
+  | { tool: 'tab_close'; result: { success: boolean } }
+  | { tool: 'tab_send_message'; result: SendMessageResponse }
+  | { tool: 'tab_get_response'; result: ClaudeResponseData }
+  | { tool: 'tab_get_response_status'; result: ResponseStatus }
+  | { tool: 'tab_forward_response'; result: { success: boolean; message?: string } }
+  | { tool: 'tab_extract_elements'; result: { elements: ConversationElement[] } }
+  | { tool: 'tab_export_conversation'; result: ConversationTranscript }
+  | { tool: 'tab_debug_page'; result: any }
+  | { tool: 'tab_batch_operations'; result: TabBatchOperationsResponse }
+  // API tools
+  | { tool: 'api_list_conversations'; result: ClaudeConversation[] }
+  | { tool: 'api_search_conversations'; result: ApiSearchConversationsResponse }
+  | { tool: 'api_get_conversation_metadata'; result: ConversationMetadata }
+  | { tool: 'api_get_conversation_url'; result: ApiGetConversationUrlResponse }
+  | { tool: 'api_delete_conversations'; result: ApiDeleteConversationsResponse };
 
 // ============================================================================
 // Type Guards
 // ============================================================================
 
-export function isSpawnTabResponse(response: any): response is SpawnClaudeTabResponse {
+export function isSpawnTabResponse(response: any): response is SpawnClaudeDotAiTabResponse {
   return response && 
     typeof response.success === 'boolean' &&
     typeof response.id === 'number' &&

@@ -34,7 +34,7 @@ export interface MCPToolRequest {
   arguments: Record<string, any>;
 }
 
-export interface MCPToolResponse {
+export interface MCPContentResponse {
   content: Array<{
     type: 'text';
     text: string;
