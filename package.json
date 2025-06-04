@@ -17,7 +17,7 @@
     }
   },
   "scripts": {
-    "test": "node tests/run-all-tests.js",
+    "test": "node tests/run-all-tests-v2.js",
     "test:quick": "node tests/regression-test-quick.js",
     "test:comprehensive": "node tests/run-comprehensive-suite.js",
     "typecheck": "tsc --noEmit",
