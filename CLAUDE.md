@@ -4,13 +4,14 @@ Quick reference for Claude. See README.md for full documentation.
 
 ## System Status
 - Version: 2.5.0 (centralized version management)
-- Architecture: Transitioning to Offscreen Documents + WebSocket (from HTTP polling)
-- Structure: Modular architecture with separated components (utils/, hub/, lifecycle/)
-- Next Phase: Implementing persistent connections via Chrome offscreen documents
+- Architecture: WebSocket-only with offscreen documents
+- Structure: Modular architecture with relay-based messaging
+- Connection: Persistent WebSocket via Chrome offscreen documents (port 54322)
 
 ## Important System Limitations
 - Claude Code cannot restart its own MCP servers. User must exit and re-run Claude Code if claude-chrome-mcp tools are not available
 - **RESTART REQUIRED**: After making changes to mcp-server code, user must manually exit and re-run Claude Code to reload the MCP server with updates
+- **RELAY REQUIRED**: WebSocket relay must be running on port 54322 before starting MCP server
 
 ## Quick Commands
 ```bash
@@ -54,13 +55,13 @@ mcp__claude-chrome-mcp__forward_response_to_claude_dot_ai_tab --sourceTabId <sou
 - TypeScript: docs/TYPESCRIPT.md
 - Roadmap: ROADMAP.md
 
-## Architecture Overview (New Design - In Progress)
-- **Message Relay**: Simple WebSocket relay on port 54321 (replacing complex hub)
-- **Offscreen Documents**: Persistent WebSocket connection (12+ hours without keepalives)
+## Architecture Overview (WebSocket-Only)
+- **Message Relay**: Simple WebSocket relay on port 54322 with health monitoring
+- **Offscreen Documents**: Persistent WebSocket connection (12+ hours)
 - **Extension as Brain**: All coordination, locking, and conflict resolution in extension
-- **Event-Driven**: Pure push messaging (replacing HTTP polling)
-- **Multi-Agent Support**: Multiple MCP servers coordinate through extension
-- **Fast Failover**: Next relay takes over in <2 seconds when active relay exits
+- **Event-Driven**: Pure push messaging (no HTTP polling)
+- **Multi-Agent Support**: Multiple MCP servers coordinate through relay
+- **Health Endpoint**: http://localhost:54322/health for relay monitoring
 
 ## Continuation Workflow  
 When you type 'continue', follow the standard workflow in docs/CONTINUATION.md

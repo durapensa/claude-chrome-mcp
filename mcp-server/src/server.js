@@ -38,9 +38,7 @@ const { ErrorTracker } = require('./utils/error-tracker');
 const { DebugMode } = require('./utils/debug-mode');
 const { OperationManager } = require('./utils/operation-manager');
 const { NotificationManager } = require('./utils/notification-manager');
-const { WebSocketHub } = require('./hub/websocket-hub');
 const { AutoHubClient } = require('./hub/hub-client');
-const { MultiHubManager } = require('./hub/multi-hub-manager');
 
 // Import modular tools
 const { allTools, getToolHandler, hasHandler } = require('./tools/index');
@@ -67,21 +65,16 @@ class ChromeMCPServer {
     this.operationManager = new OperationManager();
     this.notificationManager = new NotificationManager(this.server, this.errorTracker);
     
-    // Initialize hub client for multi-server coordination
+    // Initialize relay client (WebSocket relay mode only)
+    // Force relay mode by setting environment variable
+    process.env.USE_WEBSOCKET_RELAY = 'true';
+    
     this.hubClient = new AutoHubClient({
       id: 'claude-chrome-mcp',
       name: 'Claude Chrome MCP',
       type: 'automation_server',
       capabilities: ['chrome_tabs', 'debugger', 'claude_automation']
     }, this.operationManager, this.notificationManager);
-
-    // Initialize multi-hub manager for distributed coordination
-    this.multiHubManager = new MultiHubManager(this.hubClient);
-    
-    // Set up simplified hub failover - MultiHubManager handles connection loss
-    this.hubClient.on('connection_lost', () => {
-      this.multiHubManager.onHubConnectionLost();
-    });
 
     this.setupTools();
   }
@@ -117,7 +110,8 @@ class ChromeMCPServer {
         operationsCount: this.operationManager.operations.size,
         errorsCount: this.errorTracker.errors ? this.errorTracker.errors.length : 0
       },
-      multiHub: this.multiHubManager.getHubStatus()
+      relayMode: true,
+      relayConnected: this.hubClient.connected
     };
 
     return {
@@ -289,8 +283,6 @@ class ChromeMCPServer {
       
       // Connect hub client
       await this.hubClient.connect();
-      
-      // Multi-hub coordination starts automatically in constructor
       
       // Connect to stdio transport
       const transport = new StdioServerTransport();

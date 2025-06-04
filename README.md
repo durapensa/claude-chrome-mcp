@@ -3,8 +3,9 @@
 Browser automation tool enabling MCP clients (Claude Desktop, Claude Code, Cursor) to interact with claude.ai through Chrome extension and MCP server.
 
 ## Components
-- **MCP Server** - Hosts WebSocket hub and exposes Chrome capabilities to MCP clients
-- **Chrome Extension** - WebSocket client providing claude.ai browser access
+- **WebSocket Relay** - Simple message relay server for persistent connections (port 54322)
+- **MCP Server** - Connects to relay and exposes Chrome capabilities to MCP clients
+- **Chrome Extension** - WebSocket client with offscreen document for persistent relay connection
 - **CLI Tool** - Direct command-line browser control
 
 ## Quick Start
@@ -19,7 +20,8 @@ Browser automation tool enabling MCP clients (Claude Desktop, Claude Code, Curso
 - Claude-to-Claude response forwarding
 - Conversation management via Claude.ai API
 - Network inspection and debugging tools
-- MCP-Server-as-Hub: WebSocket hub hosted by MCP server
+- WebSocket-only architecture with persistent connections
+- Health monitoring endpoint for relay status
 
 ## Documentation
 
@@ -47,6 +49,12 @@ Browser automation tool enabling MCP clients (Claude Desktop, Claude Code, Curso
 3. Click "Load unpacked" and select `extension/` directory
    (No build step required - native ES6 modules)
 
+### WebSocket Relay
+```bash
+# Start the relay server first
+./test-websocket-relay.sh
+```
+
 ### MCP Server
 ```bash
 cd mcp-server && npm install
@@ -63,12 +71,15 @@ cd cli && npm install && npm run build && npm link
 
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Claude.ai     │    │  Chrome Extension│◄──►│  Claude Desktop │
-│   (Browser)     │    │  WebSocket Hub   │    │  MCP Client     │
-└─────────────────┘    │                  │    └─────────────────┘
-         ▲              │                  │           
-         │              │                  │◄──►┌─────────────────┐
-         └──────────────┤                  │    │  Claude Code    │
-                        │                  │    │  MCP Client     │
-                        └──────────────────┘    └─────────────────┘
+│   Claude.ai     │    │ Chrome Extension │    │ WebSocket Relay │
+│   (Browser)     │◄───┤ (Offscreen Doc)  │◄──►│   Port 54322    │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+                                                         ▲
+                                                         │
+                                                ┌────────┴────────┐
+                                                │                 │
+                                        ┌───────▼──────┐ ┌───────▼──────┐
+                                        │ MCP Server   │ │ Claude Code  │
+                                        │ (Relay Mode) │ │ MCP Client   │
+                                        └──────────────┘ └──────────────┘
 ```

@@ -21,7 +21,7 @@ class RelayConnection {
   
   connect() {
     try {
-      this.ws = new WebSocket('ws://localhost:54321');
+      this.ws = new WebSocket('ws://localhost:54322'); // WebSocket relay port
       
       this.ws.onopen = () => {
         console.log('[Offscreen] WebSocket connected to relay');

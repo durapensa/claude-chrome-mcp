@@ -39,8 +39,7 @@ if (fs.existsSync(manifestPath)) {
 
 // Update hardcoded versions in JavaScript files
 const jsFiles = [
-  'mcp-server/src/server.js',
-  'mcp-server/src/hub/websocket-hub.js'
+  'mcp-server/src/server.js'
 ];
 
 jsFiles.forEach(file => {

@@ -1,5 +1,5 @@
-// HTTP Polling Hub Client for Chrome Extension
-// Uses HTTP polling instead of WebSocket for Chrome Manifest V3 compatibility
+// WebSocket Relay Client for Chrome Extension
+// Uses WebSocket relay via offscreen document for persistent connection
 
 import { 
   WEBSOCKET_PORT, 
@@ -28,265 +28,30 @@ export class HubClient {
     // ContentScriptManager will be passed in from background script
     this.contentScriptManager = null;
     
-    // HTTP polling configuration
-    this.hubUrl = `http://localhost:${WEBSOCKET_PORT}`;
-    this.heartbeatInterval = null;
-    this.pollingInterval = null;
-    this.healthPollingInterval = null;
-    this.isActive = false;
+    // WebSocket relay configuration
+    this.relayConnected = false;
+    this.pendingRequests = new Map(); // Track requests awaiting responses
     
-    // Adaptive polling configuration
-    this.adaptivePolling = {
-      commandInterval: 500,      // Start at 500ms (was 200ms)
-      maxCommandInterval: 2000,  // Slow to 2s when idle
-      healthInterval: 10000,     // Health polling every 10s (was 3s)
-      heartbeatInterval: 15000,  // Heartbeat every 15s (was 5s)
-      idleThreshold: 30000,      // 30s without activity = idle
-      lastActivity: Date.now(),
-      currentCommandInterval: 500
-    };
-    
-    // Client timeout tracking properties
-    this.clientTimeouts = new Map();
-    this.CLIENT_TIMEOUT_MS = 60000;
-    
-    console.log('CCM Extension: HTTP HubClient created with adaptive polling');
+    console.log('CCM Extension: WebSocket HubClient created');
   }
 
   async init() {
-    console.log('CCM Extension: Initializing HubClient...');
+    console.log('CCM Extension: Initializing WebSocket HubClient...');
     
-    // Check for previous connection state
-    const previousState = await chrome.storage.local.get(['lastAliveTime', 'connectionState']);
-    if (previousState.lastAliveTime) {
-      const timeSinceLastAlive = Date.now() - previousState.lastAliveTime;
-      console.log(`CCM Extension: Service worker was last alive ${timeSinceLastAlive}ms ago`);
-      console.log(`CCM Extension: Previous connection state: ${previousState.connectionState}`);
-    }
-    
-    // Setup listeners but don't connect yet
+    // Setup listeners
     this.setupEventListeners();
-    console.log('CCM Extension: HubClient initialized (ready to connect)');
+    console.log('CCM Extension: WebSocket HubClient initialized');
   }
 
   isConnected() {
-    return this.isActive && this.heartbeatInterval && this.pollingInterval;
+    return this.relayConnected;
   }
 
   async connectToHub() {
-    if (this.isConnected()) {
-      console.log('CCM Extension: Already connected via HTTP polling');
-      return;
-    }
-    
-    console.log('CCM Extension: Starting HTTP polling connection to hub...');
-    
-    try {
-      // Test initial connection to hub
-      const response = await fetch(`${this.hubUrl}/health`);
-      if (!response.ok) {
-        throw new Error(`Hub health check failed: ${response.status}`);
-      }
-      
-      console.log('CCM Extension: Hub is healthy, starting polling...');
-      
-      // Start heartbeat to register with hub
-      this.startHeartbeat();
-      
-      // Start command polling
-      this.startPolling();
-      
-      this.isActive = true;
-      this.messageQueue.setConnected(true);
-      updateBadge('hub-connected');
-      
-      console.log('CCM Extension: HTTP polling connection established');
-      
-    } catch (error) {
-      console.error('CCM Extension: Failed to connect to hub via HTTP:', error);
-      updateBadge('hub-disconnected');
-      
-      // Retry connection after delay
-      setTimeout(() => {
-        this.connectToHub();
-      }, 5000);
-    }
+    // Connection is handled by offscreen document
+    console.log('CCM Extension: WebSocket connection handled by offscreen document');
   }
 
-  startHeartbeat() {
-    // Stop any existing heartbeat
-    if (this.heartbeatInterval) {
-      clearInterval(this.heartbeatInterval);
-    }
-    
-    // Send immediate heartbeat
-    this.sendHeartbeat();
-    
-    // Set up regular heartbeat with adaptive interval (15s instead of 5s)
-    this.heartbeatInterval = setInterval(() => {
-      this.sendHeartbeat();
-    }, this.adaptivePolling.heartbeatInterval);
-    
-    console.log(`CCM Extension: Heartbeat started (${this.adaptivePolling.heartbeatInterval}ms interval)`);
-  }
-
-  async sendHeartbeat() {
-    try {
-      const response = await fetch(`${this.hubUrl}/heartbeat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          extensionId: chrome.runtime.id,
-          timestamp: Date.now()
-        })
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Heartbeat failed: ${response.status}`);
-      }
-      
-      const result = await response.json();
-      console.log(`CCM Extension: Heartbeat sent, ${result.queuedCommands} commands queued`);
-      
-    } catch (error) {
-      console.error('CCM Extension: Heartbeat failed:', error);
-      // Don't stop on heartbeat failure - let polling handle reconnection
-    }
-  }
-
-  startPolling() {
-    // Stop any existing polling
-    if (this.pollingInterval) {
-      clearInterval(this.pollingInterval);
-    }
-    
-    if (this.healthPollingInterval) {
-      clearInterval(this.healthPollingInterval);
-    }
-    
-    // Start adaptive command polling
-    this.scheduleNextCommandPoll();
-    
-    // Set up health polling with new interval (10s instead of 3s)
-    this.healthPollingInterval = setInterval(() => {
-      this.pollHealthStatus();
-    }, this.adaptivePolling.healthInterval);
-    
-    console.log(`CCM Extension: Adaptive polling started - commands: ${this.adaptivePolling.commandInterval}ms, health: ${this.adaptivePolling.healthInterval}ms`);
-  }
-
-  scheduleNextCommandPoll() {
-    // Calculate current interval based on activity
-    const currentInterval = this.calculateCurrentInterval();
-    
-    this.pollingInterval = setTimeout(() => {
-      this.pollForCommands().then(() => {
-        // Schedule next poll
-        if (this.isActive) {
-          this.scheduleNextCommandPoll();
-        }
-      });
-    }, currentInterval);
-  }
-
-  calculateCurrentInterval() {
-    const timeSinceActivity = Date.now() - this.adaptivePolling.lastActivity;
-    
-    if (timeSinceActivity > this.adaptivePolling.idleThreshold) {
-      // Gradually increase interval when idle
-      const slowFactor = Math.min(timeSinceActivity / this.adaptivePolling.idleThreshold, 4);
-      this.adaptivePolling.currentCommandInterval = Math.min(
-        this.adaptivePolling.commandInterval * slowFactor,
-        this.adaptivePolling.maxCommandInterval
-      );
-    } else {
-      // Reset to fast interval when active
-      this.adaptivePolling.currentCommandInterval = this.adaptivePolling.commandInterval;
-    }
-    
-    return this.adaptivePolling.currentCommandInterval;
-  }
-
-  recordActivity() {
-    this.adaptivePolling.lastActivity = Date.now();
-    // Reset to fast polling on activity
-    this.adaptivePolling.currentCommandInterval = this.adaptivePolling.commandInterval;
-  }
-
-  async pollForCommands() {
-    try {
-      const response = await fetch(`${this.hubUrl}/poll-commands`);
-      if (!response.ok) {
-        throw new Error(`Poll failed: ${response.status}`);
-      }
-      
-      const result = await response.json();
-      
-      if (result.commands && result.commands.length > 0) {
-        console.log(`CCM Extension: Received ${result.commands.length} commands from hub`);
-        
-        // Record activity to speed up polling
-        this.recordActivity();
-        
-        for (const command of result.commands) {
-          try {
-            const cmdResult = await this.executeCommand(command);
-            // Send result back via HTTP
-            if (command.requestId) {
-              await this.sendCommandResponse(command.requestId, cmdResult);
-            }
-          } catch (error) {
-            // Send error back via HTTP
-            if (command.requestId) {
-              await this.sendCommandResponse(command.requestId, null, error.message);
-            }
-          }
-        }
-      }
-      
-    } catch (error) {
-      console.error('CCM Extension: Command polling failed:', error);
-      // Handle reconnection on polling failure
-      this.handleConnectionError();
-    }
-  }
-
-  async pollHealthStatus() {
-    try {
-      const response = await fetch(`${this.hubUrl}/health`);
-      if (!response.ok) {
-        throw new Error(`Health poll failed: ${response.status}`);
-      }
-      
-      const healthData = await response.json();
-      
-      // Update connected clients from WebSocket hub
-      this.connectedClients.clear();
-      if (healthData.connectedClients && Array.isArray(healthData.connectedClients)) {
-        for (const client of healthData.connectedClients) {
-          this.connectedClients.set(client.id, {
-            ...client,
-            connectedAt: client.connectedAt || Date.now()
-          });
-        }
-        
-        console.log(`CCM Extension: Health poll - ${healthData.connectedClients.length} WebSocket clients connected`);
-        
-        // Update badge based on client count
-        if (this.connectedClients.size > 0) {
-          updateBadge('mcp-connected');
-        } else {
-          updateBadge('hub-connected');
-        }
-      }
-      
-    } catch (error) {
-      console.error('CCM Extension: Health polling failed:', error);
-      // Don't disconnect on health polling failure - commands are more critical
-    }
-  }
 
   async executeCommand(command) {
     console.log(`CCM Extension: Executing command: ${command.type}`);
@@ -423,109 +188,57 @@ export class HubClient {
     }
   }
 
-  async sendCommandResponse(requestId, result, error = null) {
-    try {
-      const response = await fetch(`${this.hubUrl}/command-response`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          requestId: requestId,
-          result: result,
-          error: error,
-          timestamp: Date.now()
-        })
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Response send failed: ${response.status}`);
-      }
-      
-      console.log(`CCM Extension: Sent response for command ${requestId}`);
-      
-    } catch (sendError) {
-      console.error('CCM Extension: Failed to send command response:', sendError);
-    }
-  }
-
-  handleConnectionError() {
-    if (this.isActive) {
-      console.log('CCM Extension: Connection error, attempting reconnection...');
-      this.disconnect();
-      
-      // Retry connection after delay
-      setTimeout(() => {
-        this.connectToHub();
-      }, 2000);
-    }
-  }
 
   disconnect() {
-    console.log('CCM Extension: Disconnecting adaptive HTTP polling...');
+    console.log('CCM Extension: Disconnecting WebSocket relay...');
     
-    this.isActive = false;
-    
-    if (this.heartbeatInterval) {
-      clearInterval(this.heartbeatInterval);
-      this.heartbeatInterval = null;
-    }
-    
-    // Clear command polling timeout (now using setTimeout instead of setInterval)
-    if (this.pollingInterval) {
-      clearTimeout(this.pollingInterval);
-      this.pollingInterval = null;
-    }
-    
-    if (this.healthPollingInterval) {
-      clearInterval(this.healthPollingInterval);
-      this.healthPollingInterval = null;
-    }
-    
+    this.relayConnected = false;
     this.messageQueue.setConnected(false);
     updateBadge('hub-disconnected');
     
-    console.log('CCM Extension: Adaptive HTTP polling disconnected');
+    // Clear any pending requests
+    for (const [requestId, { reject }] of this.pendingRequests) {
+      reject(new Error('Connection disconnected'));
+    }
+    this.pendingRequests.clear();
+    
+    console.log('CCM Extension: WebSocket relay disconnected');
   }
 
   clearAllClients() {
-    // Clear all client timeouts
-    for (const [clientId, timeoutId] of this.clientTimeouts) {
-      clearTimeout(timeoutId);
-    }
-    this.clientTimeouts.clear();
-    
     // Clear connected clients map
     const previousCount = this.connectedClients.size;
     this.connectedClients.clear();
     
-    console.log(`CCM Extension: Cleared ${previousCount} stale client connections`);
+    console.log(`CCM Extension: Cleared ${previousCount} client connections`);
   }
 
-  // HTTP polling doesn't need complex WebSocket message handling
-  // Commands are executed directly via polling
-  
-  // State management for HTTP polling - includes WebSocket clients
+  // State management
   getCurrentState() {
     return {
-      hubConnected: this.isActive,
+      hubConnected: this.relayConnected,
       connectedClients: Array.from(this.connectedClients.values()),
-      extensionConnected: this.isActive,
+      extensionConnected: this.relayConnected,
       timestamp: Date.now()
     };
   }
 
   setupEventListeners() {
-    // Chrome runtime message listener will be set up in background.js
+    // Listen for relay status updates from offscreen document
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      if (message.type === 'relay_status') {
+        this.handleRelayStatus(message.status);
+      } else if (message.type === 'relay_message') {
+        this.handleRelayMessage(message.data);
+      }
+    });
+    
     console.log('CCM Extension: Event listeners setup complete');
   }
 
   // Handle MCP tool requests
   async handleMCPToolRequest(tool, params) {
     console.log(`CCM Extension: Handling MCP tool request: ${tool}`, params);
-    
-    // Record activity for any MCP tool request
-    this.recordActivity();
     
     // Map tool names to methods
     const toolHandlers = {
@@ -592,9 +305,6 @@ export class HubClient {
       console.log('CCM Extension: Missing required parameters - tabId:', tabId, 'message:', message);
       return { success: false, error: 'Missing required parameters' };
     }
-    
-    // Record activity for user-initiated actions
-    this.recordActivity();
     
     try {
       // Use the synchronous send but don't wait for response
@@ -996,10 +706,20 @@ export class HubClient {
     console.log('CCM HubClient: Relay status update:', status);
     if (status.status === 'connected') {
       console.log('CCM HubClient: WebSocket relay connected');
-      // TODO: Transition from HTTP polling to WebSocket mode
+      this.relayConnected = true;
+      this.messageQueue.setConnected(true);
+      updateBadge('hub-connected');
     } else if (status.status === 'disconnected') {
       console.log('CCM HubClient: WebSocket relay disconnected');
-      // TODO: Fall back to HTTP polling if needed
+      this.relayConnected = false;
+      this.messageQueue.setConnected(false);
+      updateBadge('hub-disconnected');
+      
+      // Clear pending requests on disconnect
+      for (const [requestId, { reject }] of this.pendingRequests) {
+        reject(new Error('Relay disconnected'));
+      }
+      this.pendingRequests.clear();
     }
   }
 
@@ -1044,15 +764,43 @@ export class HubClient {
             }
           });
         });
+      } else if (data.type === 'response' && data.id) {
+        // Handle response for a pending request
+        const pending = this.pendingRequests.get(data.id);
+        if (pending) {
+          this.pendingRequests.delete(data.id);
+          if (data.error) {
+            pending.reject(new Error(data.error));
+          } else {
+            pending.resolve(data.result);
+          }
+        }
       }
     } else if (message.type === 'client_list_update') {
       console.log('CCM HubClient: Client list updated:', message.clients);
-      // Handle client list updates if needed
+      // Update connected clients
+      this.connectedClients.clear();
+      if (message.clients && Array.isArray(message.clients)) {
+        for (const client of message.clients) {
+          this.connectedClients.set(client.id, client);
+        }
+        
+        // Update badge based on client count
+        if (this.connectedClients.size > 0) {
+          updateBadge('mcp-connected');
+        } else if (this.relayConnected) {
+          updateBadge('hub-connected');
+        }
+      }
     }
   }
 
   // Send message via offscreen WebSocket relay
   async sendToRelay(message) {
+    if (!this.relayConnected) {
+      throw new Error('WebSocket relay not connected');
+    }
+    
     try {
       await chrome.runtime.sendMessage({
         type: 'send_to_relay',
@@ -1060,9 +808,40 @@ export class HubClient {
       });
     } catch (error) {
       console.error('CCM HubClient: Failed to send to relay:', error);
-      // Fall back to HTTP if relay is not available
       throw error;
     }
+  }
+  
+  // Send request and wait for response via relay
+  async sendRequestViaRelay(targetId, type, params) {
+    const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    
+    return new Promise((resolve, reject) => {
+      // Store pending request
+      this.pendingRequests.set(requestId, { resolve, reject });
+      
+      // Set timeout
+      const timeout = setTimeout(() => {
+        this.pendingRequests.delete(requestId);
+        reject(new Error('Request timeout'));
+      }, 30000);
+      
+      // Send request via relay
+      this.sendToRelay({
+        type: 'unicast',
+        targetId: targetId,
+        data: {
+          id: requestId,
+          type: type,
+          params: params,
+          timestamp: Date.now()
+        }
+      }).catch(error => {
+        clearTimeout(timeout);
+        this.pendingRequests.delete(requestId);
+        reject(error);
+      });
+    });
   }
 }
 

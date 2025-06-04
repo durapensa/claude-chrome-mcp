@@ -39,14 +39,14 @@ Follow systematic debugging approach from [Troubleshooting Guide](TROUBLESHOOTIN
 - **[GitHub Issue Script](create-claude-code-issue.sh)**: Claude Code integration utilities
 
 ## Current System Status
-- **Version**: 2.5.0 (Transitioning to WebSocket-only architecture)
-- **Architecture**: WebSocket relay fully functional, removing HTTP code next
+- **Version**: 2.5.0 (WebSocket-only architecture)
+- **Architecture**: WebSocket relay with offscreen documents
 - **Key Features**: 
   - Async operations, Claude-to-Claude forwarding
   - WebSocket relay with health monitoring (port 54322)
   - Persistent connections via offscreen documents (12+ hours)
   - Pure message routing relay for simplified architecture
-- **Next Phase**: Complete migration to WebSocket-only
+- **Status**: Migration to WebSocket-only complete
 - **Important**: Extension needs manual reload, Claude Code needs restart after MCP server changes
 
 ## Latest Session Summary (2025-01-06 - Part 9: Production Features & Housekeeping)
@@ -76,54 +76,26 @@ Follow systematic debugging approach from [Troubleshooting Guide](TROUBLESHOOTIN
    - Simplifies codebase significantly
    - Removes port conflicts and complexity
 
-### Session Handoff Point - Context Refresh Needed
+### Session Summary - WebSocket-Only Migration Complete
 
-**Current State**:
-- Relay server provides health monitoring
-- WebSocket communication fully functional
-- Ready to remove HTTP polling code
-- MCP server currently running in HTTP hub mode (blocking port 54321)
+**Completed Tasks**:
+1. ✅ Removed HTTP polling code from extension (hub-client.js)
+2. ✅ Removed hub server dependencies
+3. ✅ Simplified connection logic to WebSocket-only
+4. ✅ Updated documentation for new architecture
+5. ✅ Updated offscreen document to use relay port 54322
 
-### Next Session: Complete WebSocket-Only Migration
+### Running the System
 
-1. **Remove HTTP Code from Extension**:
-   - Remove HTTP polling logic from hub-client.js
-   - Remove command polling and health check intervals
-   - Simplify to WebSocket-only connection
-   - Remove sendCommandResponse HTTP method
-
-2. **Remove Hub Server Code**:
-   - Remove websocket-hub.js (HTTP + WebSocket hybrid)
-   - Update MCP server to always use relay mode
-   - Remove hub election logic
-   - Remove USE_WEBSOCKET_RELAY checks
-
-3. **Simplify Connection Logic**:
-   - Make relay connection the only option
-   - Remove fallback mechanisms
-   - Update error messages for clarity
-   - Simplify initialization flow
-
-4. **Update Documentation**:
-   - Remove references to HTTP polling
-   - Update README with WebSocket-only instructions
-   - Update architecture diagrams
-   - Create production deployment guide
-
-### Restart Instructions After Compact
-
-**Important**: The MCP server is currently running in HTTP hub mode on port 54321.
-
-1. **After Claude Code exits from compact**, start relay FIRST:
+1. **Start WebSocket relay FIRST**:
    ```bash
    # Terminal 1:
    ./test-websocket-relay.sh
    ```
 
-2. **Then start Claude Code with relay mode**:
+2. **Then start Claude Code**:
    ```bash
    # Terminal 2:
-   export USE_WEBSOCKET_RELAY=true
    claude-code
    ```
 
@@ -135,6 +107,11 @@ Follow systematic debugging approach from [Troubleshooting Guide](TROUBLESHOOTIN
    # Test in Claude Code:
    mcp__claude-chrome-mcp__get_connection_health
    ```
+
+### Next Steps
+- Test complete WebSocket flow end-to-end
+- Monitor system stability
+- Consider production deployment options
 
 ### Key Implementation Files
 - `/extension/manifest.json` - ✅ Offscreen permission added
