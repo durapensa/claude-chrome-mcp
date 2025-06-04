@@ -38,7 +38,7 @@ const { ErrorTracker } = require('./utils/error-tracker');
 const { DebugMode } = require('./utils/debug-mode');
 const { OperationManager } = require('./utils/operation-manager');
 const { NotificationManager } = require('./utils/notification-manager');
-const { AutoHubClient } = require('./hub/hub-client');
+const { MCPRelayClient } = require('./relay/mcp-relay-client');
 
 // Import modular tools
 const { allTools, getToolHandler, hasHandler } = require('./tools/index');
@@ -69,7 +69,7 @@ class ChromeMCPServer {
     // Force relay mode by setting environment variable
     process.env.USE_WEBSOCKET_RELAY = 'true';
     
-    this.hubClient = new AutoHubClient({
+    this.relayClient = new MCPRelayClient({
       id: 'claude-chrome-mcp',
       name: 'Claude Chrome MCP',
       type: 'automation_server',
@@ -104,14 +104,14 @@ class ChromeMCPServer {
 
   async getConnectionHealth() {
     const health = {
-      hubClient: this.hubClient.getConnectionStats(),
+      relayClient: this.relayClient.getConnectionStats(),
       server: {
         uptime: Date.now() - this.startTime,
         operationsCount: this.operationManager.operations.size,
         errorsCount: this.errorTracker.errors ? this.errorTracker.errors.length : 0
       },
       relayMode: true,
-      relayConnected: this.hubClient.connected
+      relayConnected: this.relayClient.connected
     };
 
     return {
@@ -123,7 +123,7 @@ class ChromeMCPServer {
   }
 
   async forwardToExtension(toolName, params) {
-    const result = await this.hubClient.sendRequest(toolName, params);
+    const result = await this.relayClient.sendRequest(toolName, params);
     
     if (result.error) {
       throw new Error(result.error);
@@ -281,8 +281,8 @@ class ChromeMCPServer {
       // Load saved operations
       await this.operationManager.loadState();
       
-      // Connect hub client
-      await this.hubClient.connect();
+      // Connect relay client
+      await this.relayClient.connect();
       
       // Connect to stdio transport
       const transport = new StdioServerTransport();

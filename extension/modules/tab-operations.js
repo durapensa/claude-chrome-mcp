@@ -1,9 +1,9 @@
-// Chrome Tab Operations for HubClient
+// Chrome Tab Operations for ExtensionRelayClient
 
 import { generateOperationId, isClaudeAiUrl } from '../utils/utils.js';
 import { OPERATION_TIMEOUT, COMPLETION_TIMEOUT } from './config.js';
 
-// Tab operation methods to be mixed into HubClient
+// Tab operation methods to be mixed into ExtensionRelayClient
 export const tabOperationMethods = {
   async spawnClaudeTab(params = {}) {
     console.log('CCM Extension: Spawning new Claude.ai tab', params);

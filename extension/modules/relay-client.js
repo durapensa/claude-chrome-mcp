@@ -1,4 +1,4 @@
-// WebSocket Relay Client for Chrome Extension
+// Extension Relay Client for Chrome Extension
 // Uses WebSocket relay via offscreen document for persistent connection
 
 import { 
@@ -18,7 +18,7 @@ import { batchOperationMethods } from './batch-operations.js';
 import { debugOperationMethods } from './debug-operations.js';
 import { updateBadge } from '../utils/utils.js';
 
-export class HubClient {
+export class ExtensionRelayClient {
   constructor() {
     this.connectedClients = new Map();
     this.debuggerSessions = new Map();
@@ -32,22 +32,22 @@ export class HubClient {
     this.relayConnected = false;
     this.pendingRequests = new Map(); // Track requests awaiting responses
     
-    console.log('CCM Extension: WebSocket HubClient created');
+    console.log('CCM Extension: WebSocket ExtensionRelayClient created');
   }
 
   async init() {
-    console.log('CCM Extension: Initializing WebSocket HubClient...');
+    console.log('CCM Extension: Initializing WebSocket ExtensionRelayClient...');
     
     // Setup listeners
     this.setupEventListeners();
-    console.log('CCM Extension: WebSocket HubClient initialized');
+    console.log('CCM Extension: WebSocket ExtensionRelayClient initialized');
   }
 
   isConnected() {
     return this.relayConnected;
   }
 
-  async connectToHub() {
+  async connectToRelay() {
     // Connection is handled by offscreen document
     console.log('CCM Extension: WebSocket connection handled by offscreen document');
   }

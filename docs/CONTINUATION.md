@@ -164,7 +164,7 @@ Follow systematic debugging approach from [Troubleshooting Guide](TROUBLESHOOTIN
 - `/extension/background.js` - ✅ Offscreen document management added
 - `/mcp-server/src/relay/message-relay.js` - ✅ Created - pure message routing
 - `/mcp-server/src/relay/relay-client.js` - ✅ Created - MCP server relay client
-- `/mcp-server/src/hub/hub-client.js` - ✅ Updated - supports relay mode
+- `/mcp-server/src/relay/mcp-relay-client.js` - ✅ Updated - MCP relay client implementation
 - `/test-websocket-relay.sh` - ✅ Created - test script
 
 ## Latest Session Summary (2025-01-06 - Architecture Review & Cleanup)
@@ -193,8 +193,8 @@ Follow systematic debugging approach from [Troubleshooting Guide](TROUBLESHOOTIN
    - Fix extension/background.js line 19 to remove HTTP polling reference
 
 2. **Consider Hub Removal**:
-   - The hub/ directory could be removed if relay functionality is sufficient
-   - hub-client.js currently wraps relay - evaluate if this wrapper is still needed
+   - The hub/ directory has been removed and functionality moved to relay/
+   - mcp-relay-client.js provides relay connection management
 
 3. **Documentation Accuracy**:
    - ARCHITECTURE.md accurately reflects the implemented WebSocket-only design

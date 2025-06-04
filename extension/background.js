@@ -2,13 +2,13 @@
 // Safe initialization but more aggressive connection attempts
 
 import { MESSAGE_TYPES } from './modules/config.js';
-import { HubClient } from './modules/hub-client.js';
+import { ExtensionRelayClient } from './modules/relay-client.js';
 import { ContentScriptManager } from './modules/content-script-manager.js';
 
 console.log('CCM: Balanced background script starting...');
 
 // Global variables
-let hubClient = null;
+let relayClient = null;
 let contentScriptManager = null;
 let initializationComplete = false;
 let offscreenCreated = false;
@@ -58,8 +58,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === 'relay_connection_status') {
     console.log('CCM: Relay connection status:', request.status);
     // Forward status to hub client if available
-    if (hubClient) {
-      hubClient.handleRelayStatus(request);
+    if (relayClient) {
+      relayClient.handleRelayStatus(request);
     }
     return false;
   }
@@ -67,8 +67,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === 'relay_message') {
     console.log('CCM: Message from relay:', request.data.type);
     // Forward message to hub client
-    if (hubClient) {
-      hubClient.handleRelayMessage(request.data);
+    if (relayClient) {
+      relayClient.handleRelayMessage(request.data);
     }
     return false;
   }
@@ -85,7 +85,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   
   // Always handle health checks immediately, even during initialization
   if (request.type === 'mcp_tool_request' && request.tool === 'get_connection_health') {
-    const currentState = hubClient ? hubClient.getCurrentState() : {
+    const currentState = relayClient ? relayClient.getCurrentState() : {
       hubConnected: false,
       isReconnecting: false,
       connectedClients: [],
@@ -98,8 +98,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       success: true,
       health: {
         ...currentState,
-        operationLocks: hubClient ? hubClient.operationLock.getAllLocks() : [],
-        messageQueueSize: hubClient ? hubClient.messageQueue.size() : 0,
+        operationLocks: relayClient ? relayClient.operationLock.getAllLocks() : [],
+        messageQueueSize: relayClient ? relayClient.messageQueue.size() : 0,
         contentScriptTabs: contentScriptManager ? Array.from(contentScriptManager.injectedTabs) : [],
         initialized: initializationComplete
       }
@@ -119,7 +119,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 function handleMessage(request, sender, sendResponse) {
   // Health checks are now handled at the top level
   
-  if (!hubClient || !contentScriptManager) {
+  if (!relayClient || !contentScriptManager) {
     sendResponse({ success: false, error: 'Extension not fully initialized' });
     return false;
   }
@@ -127,7 +127,7 @@ function handleMessage(request, sender, sendResponse) {
   // Handle MCP tool requests
   if (request.type === 'mcp_tool_request' && request.tool && request.params) {
     console.log(`CCM: MCP tool request: ${request.tool}`);
-    hubClient.handleMCPToolRequest(request.tool, request.params)
+    relayClient.handleMCPToolRequest(request.tool, request.params)
       .then(result => sendResponse(result))
       .catch(error => sendResponse({ success: false, error: error.message }));
     return true;
@@ -144,7 +144,7 @@ function handleMessage(request, sender, sendResponse) {
   // Handle force reconnect from popup
   if (request.type === 'force_reconnect') {
     console.log('CCM Extension: Force reconnect requested from popup');
-    hubClient.connectToHub().then(() => {
+    relayClient.connectToRelay().then(() => {
       console.log('CCM Extension: Force reconnect succeeded');
       sendResponse({ success: true });
     }).catch(error => {
@@ -162,8 +162,8 @@ setTimeout(async () => {
   console.log('CCM Extension: Starting initialization...');
   
   try {
-    // Create HubClient first (no DOM dependencies)
-    hubClient = new HubClient();
+    // Create ExtensionRelayClient first (no DOM dependencies)
+    relayClient = new ExtensionRelayClient();
     
     // Create ContentScriptManager
     contentScriptManager = new ContentScriptManager();
@@ -173,11 +173,11 @@ setTimeout(async () => {
     await ensureOffscreenDocument();
     
     // Set the content script manager reference
-    hubClient.contentScriptManager = contentScriptManager;
-    await hubClient.init();
+    relayClient.contentScriptManager = contentScriptManager;
+    await relayClient.init();
     
     // Make globally accessible
-    globalThis.ccmHubClient = hubClient;
+    globalThis.ccmRelayClient = relayClient;
     globalThis.contentScriptManager = contentScriptManager;
     
     initializationComplete = true;
@@ -191,7 +191,7 @@ setTimeout(async () => {
     
     // Try connecting immediately after initialization
     console.log('CCM Extension: Attempting immediate WebSocket connection...');
-    hubClient.connectToHub().catch(err => {
+    relayClient.connectToRelay().catch(err => {
       console.log('CCM Extension: Initial connection failed, will retry via alarms:', err.message);
     });
     
@@ -206,8 +206,8 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   if (contentScriptManager) {
     contentScriptManager.removeTab(tabId);
   }
-  if (hubClient && hubClient.operationLock) {
-    hubClient.operationLock.releaseLock(tabId);
+  if (relayClient && relayClient.operationLock) {
+    relayClient.operationLock.releaseLock(tabId);
   }
 });
 
@@ -216,9 +216,9 @@ chrome.action.onClicked.addListener(() => {
   console.log('CCM Extension: Extension icon clicked - activating service worker');
   if (!initializationComplete) {
     console.log('CCM Extension: Icon click triggered initialization');
-  } else if (hubClient && !hubClient.isConnected()) {
+  } else if (relayClient && !relayClient.isConnected()) {
     console.log('CCM Extension: Icon click triggered connection attempt');
-    hubClient.connectToHub().catch(err => {
+    relayClient.connectToRelay().catch(err => {
       console.error('CCM Extension: Icon-triggered connection failed:', err);
     });
   }

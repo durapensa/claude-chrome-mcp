@@ -42,7 +42,7 @@ mcp__claude-chrome-mcp__forward_response_to_claude_dot_ai_tab --sourceTabId <sou
   - `background.js` - Service worker with coordination logic
 - `mcp-server/` - MCP server (modular architecture)
   - `src/server.js` - Main entry point (382 lines, modular)
-  - `src/relay/` - (planned) Simple message relay replacing complex hub
+  - `src/relay/` - Message relay for WebSocket communication
   - `src/utils/` - Error tracking, operation management, debugging
   - `src/lifecycle/` - Process lifecycle and graceful shutdown
 - `cli/` - Universal MCP CLI client
@@ -70,7 +70,7 @@ mcp__claude-chrome-mcp__forward_response_to_claude_dot_ai_tab --sourceTabId <sou
 When you type 'continue', follow the standard workflow in docs/CONTINUATION.md
 
 ## Testing Workflow
-1. **System Health**: `get_connection_health` - verify hub and clients connected
+1. **System Health**: `get_connection_health` - verify relay and clients connected
 2. **Spawn Tab**: `spawn_claude_dot_ai_tab --injectContentScript true` 
 3. **Async Message**: `send_message_async --message "test" --tabId <id>`
 4. **Get Response**: `get_claude_dot_ai_response --tabId <id>` (auto-completion detection)
