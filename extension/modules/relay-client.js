@@ -32,7 +32,10 @@ export class ExtensionRelayClient {
     this.relayConnected = false;
     this.pendingRequests = new Map(); // Track requests awaiting responses
     
-    console.log('CCM Extension: WebSocket ExtensionRelayClient created');
+    // Track extension startup for reload confirmation
+    this.startupTimestamp = Date.now();
+    
+    console.log('CCM Extension: WebSocket ExtensionRelayClient created at', this.startupTimestamp);
   }
 
   async init() {
@@ -291,7 +294,12 @@ export class ExtensionRelayClient {
         })),
         operationLocks: this.operationLock.getAllLocks(),
         messageQueueSize: this.messageQueue.size(),
-        contentScriptTabs: this.contentScriptManager ? Array.from(this.contentScriptManager.injectedTabs) : []
+        contentScriptTabs: this.contentScriptManager ? Array.from(this.contentScriptManager.injectedTabs) : [],
+        extensionStartup: {
+          timestamp: this.startupTimestamp,
+          uptime: Date.now() - this.startupTimestamp,
+          startupTime: new Date(this.startupTimestamp).toISOString()
+        }
       }
     };
   }
@@ -446,15 +454,19 @@ export class ExtensionRelayClient {
     console.log('CCM Extension: Reloading extension as requested');
     
     try {
-      // Use Chrome runtime API to reload the extension
-      chrome.runtime.reload();
+      // Schedule reload after a brief delay to allow response to be sent
+      setTimeout(() => {
+        console.log('CCM Extension: Executing delayed reload...');
+        chrome.runtime.reload();
+      }, 100);
       
+      // Return success immediately - the reload will happen after response is sent
       return {
         success: true,
-        message: 'Extension reload initiated'
+        message: 'Extension reload scheduled'
       };
     } catch (error) {
-      console.error('CCM Extension: Failed to reload extension:', error);
+      console.error('CCM Extension: Failed to schedule extension reload:', error);
       return {
         success: false,
         error: error.message

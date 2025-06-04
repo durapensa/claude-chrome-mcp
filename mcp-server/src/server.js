@@ -171,7 +171,8 @@ class ChromeMCPServer {
   }
 
   async getConnectionHealth() {
-    const health = {
+    // Get server-side health
+    const serverHealth = {
       relayClient: this.relayClient.getConnectionStats(),
       server: {
         uptime: Date.now() - this.startTime,
@@ -182,10 +183,28 @@ class ChromeMCPServer {
       relayConnected: this.relayClient.connected
     };
 
+    // Try to get extension-side health
+    let extensionHealth = null;
+    try {
+      const extensionResult = await this.relayClient.sendRequest('get_connection_health', {});
+      if (extensionResult && extensionResult.health) {
+        extensionHealth = extensionResult.health;
+      }
+    } catch (error) {
+      console.warn('Failed to get extension health:', error.message);
+      extensionHealth = { error: 'Extension health unavailable', message: error.message };
+    }
+
+    // Combine both health reports
+    const combinedHealth = {
+      ...serverHealth,
+      extension: extensionHealth
+    };
+
     return {
       content: [{
         type: 'text',
-        text: JSON.stringify(health, null, 2)
+        text: JSON.stringify(combinedHealth, null, 2)
       }]
     };
   }
