@@ -102,12 +102,13 @@ class ChromeMCPServer {
       this.debug.info('MCP initialization params received', {
         params: params,
         paramsJSON: JSON.stringify(params, null, 2),
-        hasClientInfo: !!params?.clientInfo,
-        clientInfoName: params?.clientInfo?.name
+        hasClientInfo: !!params?.params?.clientInfo,
+        clientInfoName: params?.params?.clientInfo?.name
       });
       
       // Get client info from initialization params (authoritative source)
-      const clientInfo = params?.clientInfo;
+      // The handler receives the full request, so clientInfo is at params.params.clientInfo
+      const clientInfo = params?.params?.clientInfo;
       
       if (!clientInfo) {
         this.debug.warn('No clientInfo object in initialization params', {
