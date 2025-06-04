@@ -38,8 +38,8 @@ async function ensureOffscreenDocument() {
       console.log('CCM: Creating offscreen document for WebSocket connection...');
       await chrome.offscreen.createDocument({
         url: 'offscreen.html',
-        reasons: ['WEBSOCKET'],
-        justification: 'Maintain persistent WebSocket connection to relay server'
+        reasons: ['DOM_SCRAPING'],
+        justification: 'Maintain persistent WebSocket connection to relay server for Chrome automation'
       });
       offscreenCreated = true;
       console.log('CCM: Offscreen document created successfully');
