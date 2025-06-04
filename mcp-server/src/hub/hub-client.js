@@ -1,7 +1,7 @@
 const EventEmitter = require('events');
 const { ErrorTracker } = require('../utils/error-tracker');
 const { DebugMode } = require('../utils/debug-mode');
-const { RelayClient } = require('../relay/relay-client');
+const { EmbeddedRelayManager } = require('../relay/embedded-relay-manager');
 
 // WebSocket relay client for MCP server
 // Uses persistent WebSocket connection via relay for all communication
@@ -16,8 +16,8 @@ class AutoHubClient extends EventEmitter {
     this.requestCounter = 0;
     this.pendingRequests = new Map();
     
-    // Always use WebSocket relay mode
-    this.relayClient = null;
+    // Embedded relay manager handles election automatically
+    this.relayManager = null;
     
     // Connection state tracking
     this.connectionState = 'disconnected'; // disconnected, connecting, connected, reconnecting
@@ -164,31 +164,34 @@ class AutoHubClient extends EventEmitter {
   }
 
   initializeRelayClient() {
-    this.relayClient = new RelayClient(this.clientInfo);
+    this.relayManager = new EmbeddedRelayManager(this.clientInfo);
     
     // Handle relay events
-    this.relayClient.on('connected', ({ clientId }) => {
-      console.error('RelayClient: Connected to relay as', clientId);
+    this.relayManager.on('connected', () => {
+      console.error('RelayClient: Connected to relay');
       this.connected = true;
       this.connectionState = 'connected';
       this.lastSuccessfulConnection = Date.now();
       this.emit('connected');
     });
     
-    this.relayClient.on('disconnected', ({ code, reason }) => {
-      console.error('RelayClient: Disconnected from relay:', code, reason);
+    this.relayManager.on('disconnected', () => {
+      console.error('RelayClient: Disconnected from relay');
       this.connected = false;
       this.connectionState = 'disconnected';
       this.emit('connection_lost');
     });
     
-    this.relayClient.on('message', (message) => {
+    this.relayManager.on('message', (message) => {
       this.handleRelayMessage(message);
     });
     
-    this.relayClient.on('client_list', (clients) => {
-      console.error('RelayClient: Client list updated:', clients.length, 'clients');
-      // Handle client list updates if needed
+    this.relayManager.on('relayClientConnected', (client) => {
+      console.error('RelayClient: New client connected to relay:', client.name);
+    });
+    
+    this.relayManager.on('relayClientDisconnected', (clientId) => {
+      console.error('RelayClient: Client disconnected from relay:', clientId);
     });
   }
 
@@ -228,11 +231,18 @@ class AutoHubClient extends EventEmitter {
     this.connectionState = 'connecting';
     
     try {
-      console.error('RelayClient: Connecting to WebSocket relay...');
-      await this.relayClient.connect();
-      // Events will be handled by the relay client listeners
+      console.error('RelayClient: Initializing embedded relay...');
+      await this.relayManager.initialize();
+      // Events will be handled by the relay manager listeners
+      
+      const status = this.relayManager.getStatus();
+      if (status.isRelayHost) {
+        console.error('RelayClient: Running as relay host');
+      } else {
+        console.error('RelayClient: Connected to existing relay');
+      }
     } catch (error) {
-      console.error('RelayClient: Failed to connect to relay:', error);
+      console.error('RelayClient: Failed to initialize relay:', error);
       this.connectionState = 'disconnected';
       throw error;
     }
@@ -258,13 +268,13 @@ class AutoHubClient extends EventEmitter {
 
   async sendRequest(type, params = {}) {
     // Handle relay mode only
-    if (!this.relayClient || !this.relayClient.isConnected) {
+    if (!this.relayManager || !this.relayManager.client || !this.relayManager.client.isConnected) {
       if (this.connectionState === 'disconnected') {
         this.debug.info('Attempting to reconnect to relay for request');
         await this.connect();
       }
       
-      if (!this.relayClient.isConnected) {
+      if (!this.relayManager.client || !this.relayManager.client.isConnected) {
         throw new Error('Not connected to relay and reconnection failed');
       }
     }
@@ -284,11 +294,11 @@ class AutoHubClient extends EventEmitter {
       });
       
       // Send via relay - broadcast to extension clients
-      this.relayClient.multicast('chrome_extension', {
+      this.relayManager.client.multicast('chrome_extension', {
         id: requestId,
         type,
         params,
-        from: this.relayClient.clientId || this.clientInfo.name,
+        from: this.relayManager.client.clientId || this.clientInfo.name,
         timestamp: Date.now()
       });
       
@@ -315,9 +325,9 @@ class AutoHubClient extends EventEmitter {
   async close() {
     this.connectionState = 'shutting_down';
     
-    if (this.relayClient) {
-      await this.relayClient.disconnect();
-      this.relayClient = null;
+    if (this.relayManager) {
+      await this.relayManager.stop();
+      this.relayManager = null;
     }
     
     this.connected = false;
@@ -335,11 +345,14 @@ class AutoHubClient extends EventEmitter {
   }
 
   getConnectionStats() {
+    const relayStatus = this.relayManager ? this.relayManager.getStatus() : null;
     return {
       state: this.connectionState,
       lastSuccessfulConnection: this.lastSuccessfulConnection,
       pendingRequests: this.pendingRequests.size,
-      relayConnected: this.connected
+      relayConnected: this.connected,
+      relayMode: true,
+      ...relayStatus
     };
   }
 }

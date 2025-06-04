@@ -11,7 +11,7 @@ Quick reference for Claude. See README.md for full documentation.
 ## Important System Limitations
 - Claude Code cannot restart its own MCP servers. User must exit and re-run Claude Code if claude-chrome-mcp tools are not available
 - **RESTART REQUIRED**: After making changes to mcp-server code, user must manually exit and re-run Claude Code to reload the MCP server with updates
-- **RELAY REQUIRED**: WebSocket relay must be running on port 54322 before starting MCP server
+- **EMBEDDED RELAY**: WebSocket relay is now embedded in MCP server with automatic election (no separate process needed)
 
 ## Quick Commands
 ```bash
@@ -55,8 +55,11 @@ mcp__claude-chrome-mcp__forward_response_to_claude_dot_ai_tab --sourceTabId <sou
 - TypeScript: docs/TYPESCRIPT.md
 - Roadmap: ROADMAP.md
 
-## Architecture Overview (WebSocket-Only)
-- **Message Relay**: Simple WebSocket relay on port 54322 with health monitoring
+## Architecture Overview (WebSocket-Only with Embedded Relay)
+- **Embedded Relay**: WebSocket relay embedded in MCP server with automatic election
+  - First MCP server becomes relay host on port 54321
+  - Additional servers connect as clients
+  - Automatic failover on host exit
 - **Offscreen Documents**: Persistent WebSocket connection (12+ hours)
 - **Extension as Brain**: All coordination, locking, and conflict resolution in extension
 - **Event-Driven**: Pure push messaging (no HTTP polling)

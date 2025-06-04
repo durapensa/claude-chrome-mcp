@@ -1,24 +1,19 @@
 #!/bin/bash
 
-# Test script for WebSocket relay mode
-# This script starts the relay server and sets environment variables for relay mode
+# Claude Chrome MCP - Embedded Relay Architecture
+# The relay is now embedded in the MCP server with automatic election
 
-echo "=== Claude Chrome MCP WebSocket Relay Test ==="
+echo "=== Claude Chrome MCP - Embedded Relay ==="
 echo ""
-echo "This script will:"
-echo "1. Start the WebSocket relay server on port 54321"
-echo "2. Start health monitoring endpoint on port 54322"
-echo "3. Set USE_WEBSOCKET_RELAY=true for MCP server"
+echo "The WebSocket relay is now embedded in the MCP server!"
+echo ""
+echo "How it works:"
+echo "- First MCP server to start becomes the relay host (port 54321)"
+echo "- Additional MCP servers connect as clients to the existing relay"
+echo "- Automatic failover if the relay host exits"
 echo ""
 echo "To check relay health:"
 echo "  curl http://localhost:54322/health"
 echo ""
-echo "Press Ctrl+C to stop the relay server"
+echo "Just run Claude Code normally - no separate relay process needed!"
 echo ""
-
-# Start relay server
-echo "Starting WebSocket relay server..."
-export USE_WEBSOCKET_RELAY=true
-export RELAY_PORT=54321
-
-node mcp-server/src/relay/start-relay.js
