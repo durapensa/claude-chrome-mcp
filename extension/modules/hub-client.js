@@ -231,7 +231,18 @@ export class HubClient {
         this.recordActivity();
         
         for (const command of result.commands) {
-          await this.executeCommand(command);
+          try {
+            const cmdResult = await this.executeCommand(command);
+            // Send result back via HTTP
+            if (command.requestId) {
+              await this.sendCommandResponse(command.requestId, cmdResult);
+            }
+          } catch (error) {
+            // Send error back via HTTP
+            if (command.requestId) {
+              await this.sendCommandResponse(command.requestId, null, error.message);
+            }
+          }
         }
       }
       
@@ -403,12 +414,12 @@ export class HubClient {
           throw new Error(`Unknown command type: ${command.type}`);
       }
       
-      // Send result back to hub
-      await this.sendCommandResponse(command.requestId, result);
+      // Return the result - caller will handle how to send it
+      return result;
       
     } catch (error) {
       console.error(`CCM Extension: Command execution failed:`, error);
-      await this.sendCommandResponse(command.requestId, null, error.message);
+      throw error; // Let the caller handle error response
     }
   }
 
