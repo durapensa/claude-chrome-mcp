@@ -28,6 +28,14 @@ class RelayConnection {
         this.isConnected = true;
         this.reconnectDelay = 1000; // Reset delay on successful connection
         
+        // Identify ourselves to the relay
+        this.ws.send(JSON.stringify({
+          type: 'identify',
+          clientType: 'chrome_extension',
+          name: 'Claude Chrome MCP Extension',
+          capabilities: ['tabs', 'debugger', 'claude_automation']
+        }));
+        
         // Send any queued messages
         while (this.messageQueue.length > 0) {
           const message = this.messageQueue.shift();

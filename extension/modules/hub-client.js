@@ -994,12 +994,49 @@ export class HubClient {
 
   handleRelayMessage(message) {
     console.log('CCM HubClient: Message from relay:', message.type);
-    // TODO: Route messages based on type
-    // For now, treat it like a command from the hub
-    if (message.type && message.data) {
-      this.executeCommand(message).catch(error => {
-        console.error('CCM HubClient: Error executing relay message:', error);
-      });
+    
+    // Handle different relay message types
+    if (message.type === 'relay_message' && message.data) {
+      const data = message.data;
+      
+      // Check if this is an MCP tool request from an MCP server
+      if (data.from && data.id && data.type) {
+        console.log('CCM HubClient: MCP tool request via relay:', data.type);
+        
+        // Execute the command and send response back via relay
+        this.executeCommand({
+          type: data.type,
+          params: data.params || {},
+          requestId: data.id
+        }).then(result => {
+          // Send response back via relay
+          this.sendToRelay({
+            type: 'unicast',
+            targetId: data.from,
+            data: {
+              id: data.id,
+              type: 'response',
+              result: result,
+              timestamp: Date.now()
+            }
+          });
+        }).catch(error => {
+          // Send error response back via relay
+          this.sendToRelay({
+            type: 'unicast',
+            targetId: data.from,
+            data: {
+              id: data.id,
+              type: 'error',
+              error: error.message || 'Command execution failed',
+              timestamp: Date.now()
+            }
+          });
+        });
+      }
+    } else if (message.type === 'client_list_update') {
+      console.log('CCM HubClient: Client list updated:', message.clients);
+      // Handle client list updates if needed
     }
   }
 

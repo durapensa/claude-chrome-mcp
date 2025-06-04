@@ -3,6 +3,7 @@ const EventEmitter = require('events');
 const { ErrorTracker } = require('../utils/error-tracker');
 const { DebugMode } = require('../utils/debug-mode');
 const { WebSocketHub, HUB_PORT } = require('./websocket-hub');
+const { RelayClient } = require('../relay/relay-client');
 
 // Hub client that can connect to existing hub or create its own
 // Supports multi-server architecture with automatic hub election
@@ -17,6 +18,10 @@ class AutoHubClient extends EventEmitter {
     this.connected = false;
     this.requestCounter = 0;
     this.pendingRequests = new Map();
+    
+    // Check if using WebSocket relay mode
+    this.useRelayMode = process.env.USE_WEBSOCKET_RELAY === 'true';
+    this.relayClient = null;
     
     // Improved reconnection parameters
     this.reconnectAttempts = 0;
@@ -37,6 +42,13 @@ class AutoHubClient extends EventEmitter {
     // Enhanced debugging and error tracking
     this.errorTracker = new ErrorTracker();
     this.debug = new DebugMode().createLogger('AutoHubClient');
+    
+    if (this.useRelayMode) {
+      console.error('AutoHubClient: Running in WebSocket relay mode');
+      this.initializeRelayClient();
+    } else {
+      console.error('AutoHubClient: Running in HTTP polling hub mode');
+    }
     
     this.setupProcessMonitoring();
   }
@@ -177,6 +189,55 @@ class AutoHubClient extends EventEmitter {
     };
   }
 
+  initializeRelayClient() {
+    this.relayClient = new RelayClient(this.clientInfo);
+    
+    // Handle relay events
+    this.relayClient.on('connected', ({ clientId }) => {
+      console.error('AutoHubClient: Connected to relay as', clientId);
+      this.connected = true;
+      this.connectionState = 'connected';
+      this.lastSuccessfulConnection = Date.now();
+      this.reconnectAttempts = 0;
+      this.isHubOwner = false; // In relay mode, we're never the hub owner
+      this.emit('connected');
+    });
+    
+    this.relayClient.on('disconnected', ({ code, reason }) => {
+      console.error('AutoHubClient: Disconnected from relay:', code, reason);
+      this.connected = false;
+      this.connectionState = 'disconnected';
+      this.emit('connection_lost');
+    });
+    
+    this.relayClient.on('message', (message) => {
+      this.handleRelayMessage(message);
+    });
+    
+    this.relayClient.on('client_list', (clients) => {
+      console.error('AutoHubClient: Client list updated:', clients.length, 'clients');
+      // Handle client list updates if needed
+    });
+  }
+
+  handleRelayMessage(message) {
+    // Handle messages from relay
+    if (message.type === 'relay_message' && message.data) {
+      const data = message.data;
+      
+      // Check if this is a response to one of our requests
+      if (data.id && this.pendingRequests.has(data.id)) {
+        const callback = this.pendingRequests.get(data.id);
+        this.pendingRequests.delete(data.id);
+        callback(null, data);
+        return;
+      }
+      
+      // Otherwise, emit the message for other handlers
+      this.emit('message', data);
+    }
+  }
+
   async connect() {
     if (this.connectionState === 'connecting') {
       console.error('CCM: Connection already in progress');
@@ -184,6 +245,20 @@ class AutoHubClient extends EventEmitter {
     }
 
     this.connectionState = 'connecting';
+    
+    // If in relay mode, connect to relay instead of hub
+    if (this.useRelayMode) {
+      try {
+        console.error('CCM: Connecting to WebSocket relay...');
+        await this.relayClient.connect();
+        // Events will be handled by the relay client listeners
+        return;
+      } catch (error) {
+        console.error('CCM: Failed to connect to relay:', error);
+        this.connectionState = 'disconnected';
+        throw error;
+      }
+    }
     
     // Check if hub creation is forced or if we should auto-create
     const forceHubCreation = process.env.CCM_FORCE_HUB_CREATION === '1';
@@ -549,6 +624,52 @@ class AutoHubClient extends EventEmitter {
   }
 
   async sendRequest(type, params = {}) {
+    if (this.useRelayMode) {
+      // Handle relay mode
+      if (!this.relayClient || !this.relayClient.isConnected) {
+        if (this.connectionState === 'disconnected') {
+          this.debug.info('Attempting to reconnect to relay for request');
+          await this.connect();
+        }
+        
+        if (!this.relayClient.isConnected) {
+          throw new Error('Not connected to relay and reconnection failed');
+        }
+      }
+      
+      const requestId = `req-${++this.requestCounter}`;
+      
+      return new Promise((resolve, reject) => {
+        const timeoutMs = 10000;
+        
+        this.pendingRequests.set(requestId, (error, response) => {
+          clearTimeout(timeoutId);
+          if (error) {
+            reject(error);
+          } else {
+            resolve(response);
+          }
+        });
+        
+        // Send via relay - broadcast to extension clients
+        this.relayClient.multicast('chrome_extension', {
+          id: requestId,
+          type,
+          params,
+          from: this.clientInfo.name,
+          timestamp: Date.now()
+        });
+        
+        const timeoutId = setTimeout(() => {
+          if (this.pendingRequests.has(requestId)) {
+            this.pendingRequests.delete(requestId);
+            reject(new Error(`Request timeout after ${timeoutMs}ms (requestId: ${requestId}, type: ${type})`));
+          }
+        }, timeoutMs);
+      });
+    }
+    
+    // Original hub mode logic
     if (!this.connected || !this.ws || this.ws.readyState !== WebSocket.OPEN) {
       // Try to reconnect if not connected
       if (this.connectionState === 'disconnected') {
