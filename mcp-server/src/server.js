@@ -94,21 +94,30 @@ class ChromeMCPServer {
         result = await originalHandler.call(this.server, params);
       }
       
-      // Log the initialization params to see what clients actually send
-      console.error('CCM: MCP initialization params:', JSON.stringify(params, null, 2));
+      // Log complete initialization params to understand what's being sent
+      console.error('CCM: === MCP INITIALIZATION START ===');
+      console.error('CCM: Raw params:', params);
+      console.error('CCM: Params JSON:', JSON.stringify(params, null, 2));
       
       // Get client info from initialization params (authoritative source)
       const clientInfo = params?.clientInfo;
       
-      if (!clientInfo || !clientInfo.name) {
-        console.error('CCM: Warning - No clientInfo in initialization params');
+      if (!clientInfo) {
+        console.error('CCM: WARNING - No clientInfo object in params');
+      } else if (!clientInfo.name) {
+        console.error('CCM: WARNING - clientInfo exists but has no name');
+        console.error('CCM: clientInfo object:', JSON.stringify(clientInfo, null, 2));
+      } else {
+        console.error('CCM: clientInfo found:', JSON.stringify(clientInfo, null, 2));
       }
       
-      // Use client name exactly as provided by the MCP client
+      // Use exactly what the client provides, no mappings
       const clientName = clientInfo?.name || 'Unknown MCP Client';
       const clientVersion = clientInfo?.version || 'unknown';
       
-      console.error('CCM: Client identified as:', clientName, 'version:', clientVersion);
+      console.error('CCM: Client name from init:', clientName);
+      console.error('CCM: Client version from init:', clientVersion);
+      console.error('CCM: === MCP INITIALIZATION END ===');
       
       // Update relay with the exact client name from initialization
       this.relayClient.updateClientInfo({
