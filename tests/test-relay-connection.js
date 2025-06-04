@@ -1,29 +1,29 @@
 #!/usr/bin/env node
 
 /**
- * Test hub connection with multiple MCP servers
+ * Test relay connection with multiple MCP servers
  */
 
 const WebSocket = require('ws');
 
-async function testHubConnection() {
-  console.log('🔌 Testing WebSocket Hub Connection\n');
+async function testRelayConnection() {
+  console.log('🔌 Testing WebSocket Relay Connection\n');
   
-  // Test 1: Check if hub is running
-  console.log('1️⃣ Checking if hub is accessible...');
+  // Test 1: Check if relay is running
+  console.log('1️⃣ Checking if relay is accessible...');
   
   try {
     const testWs = new WebSocket('ws://localhost:54321');
     
     await new Promise((resolve, reject) => {
       testWs.on('open', () => {
-        console.log('✅ Connected to hub on port 54321');
+        console.log('✅ Connected to relay on port 54321');
         testWs.close();
         resolve();
       });
       
       testWs.on('error', (err) => {
-        console.log('❌ Could not connect to hub:', err.message);
+        console.log('❌ Could not connect to relay:', err.message);
         reject(err);
       });
       
@@ -34,7 +34,7 @@ async function testHubConnection() {
     });
     
   } catch (error) {
-    console.error('Hub connection test failed:', error.message);
+    console.error('Relay connection test failed:', error.message);
   }
   
   // Test 2: Try to register as a new MCP server
@@ -45,7 +45,7 @@ async function testHubConnection() {
     
     await new Promise((resolve, reject) => {
       ws.on('open', () => {
-        console.log('✅ Connected to hub');
+        console.log('✅ Connected to relay');
         
         // Register as a new MCP server
         const registration = {
@@ -66,7 +66,7 @@ async function testHubConnection() {
         console.log('📥 Received:', message);
         
         if (message.type === 'registered') {
-          console.log('✅ Successfully registered with hub');
+          console.log('✅ Successfully registered with relay');
           ws.close();
           resolve();
         }
@@ -87,8 +87,8 @@ async function testHubConnection() {
     console.error('Registration test failed:', error.message);
   }
   
-  console.log('\n✅ Hub connection tests completed');
+  console.log('\n✅ Relay connection tests completed');
 }
 
 // Run the test
-testHubConnection().catch(console.error);
+testRelayConnection().catch(console.error);

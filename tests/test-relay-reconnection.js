@@ -1,17 +1,17 @@
 #!/usr/bin/env node
 
 /**
- * Test Hub Reconnection Behavior
+ * Test Relay Reconnection Behavior
  * 
  * This test verifies that the Chrome extension properly reconnects
- * to the hub after periods of inactivity or disconnection.
+ * to the relay after periods of inactivity or disconnection.
  */
 
 const WebSocket = require('ws');
 const { promisify } = require('util');
 const sleep = promisify(setTimeout);
 
-const HUB_PORT = 54321;
+const RELAY_PORT = 54321;
 
 // ANSI colors
 const colors = {
@@ -23,9 +23,9 @@ const colors = {
   cyan: '\x1b[36m'
 };
 
-// Simple test hub that can be started/stopped
-class TestHub {
-  constructor(port = HUB_PORT) {
+// Simple test relay that can be started/stopped
+class TestRelay {
+  constructor(port = RELAY_PORT) {
     this.port = port;
     this.server = null;
     this.clients = new Set();
@@ -36,13 +36,13 @@ class TestHub {
       this.server = new WebSocket.Server({ port: this.port });
       
       this.server.on('listening', () => {
-        console.log(`${colors.green}✓ Test hub started on port ${this.port}${colors.reset}`);
+        console.log(`${colors.green}✓ Test relay started on port ${this.port}${colors.reset}`);
         resolve();
       });
       
       this.server.on('error', (error) => {
         if (error.code === 'EADDRINUSE') {
-          console.log(`${colors.yellow}⚠ Port ${this.port} already in use (likely real hub running)${colors.reset}`);
+          console.log(`${colors.yellow}⚠ Port ${this.port} already in use (likely real relay running)${colors.reset}`);
           reject(new Error('Port in use'));
         } else {
           reject(error);
@@ -85,7 +85,7 @@ class TestHub {
       // Close server
       await new Promise((resolve) => {
         this.server.close(() => {
-          console.log(`${colors.red}✓ Test hub stopped${colors.reset}`);
+          console.log(`${colors.red}✓ Test relay stopped${colors.reset}`);
           resolve();
         });
       });
@@ -102,9 +102,9 @@ class TestHub {
 
 // Test scenarios
 async function runReconnectionTests() {
-  console.log(`${colors.blue}🧪 Hub Reconnection Tests${colors.reset}\n`);
+  console.log(`${colors.blue}🧪 Relay Reconnection Tests${colors.reset}\n`);
   
-  const hub = new TestHub();
+  const relay = new TestRelay();
   let testsPassed = 0;
   let testsFailed = 0;
   
@@ -120,16 +120,16 @@ async function runReconnectionTests() {
     }
   }
   
-  // Test 1: Basic hub operation
-  await test('Basic hub start/stop', async () => {
+  // Test 1: Basic relay operation
+  await test('Basic relay start/stop', async () => {
     try {
-      await hub.start();
+      await relay.start();
       await sleep(1000);
-      await hub.stop();
+      await relay.stop();
     } catch (error) {
       if (error.message === 'Port in use') {
-        console.log('  Real hub is running - skipping hub simulation tests');
-        throw new Error('Cannot test - real hub is running');
+        console.log('  Real relay is running - skipping relay simulation tests');
+        throw new Error('Cannot test - real relay is running');
       }
       throw error;
     }
@@ -137,10 +137,10 @@ async function runReconnectionTests() {
   
   // Test 2: Client connection simulation
   await test('Client connection and disconnection', async () => {
-    await hub.start();
+    await relay.start();
     
     // Simulate extension connection
-    const client = new WebSocket(`ws://127.0.0.1:${HUB_PORT}`);
+    const client = new WebSocket(`ws://127.0.0.1:${RELAY_PORT}`);
     
     await new Promise((resolve, reject) => {
       client.on('open', () => {
@@ -151,7 +151,7 @@ async function runReconnectionTests() {
     });
     
     // Verify client count
-    if (hub.getClientCount() !== 1) {
+    if (relay.getClientCount() !== 1) {
       throw new Error('Client count mismatch');
     }
     
@@ -173,24 +173,24 @@ async function runReconnectionTests() {
     client.close();
     await sleep(100);
     
-    if (hub.getClientCount() !== 0) {
+    if (relay.getClientCount() !== 0) {
       throw new Error('Client not properly disconnected');
     }
     
-    await hub.stop();
+    await relay.stop();
   });
   
-  // Test 3: Reconnection after hub restart
-  await test('Reconnection after hub restart', async () => {
-    await hub.start();
+  // Test 3: Reconnection after relay restart
+  await test('Reconnection after relay restart', async () => {
+    await relay.start();
     
     // Connect client
-    let client = new WebSocket(`ws://127.0.0.1:${HUB_PORT}`);
+    let client = new WebSocket(`ws://127.0.0.1:${RELAY_PORT}`);
     await new Promise((resolve) => client.on('open', resolve));
     console.log('  Initial connection established');
     
     // Stop hub (simulate crash/restart)
-    await hub.stop();
+    await relay.stop();
     await sleep(1000);
     
     // Client should be disconnected
@@ -198,12 +198,12 @@ async function runReconnectionTests() {
       throw new Error('Client still shows as connected');
     }
     
-    // Restart hub
-    await hub.start();
-    console.log('  Hub restarted');
+    // Restart relay
+    await relay.start();
+    console.log('  Relay restarted');
     
     // Try to reconnect
-    client = new WebSocket(`ws://127.0.0.1:${HUB_PORT}`);
+    client = new WebSocket(`ws://127.0.0.1:${RELAY_PORT}`);
     await new Promise((resolve, reject) => {
       client.on('open', () => {
         console.log('  Reconnection successful');
@@ -213,7 +213,7 @@ async function runReconnectionTests() {
     });
     
     client.close();
-    await hub.stop();
+    await relay.stop();
   });
   
   // Test 4: Multiple reconnection attempts
@@ -223,7 +223,7 @@ async function runReconnectionTests() {
     
     async function attemptConnection() {
       return new Promise((resolve, reject) => {
-        const client = new WebSocket(`ws://127.0.0.1:${HUB_PORT}`);
+        const client = new WebSocket(`ws://127.0.0.1:${RELAY_PORT}`);
         const timeout = setTimeout(() => {
           client.terminate();
           reject(new Error('Connection timeout'));
@@ -244,8 +244,8 @@ async function runReconnectionTests() {
       });
     }
     
-    // Start hub
-    await hub.start();
+    // Start relay
+    await relay.start();
     
     // Multiple connect/disconnect cycles
     for (let i = 0; i < maxReconnects; i++) {
@@ -257,7 +257,7 @@ async function runReconnectionTests() {
       throw new Error(`Only ${reconnectCount} of ${maxReconnects} reconnections succeeded`);
     }
     
-    await hub.stop();
+    await relay.stop();
   });
   
   // Print summary
@@ -274,7 +274,7 @@ async function runReconnectionTests() {
   }
   
   // Cleanup
-  await hub.stop().catch(() => {});
+  await relay.stop().catch(() => {});
   
   return testsFailed === 0;
 }
@@ -284,8 +284,8 @@ function printManualTestInstructions() {
   console.log('\n' + '='.repeat(50));
   console.log(`${colors.yellow}📝 Manual Testing Instructions${colors.reset}`);
   console.log('='.repeat(50));
-  console.log('\n1. Start Claude Code (ensures MCP server and hub are running)');
-  console.log('2. Open Chrome extension popup - verify hub shows as connected');
+  console.log('\n1. Start Claude Code (ensures MCP server and relay are running)');
+  console.log('2. Open Chrome extension popup - verify relay shows as connected');
   console.log('3. Wait 5-10 minutes without using the extension');
   console.log('4. Open popup again - it should either:');
   console.log('   a) Show as connected (auto-reconnected)');
@@ -294,7 +294,7 @@ function printManualTestInstructions() {
   console.log('\nTo test with this script:');
   console.log('- Stop Claude Code first');
   console.log('- Run this test script');
-  console.log('- Script will simulate hub start/stop/reconnection');
+  console.log('- Script will simulate relay start/stop/reconnection');
 }
 
 // Run tests
@@ -311,4 +311,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { TestHub, runReconnectionTests };
+module.exports = { TestRelay, runReconnectionTests };
