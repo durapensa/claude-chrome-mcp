@@ -51,7 +51,9 @@ class MessageRelay extends EventEmitter {
         this.metrics.errors++;
         if (error.code === 'EADDRINUSE') {
           console.error('[Relay] Port', this.port, 'already in use');
-          reject(new Error(`Port ${this.port} already in use`));
+          const addrInUseError = new Error(`Port ${this.port} already in use`);
+          addrInUseError.code = 'EADDRINUSE';
+          reject(addrInUseError);
         } else {
           console.error('[Relay] Server error:', error);
           reject(error);

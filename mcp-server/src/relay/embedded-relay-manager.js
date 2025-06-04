@@ -21,13 +21,28 @@ class EmbeddedRelayManager extends EventEmitter {
   }
 
   async initialize() {
-    console.error('[EmbeddedRelay] Attempting to start embedded relay...');
+    console.error('[EmbeddedRelay] Checking for existing relay...');
+    
+    // First check if a relay is already running via health endpoint
+    try {
+      const response = await fetch(`http://localhost:${this.port + 1}/health`);
+      if (response.ok) {
+        const health = await response.json();
+        console.error('[EmbeddedRelay] Found existing relay:', health.status);
+        // Connect as client to existing relay
+        await this.connectAsClient();
+        return;
+      }
+    } catch (error) {
+      // No relay running, we can try to become host
+      console.error('[EmbeddedRelay] No existing relay found, attempting to become host...');
+    }
     
     try {
       // Try to become the relay host
       await this.startAsRelayHost();
     } catch (error) {
-      if (error.code === 'EADDRINUSE') {
+      if (error.code === 'EADDRINUSE' || error.message?.includes('already in use')) {
         console.error('[EmbeddedRelay] Port in use, connecting as client...');
         await this.connectAsClient();
       } else {
