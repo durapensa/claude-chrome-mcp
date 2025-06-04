@@ -16,9 +16,9 @@ let offscreenCreated = false;
 // Register event listeners
 console.log('CCM: Registering event listeners...');
 
-// Event-driven extension with HTTP polling
+// Event-driven extension with WebSocket relay
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('CCM Extension: Installed/Updated - HTTP polling mode');
+  console.log('CCM Extension: Installed/Updated - WebSocket relay mode');
 });
 
 // Message queue for early messages
