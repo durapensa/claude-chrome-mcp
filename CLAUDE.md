@@ -83,8 +83,10 @@ mcp__claude-chrome-mcp__forward_response_to_claude_dot_ai_tab --sourceTabId <sou
 
 ## Critical Directives
 - **MAINTAIN CODE HYGIENE**: Prevent file proliferation - "one-in-one-out" rule
-- **NO SESSION ARTIFACTS**: Remove temporary context from permanent docs  
-- **GIT FOR HISTORY**: Don't keep backup files in filesystem
+- **ZERO INSTRUCTION DUPLICATION**: Reference other docs, never repeat instructions. One source of truth per instruction set. Prevent maintenance burden of keeping multiple copies in sync.
+- **NO SESSION ARTIFACTS**: Remove temporary context from permanent docs - git history captures accomplishments
+- **STREAMLINE AGGRESSIVELY**: Delete bloat immediately. CONTINUATION.md stays under 100 lines. Session summaries go in git commits, not docs.
+- **GIT FOR HISTORY**: Don't keep backup files in filesystem or detailed session logs in docs
 - **TEST AS YOU GO**: Each change should be immediately testable
 - **CLEAN REFERENCES**: Update doc links when files are moved/deleted
 - **Do not be overconfident about treating fixes and new work as 'production-ready' or 'enterprise-grade' etc.**
