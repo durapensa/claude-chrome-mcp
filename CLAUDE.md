@@ -103,3 +103,6 @@ When you type 'continue', follow the standard workflow in docs/CONTINUATION.md
 
 ## Key Troubleshooting Memory
 - If you encounter missing or broken tools, functions, etc. check git history, including pre-refactor source file content, as they may have been removed during refactor
+
+## MCP Specification Reference
+- MCP specification and source code is located at node_modules/@modelcontextprotocol. always reference this when making changes related to MCP
