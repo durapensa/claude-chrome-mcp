@@ -73,6 +73,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return false;
   }
   
+  // Handle other relay messages that come directly (not wrapped)
+  if (request.type === 'client_list_update' || request.type === 'relay_welcome') {
+    console.log('CCM: Direct relay message:', request.type);
+    // Forward to relay client
+    if (relayClient) {
+      relayClient.handleRelayMessage(request);
+    }
+    return false;
+  }
+  
   if (request.type === 'offscreen_heartbeat') {
     // Acknowledge heartbeat from offscreen document
     return false;
