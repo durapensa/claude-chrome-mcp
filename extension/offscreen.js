@@ -74,11 +74,8 @@ class RelayConnection {
           const message = JSON.parse(event.data);
           console.log('[Offscreen] Received from relay:', message.type);
           
-          // Forward to service worker
-          chrome.runtime.sendMessage({
-            type: 'relay_message',
-            data: message
-          });
+          // Forward to service worker - pass through the message type directly
+          chrome.runtime.sendMessage(message);
         } catch (error) {
           console.error('[Offscreen] Error parsing message:', error);
         }

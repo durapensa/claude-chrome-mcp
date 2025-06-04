@@ -226,10 +226,10 @@ export class ExtensionRelayClient {
   setupEventListeners() {
     // Listen for relay status updates from offscreen document
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-      if (message.type === 'relay_status') {
-        this.handleRelayStatus(message.status);
+      if (message.type === 'relay_connection_status') {
+        this.handleRelayStatus(message);
       } else if (message.type === 'relay_message') {
-        this.handleRelayMessage(message.data);
+        this.handleRelayMessage(message);
       }
     });
     
@@ -702,14 +702,14 @@ export class ExtensionRelayClient {
   }
 
   // Offscreen WebSocket relay methods
-  handleRelayStatus(status) {
-    console.log('CCM HubClient: Relay status update:', status);
-    if (status.status === 'connected') {
+  handleRelayStatus(message) {
+    console.log('CCM HubClient: Relay status update:', message);
+    if (message.status === 'connected') {
       console.log('CCM HubClient: WebSocket relay connected');
       this.relayConnected = true;
       this.messageQueue.setConnected(true);
       updateBadge('hub-connected');
-    } else if (status.status === 'disconnected') {
+    } else if (message.status === 'disconnected') {
       console.log('CCM HubClient: WebSocket relay disconnected');
       this.relayConnected = false;
       this.messageQueue.setConnected(false);
