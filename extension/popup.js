@@ -23,9 +23,9 @@ async function getInitialState() {
 
 // Listen for real-time events from extension
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === 'hub_event_update') {
+  if (message.type === 'relay_event_update') {
     console.log(`CCM Popup: Received real-time event '${message.eventType}'`);
-    updatePopupUI(message.hubInfo);
+    updatePopupUI(message.relayInfo);
   }
 });
 
@@ -40,17 +40,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 function updatePopupUI(health) {
-  // Update hub status
+  // Update relay status
   const statusDot = document.getElementById('server-dot');
   const statusDetail = document.getElementById('server-detail');
   const helpSection = document.getElementById('help-section');
   
-  if (health.hubConnected) {
+  if (health.relayConnected) {
     if (statusDot) {
       statusDot.className = 'status-dot connected';
     }
     if (statusDetail) {
-      statusDetail.textContent = 'Connected to WebSocket Hub';
+      statusDetail.textContent = 'Connected to WebSocket Relay';
     }
     if (helpSection) {
       helpSection.style.display = 'none';
@@ -60,7 +60,7 @@ function updatePopupUI(health) {
       statusDot.className = 'status-dot connecting';
     }
     if (statusDetail) {
-      statusDetail.textContent = 'Reconnecting to hub...';
+      statusDetail.textContent = 'Reconnecting to relay...';
     }
     if (helpSection) {
       helpSection.style.display = 'none';
@@ -70,7 +70,7 @@ function updatePopupUI(health) {
       statusDot.className = 'status-dot disconnected';
     }
     if (statusDetail) {
-      statusDetail.textContent = 'Not connected to hub';
+      statusDetail.textContent = 'Not connected to relay';
     }
     if (helpSection) {
       helpSection.style.display = 'block';
@@ -87,12 +87,21 @@ function updatePopupUI(health) {
   
   if (clientsList) {
     if (health.connectedClients.length > 0) {
-      clientsList.innerHTML = health.connectedClients.map(client => `
+      clientsList.innerHTML = health.connectedClients.map(client => {
+        // Get icon and name from client info or use defaults
+        const icon = client.icon || getMCPClientIcon(client.type);
+        const displayName = client.name || getDefaultClientName(client.type);
+        const longName = client.longName || displayName;
+        
+        return `
         <div class="client-card">
           <div class="client-header">
             <div class="client-info">
-              <div class="client-name">${client.name || 'Unknown Client'}</div>
-              <div class="client-id">${client.id}</div>
+              <div class="client-icon">${icon}</div>
+              <div>
+                <div class="client-name" title="${longName}">${displayName}</div>
+                <div class="client-id">${client.id}</div>
+              </div>
             </div>
             <div class="client-type-badge ${client.type}">${client.type || 'unknown'}</div>
           </div>
@@ -101,13 +110,9 @@ function updatePopupUI(health) {
               <div class="stat-label">Connected</div>
               <div class="stat-value">${formatDuration(Date.now() - client.connectedAt)}</div>
             </div>
-            <div class="stat-item">
-              <div class="stat-label">Messages</div>
-              <div class="stat-value">${client.messageCount || 0}</div>
-            </div>
           </div>
         </div>
-      `).join('');
+      `}).join('');
     } else {
       clientsList.innerHTML = `
         <div class="empty-state">
@@ -178,6 +183,32 @@ function formatDuration(ms) {
   if (ms < 60000) return `${Math.floor(ms / 1000)}s ago`;
   if (ms < 3600000) return `${Math.floor(ms / 60000)}m ago`;
   return `${Math.floor(ms / 3600000)}h ago`;
+}
+
+function getMCPClientIcon(type) {
+  const iconMap = {
+    'claude-code': '🔧',
+    'claude-desktop': '🖥️',
+    'vscode': '📝',
+    'cursor': '✨',
+    'chrome_extension': '🔗',
+    'mcp-server': '🌐',
+    'generic': '🔌'
+  };
+  return iconMap[type] || '🔌';
+}
+
+function getDefaultClientName(type) {
+  const nameMap = {
+    'claude-code': 'Claude Code',
+    'claude-desktop': 'Claude Desktop',
+    'vscode': 'VS Code',
+    'cursor': 'Cursor',
+    'chrome_extension': 'Extension',
+    'mcp-server': 'MCP Server',
+    'generic': 'MCP Client'
+  };
+  return nameMap[type] || type.charAt(0).toUpperCase() + type.slice(1).replace(/-/g, ' ');
 }
 
 function setupButtonHandlers() {
