@@ -1,6 +1,6 @@
 /**
  * WebSocket relay client for MCP server
- * Connects to the relay server instead of acting as a hub
+ * Connects to the relay server for inter-process communication
  */
 
 const WebSocket = require('ws');

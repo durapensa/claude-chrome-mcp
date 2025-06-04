@@ -2,7 +2,6 @@ const EventEmitter = require('events');
 const { ErrorTracker } = require('../utils/error-tracker');
 const { DebugMode } = require('../utils/debug-mode');
 const { EmbeddedRelayManager } = require('./embedded-relay-manager');
-const { MCPClientDetector } = require('../utils/mcp-client-detector');
 
 // MCP Relay Client for MCP server
 // Uses persistent WebSocket connection via relay for all communication
@@ -10,7 +9,7 @@ const { MCPClientDetector } = require('../utils/mcp-client-detector');
 class MCPRelayClient extends EventEmitter {
   constructor(clientInfo = {}, operationManager = null, notificationManager = null) {
     super();
-    this.clientInfo = MCPClientDetector.mergeClientInfo(clientInfo);
+    this.clientInfo = clientInfo;
     this.operationManager = operationManager;
     this.notificationManager = notificationManager;
     this.connected = false;
@@ -88,6 +87,16 @@ class MCPRelayClient extends EventEmitter {
       
       // Otherwise, emit the message for other handlers
       this.emit('message', data);
+    }
+  }
+
+  updateClientInfo(clientInfo) {
+    this.clientInfo = clientInfo;
+    console.error('RelayClient: Updated client info:', clientInfo);
+    
+    // Update relay manager with new client info if initialized
+    if (this.relayManager && this.relayManager.client) {
+      this.relayManager.updateClientInfo(clientInfo);
     }
   }
 

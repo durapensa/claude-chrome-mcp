@@ -4,7 +4,7 @@
  * Claude Chrome MCP Server - Modular Architecture
  * 
  * This is the new modular entry point that imports and coordinates
- * all the extracted components for the MCP-Server-as-Hub architecture.
+ * all the extracted components for the MCP-Server with embedded relay architecture.
  */
 
 // CRITICAL: Redirect all console output to stderr to keep stdout clean for JSON-RPC
@@ -69,14 +69,45 @@ class ChromeMCPServer {
     // Force relay mode by setting environment variable
     process.env.USE_WEBSOCKET_RELAY = 'true';
     
+    // Initialize with minimal client info, will be updated after MCP initialization
     this.relayClient = new MCPRelayClient({
-      id: 'claude-chrome-mcp',
-      name: 'Claude Chrome MCP',
-      type: 'automation_server',
+      // This will be replaced with actual client info after initialization
+      name: 'Initializing...',
+      version: '0.0.0',
       capabilities: ['chrome_tabs', 'debugger', 'claude_automation']
     }, this.operationManager, this.notificationManager);
 
     this.setupTools();
+    this.setupInitializationHandler();
+  }
+
+  setupInitializationHandler() {
+    // Store original initialization handler if any
+    const originalHandler = this.server._oninitialize;
+    
+    // Override initialization handler to capture client info
+    this.server._oninitialize = async (params) => {
+      // Call original handler if exists
+      let result;
+      if (originalHandler) {
+        result = await originalHandler.call(this.server, params);
+      }
+      
+      // After initialization, update relay client with actual client info
+      const clientInfo = this.server.getClientVersion();
+      if (clientInfo) {
+        this.debug.info('CCM: Received client info from MCP protocol:', clientInfo);
+        
+        // Update relay client with actual client info
+        this.relayClient.updateClientInfo({
+          name: clientInfo.name,
+          version: clientInfo.version,
+          capabilities: ['chrome_tabs', 'debugger', 'claude_automation']
+        });
+      }
+      
+      return result;
+    };
   }
 
   setupTools() {

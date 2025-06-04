@@ -5,15 +5,15 @@ export function updateBadge(status) {
   let color = '#666666'; // Default gray
   
   switch (status) {
-    case 'hub-connected':
-      text = 'H';
+    case 'relay-connected':
+      text = 'R';
       color = '#4CAF50'; // Green
       break;
     case 'mcp-connected':
       text = 'M';
       color = '#2196F3'; // Blue
       break;
-    case 'hub-disconnected':
+    case 'relay-disconnected':
       text = '';
       color = '#F44336'; // Red
       break;

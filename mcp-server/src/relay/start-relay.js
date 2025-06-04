@@ -2,7 +2,7 @@
 
 /**
  * Standalone WebSocket relay server
- * Run this instead of the hub when using WebSocket relay mode
+ * Run this for standalone relay server mode (when not using embedded relay)
  */
 
 const { MessageRelay } = require('./message-relay');

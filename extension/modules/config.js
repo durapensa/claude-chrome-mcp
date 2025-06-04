@@ -14,7 +14,7 @@ export const MESSAGE_TYPES = {
   CLIENT_CONNECTED: 'client_connected',
   CLIENT_DISCONNECTED: 'client_disconnected',
   CLIENT_LIST_UPDATE: 'client_list_update',
-  HUB_HEALTH: 'hub_health',
+  RELAY_HEALTH: 'relay_health',
   OPERATION_UPDATE: 'operation_update',
   
   // Chrome runtime messages  

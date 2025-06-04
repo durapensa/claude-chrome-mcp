@@ -89,8 +89,8 @@ function updatePopupUI(health) {
     if (health.connectedClients.length > 0) {
       clientsList.innerHTML = health.connectedClients.map(client => {
         // Get icon and name from client info or use defaults
-        const icon = client.icon || getMCPClientIcon(client.type);
-        const displayName = client.name || getDefaultClientName(client.type);
+        const icon = client.icon || getMCPClientIcon(client.type || client.name);
+        const displayName = client.name || getDefaultClientName(client.name);
         const longName = client.longName || displayName;
         
         return `
@@ -186,29 +186,13 @@ function formatDuration(ms) {
 }
 
 function getMCPClientIcon(type) {
-  const iconMap = {
-    'claude-code': '🔧',
-    'claude-desktop': '🖥️',
-    'vscode': '📝',
-    'cursor': '✨',
-    'chrome_extension': '🔗',
-    'mcp-server': '🌐',
-    'generic': '🔌'
-  };
-  return iconMap[type] || '🔌';
+  // Default MCP client icon - clients should provide their own icon in clientInfo
+  return '🔌';
 }
 
-function getDefaultClientName(type) {
-  const nameMap = {
-    'claude-code': 'Claude Code',
-    'claude-desktop': 'Claude Desktop',
-    'vscode': 'VS Code',
-    'cursor': 'Cursor',
-    'chrome_extension': 'Extension',
-    'mcp-server': 'MCP Server',
-    'generic': 'MCP Client'
-  };
-  return nameMap[type] || type.charAt(0).toUpperCase() + type.slice(1).replace(/-/g, ' ');
+function getDefaultClientName(name) {
+  // Trust the MCP protocol - return name as provided by the client
+  return name || 'Unknown Client';
 }
 
 function setupButtonHandlers() {

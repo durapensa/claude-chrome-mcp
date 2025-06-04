@@ -57,7 +57,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // Handle messages from offscreen document
   if (request.type === 'relay_connection_status') {
     console.log('CCM: Relay connection status:', request.status);
-    // Forward status to hub client if available
+    // Forward status to relay client if available
     if (relayClient) {
       relayClient.handleRelayStatus(request);
     }
@@ -66,7 +66,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   
   if (request.type === 'relay_message') {
     console.log('CCM: Message from relay:', request.data.type);
-    // Forward message to hub client
+    // Forward message to relay client
     if (relayClient) {
       relayClient.handleRelayMessage(request.data);
     }
@@ -86,7 +86,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // Always handle health checks immediately, even during initialization
   if (request.type === 'mcp_tool_request' && request.tool === 'get_connection_health') {
     const currentState = relayClient ? relayClient.getCurrentState() : {
-      hubConnected: false,
+      relayConnected: false,
       isReconnecting: false,
       connectedClients: [],
       extensionConnected: false,
