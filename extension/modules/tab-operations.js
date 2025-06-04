@@ -33,7 +33,20 @@ export const tabOperationMethods = {
       // Inject content script if requested
       if (params.injectContentScript && this.contentScriptManager) {
         console.log(`CCM Extension: Injecting content script into spawned tab ${tab.id}`);
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for page to stabilize
+        
+        // Wait for the URL to actually be set (not just status complete)
+        await new Promise((resolve) => {
+          const checkUrl = async () => {
+            const currentTab = await chrome.tabs.get(tab.id);
+            if (currentTab.url && currentTab.url.includes('claude.ai')) {
+              resolve();
+            } else {
+              setTimeout(checkUrl, 100);
+            }
+          };
+          checkUrl();
+        });
+        
         const injectionResult = await this.contentScriptManager.injectContentScript(tab.id);
         console.log(`CCM Extension: Injection result:`, injectionResult);
         
