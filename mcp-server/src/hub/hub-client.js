@@ -229,7 +229,16 @@ class AutoHubClient extends EventEmitter {
       if (data.id && this.pendingRequests.has(data.id)) {
         const callback = this.pendingRequests.get(data.id);
         this.pendingRequests.delete(data.id);
-        callback(null, data);
+        
+        // Extract the result from the response
+        if (data.type === 'error') {
+          callback(new Error(data.error || 'Unknown error'));
+        } else if (data.type === 'response' && data.result !== undefined) {
+          callback(null, data.result);
+        } else {
+          // Fallback to sending the whole data object if no result field
+          callback(null, data);
+        }
         return;
       }
       
