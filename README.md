@@ -38,7 +38,6 @@ Browser automation tool enabling MCP clients (Claude Desktop, Claude Code, Curso
 
 - [**MCP Configuration**](CLAUDE.md) - Quick commands and setup
 - [**Changelog**](CHANGELOG.md) - Release history  
-- [**Roadmap**](ROADMAP.md) - Planned features
 - [**GitHub Issue Script**](docs/create-claude-code-issue.sh) - Claude Code integration utilities
 
 ## Installation

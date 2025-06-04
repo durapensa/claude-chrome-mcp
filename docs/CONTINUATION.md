@@ -15,18 +15,19 @@ Check connection health output for:
 - Active client connections
 - Any connection issues
 
-### Step 3: Standard Testing Workflow
-Once system is healthy:
+### Step 3: Standard Testing Workflow (OPTIONAL - only if user requests)
+**Rule: Skip testing workflow by default unless user specifically asks for it**
+
+If testing is requested:
 1. **Spawn Tab**: `spawn_claude_dot_ai_tab --injectContentScript true`
 2. **Async Message**: `send_message_async --message "test" --tabId <id>`
 3. **Get Response**: `get_claude_dot_ai_response --tabId <id>`
 4. **Claude-to-Claude**: `forward_response_to_claude_dot_ai_tab --sourceTabId <src> --targetTabId <tgt>`
 
-### Step 4: If Issues Arise
-Follow systematic debugging approach from [Troubleshooting Guide](TROUBLESHOOTING.md#debugging-methodology):
-- Use evidence-based network debugging
-- Apply proper tool selection
-- Avoid common anti-patterns
+### Step 4: Resume Active Work
+- Read current todo list with TodoRead
+- Continue with pending tasks from previous session
+- If issues arise, follow [Troubleshooting Guide](TROUBLESHOOTING.md#debugging-methodology)
 
 ## Key Documentation
 - **[Architecture](ARCHITECTURE.md)**: System design and components
@@ -39,7 +40,7 @@ Follow systematic debugging approach from [Troubleshooting Guide](TROUBLESHOOTIN
 - **[GitHub Issue Script](create-claude-code-issue.sh)**: Claude Code integration utilities
 
 ## Current System Status
-- **Version**: 2.5.0 (WebSocket-only architecture)
+- **Version**: 2.6.0 (WebSocket-only architecture)
 - **Architecture**: WebSocket relay with offscreen documents
 - **Key Features**: 
   - Async operations, Claude-to-Claude forwarding
@@ -175,45 +176,127 @@ Follow systematic debugging approach from [Troubleshooting Guide](TROUBLESHOOTIN
 - `/mcp-server/src/relay/mcp-relay-client.js` - ✅ Updated - MCP relay client implementation
 - `/test-websocket-relay.sh` - ✅ Created - test script
 
-## Latest Session Summary (2025-01-06 - Architecture Review & Cleanup)
+## Latest Session Summary (2025-06-04 - Part 2: High-Impact Improvements & Documentation Cleanup)
 
-### Architecture Alignment Review
+### What Was Accomplished
 
-1. **WebSocket Architecture Fully Implemented** ✅:
-   - Offscreen documents are operational with persistent WebSocket connections
-   - WebSocket relay is embedded in MCP server with automatic election
-   - Extension uses WebSocket exclusively (no HTTP polling in implementation)
-   - Architecture matches documented design in ARCHITECTURE.md
+1. **Artifact/Code Block Extraction Feature Completed** ✅:
+   - Implemented comprehensive extraction in `conversation-operations.js`
+   - Added artifact detection with multiple selector strategies
+   - Added code block extraction with language detection
+   - Enhanced statistics with code metrics and language analysis
+   - Updated both markdown and JSON export formats
+   - Tested successfully with live conversation containing JavaScript code
 
-2. **Implementation Status**:
-   - **MCP Server**: Modular architecture with embedded relay
-   - **Extension**: Offscreen document maintains WebSocket connection
-   - **Message Flow**: Extension → Offscreen → WebSocket Relay → MCP Server
-   - **Coordination**: Extension acts as the brain for all coordination logic
+2. **Operation ID Architecture Fixed** ✅:
+   - Clarified MCP server as sole authority for operation IDs
+   - Implemented `op_{tool_name}_{timestamp}` format for better debugging
+   - Removed `generateOperationId()` from extension utils
+   - Updated ARCHITECTURE.md with clear authority documentation
+   - Fixed dual operation ID system issue
 
-3. **Minor Discrepancies Found**:
-   - Stale comment in extension/background.js line 19 mentions "HTTP polling mode"
-   - Hub directory still exists but wraps relay functionality (transitional state)
+3. **Documentation Cleanup & "One-In-One-Out" Rule Enforcement** ✅:
+   - Deleted 3 redundant files: ARCHITECTURE-REFACTOR-LOG.md, ROADMAP.md, implementation-vs-documentation-analysis.md
+   - Eliminated 340+ lines of duplicated and stale content
+   - Strengthened file hygiene principles
+   - Established clear documentation structure: CONTINUATION.md for state, ARCHITECTURE.md for design, CLAUDE.md for commands
 
-### Recommended Cleanup Steps
+4. **Centralized Logging System Started** 🔄:
+   - Created `/extension/utils/logger.js` with browser-compatible Winston-style logging
+   - Migrated background.js from console.log to structured logging (28 statements)
+   - Started relay-client.js migration (4 of 26 statements migrated)
+   - Established component-based logging with configurable levels
 
-1. **Update Stale Comment**:
-   - Fix extension/background.js line 19 to remove HTTP polling reference
+5. **Continuation Workflow Improved** ✅:
+   - Updated CONTINUATION.md to make testing workflow optional
+   - Established stronger restart workflow rules
+   - Made Step 3 (testing) only run if user specifically requests it
 
-2. **Consider Hub Removal**:
-   - The hub/ directory has been removed and functionality moved to relay/
-   - mcp-relay-client.js provides relay connection management
+### Current State
+- **System Status**: Fully operational with WebSocket relay architecture
+- **Priority Work**: Complete centralized logging migration (relay-client.js, content-script-manager.js, remaining files)
+- **Architecture**: Clean, with MCP server as operation ID authority and clear documentation structure
+- **Documentation**: Streamlined and focused on active use
 
-3. **Documentation Accuracy**:
-   - ARCHITECTURE.md accurately reflects the implemented WebSocket-only design
-   - CLAUDE.md correctly describes the embedded relay with automatic election
-   - This CONTINUATION.md has been updated to reflect current state
+### Next Session Priorities
+1. Complete logging migration in relay-client.js (22 remaining console statements)
+2. Complete logging migration in content-script-manager.js (21 statements)  
+3. Complete logging migration in remaining extension files
+4. Enhanced error handling with structured ErrorTracker usage
+
+## Previous Session Summary (2025-06-04 - System Assessment & Improvement Planning)
+
+### System Health Verification ✅
+
+1. **Full System Operational**:
+   - WebSocket relay connected and functioning as host
+   - 2 active clients, 0 errors, 517+ seconds uptime
+   - Standard testing workflow completed successfully:
+     - Tab spawning with content script injection
+     - Async messaging and response capture
+     - Claude-to-Claude response forwarding
+
+2. **Architecture Status**:
+   - **MCP Server**: Embedded relay with automatic election operational
+   - **Extension**: Offscreen document maintaining persistent WebSocket connections
+   - **Message Flow**: Extension → Offscreen → WebSocket Relay → MCP Server working correctly
+   - **Performance**: 2 messages routed, 3 clients connected, 1 client disconnected
+
+### Codebase Analysis & Improvement Opportunities
+
+**Comprehensive search revealed priority improvement areas:**
+
+1. **Incomplete Features (High Impact)**:
+   - Artifact/code block extraction TODOs in `extension/modules/conversation-operations.js:183-184, 212, 230-231`
+   - Clear user value with well-defined scope
+
+2. **Code Quality Issues**:
+   - 92+ console statements scattered across codebase (should use Winston logger)
+   - Highest concentrations: background.js (28), relay-client.js (26), content-script-manager.js (21)
+
+3. **Architecture Technical Debt**:
+   - ~~Dual operation ID systems between Extension and MCP server~~ ✅ (MCP server is sole authority)
+   - Module duplication: `tab-management.js` vs `tab-operations.js`
+   - Architecture cleanup tracked in current todos
+
+4. **Timer/Polling Optimization**:
+   - Hardcoded timeouts and polling intervals could be more intelligent
+   - Multiple 2-second waits and fixed heartbeat intervals
+
+5. **Error Handling Enhancement**:
+   - Many try-catch blocks could benefit from structured error handling
+   - Could better leverage existing ErrorTracker utility
+
+### Recommended Priorities (2025-06-04)
+
+**Top 5 Improvement Opportunities:**
+
+1. **Complete Artifact/Code Block Extraction** (High Impact)
+   - Clear feature completion with obvious user value
+   - Well-defined scope in conversation export functionality
+
+2. **Centralized Logging System** (Code Quality)
+   - Consolidate 92+ console statements into Winston logger
+   - Improve debugging and maintainability
+
+3. **Architecture Cleanup** (Technical Debt)
+   - Fix dual operation ID systems
+   - Consolidate duplicated modules
+   - Resolve identified architecture inconsistencies
+
+4. **Documentation Updates** (Quick Win)
+   - Update roadmap to reflect completed WebSocket architecture
+   - Ensure documentation matches current implementation
+
+5. **Enhanced Error Handling** (Reliability)
+   - Structured error handling with proper cleanup
+   - Better utilization of existing ErrorTracker utility
 
 ### Current Production Status
-- WebSocket-only architecture is fully operational
-- Embedded relay with automatic election is working
-- System is production-ready with health monitoring
-- All MCP tools function correctly through the relay
+- System is fully operational and production-ready
+- All MCP tools functioning correctly through embedded relay
+- WebSocket-only architecture stable with health monitoring
+- Ready for improvement work on identified opportunities
 
 ## Previous Sessions
 

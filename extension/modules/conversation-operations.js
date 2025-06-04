@@ -173,6 +173,126 @@ export const conversationOperationMethods = {
       const messageResult = await this.executeScript({ tabId, script: messageScript });
       const messageData = messageResult.result?.value || { messages: [], metadata: {} };
       
+      // Extract artifacts and code blocks
+      const artifactsScript = `
+        (function() {
+          const artifacts = [];
+          const codeBlocks = [];
+          
+          // Find artifacts - Claude uses various selectors for artifacts
+          const artifactSelectors = [
+            '[data-testid*="artifact"]',
+            '.artifact-container',
+            '[class*="artifact"]',
+            '[data-component="artifact"]',
+            'iframe[src*="artifacts"]'
+          ];
+          
+          artifactSelectors.forEach(selector => {
+            document.querySelectorAll(selector).forEach((element, index) => {
+              const artifactData = {
+                id: element.id || \`artifact-\${artifacts.length + 1}\`,
+                type: element.getAttribute('data-type') || 'unknown',
+                title: element.getAttribute('data-title') || element.querySelector('h1, h2, h3, .title')?.textContent || \`Artifact \${artifacts.length + 1}\`,
+                content: element.textContent || element.innerHTML || '',
+                selector: selector,
+                elementIndex: index
+              };
+              
+              // Try to determine artifact type from content or attributes
+              if (!artifactData.type || artifactData.type === 'unknown') {
+                if (artifactData.content.includes('function') || artifactData.content.includes('const ') || artifactData.content.includes('let ')) {
+                  artifactData.type = 'code';
+                } else if (artifactData.content.includes('<html') || artifactData.content.includes('<!DOCTYPE')) {
+                  artifactData.type = 'html';
+                } else if (artifactData.content.includes('import ') || artifactData.content.includes('export ')) {
+                  artifactData.type = 'javascript';
+                } else {
+                  artifactData.type = 'text';
+                }
+              }
+              
+              artifacts.push(artifactData);
+            });
+          });
+          
+          // Find code blocks - look for various code block patterns
+          const codeSelectors = [
+            'pre code',
+            'pre',
+            '.code-block',
+            '[data-testid*="code"]',
+            '.highlight',
+            '.hljs'
+          ];
+          
+          codeSelectors.forEach(selector => {
+            document.querySelectorAll(selector).forEach((element, index) => {
+              // Skip if this element is already part of an artifact
+              if (element.closest('[data-testid*="artifact"], .artifact-container, [class*="artifact"]')) {
+                return;
+              }
+              
+              const codeText = element.textContent || '';
+              if (codeText.trim().length === 0) return;
+              
+              // Determine language from class names or content
+              let language = 'text';
+              const classNames = element.className || '';
+              const languageMatch = classNames.match(/language-(\w+)|hljs-(\w+)|(\w+)-code/);
+              if (languageMatch) {
+                language = languageMatch[1] || languageMatch[2] || languageMatch[3];
+              } else {
+                // Try to detect language from content
+                if (codeText.includes('function') || codeText.includes('=>')) {
+                  language = 'javascript';
+                } else if (codeText.includes('def ') || codeText.includes('import ')) {
+                  language = 'python';
+                } else if (codeText.includes('#include') || codeText.includes('int main')) {
+                  language = 'c';
+                } else if (codeText.includes('<!DOCTYPE') || codeText.includes('<html')) {
+                  language = 'html';
+                } else if (codeText.includes('SELECT') || codeText.includes('FROM')) {
+                  language = 'sql';
+                }
+              }
+              
+              const codeData = {
+                id: \`code-block-\${codeBlocks.length + 1}\`,
+                language: language,
+                content: codeText.trim(),
+                lineCount: codeText.trim().split('\\n').length,
+                characterCount: codeText.length,
+                selector: selector,
+                elementIndex: index,
+                hasLineNumbers: !!element.querySelector('.line-number, .line-numbers'),
+                parentMessage: null // Will be determined by position
+              };
+              
+              // Try to find the parent message
+              const messageParent = element.closest('[data-testid="user-message"], .font-claude-message, [data-message-role]');
+              if (messageParent) {
+                const isUser = messageParent.getAttribute('data-testid') === 'user-message' ||
+                              messageParent.getAttribute('data-message-role') === 'user';
+                codeData.parentMessage = isUser ? 'user' : 'assistant';
+              }
+              
+              codeBlocks.push(codeData);
+            });
+          });
+          
+          return {
+            artifacts: artifacts,
+            codeBlocks: codeBlocks,
+            artifactCount: artifacts.length,
+            codeBlockCount: codeBlocks.length
+          };
+        })()
+      `;
+      
+      const artifactsResult = await this.executeScript({ tabId, script: artifactsScript });
+      const artifactsData = artifactsResult.result?.value || { artifacts: [], codeBlocks: [], artifactCount: 0, codeBlockCount: 0 };
+      
       // Calculate statistics
       const statistics = {
         totalMessages: messageData.messages.length,
@@ -180,8 +300,10 @@ export const conversationOperationMethods = {
         assistantMessages: messageData.messages.filter(m => m.role === 'assistant').length,
         totalCharacters: messageData.messages.reduce((sum, m) => sum + m.length, 0),
         estimatedTokens: Math.round(messageData.messages.reduce((sum, m) => sum + m.length, 0) / 4),
-        artifactCount: 0, // TODO: Implement artifact extraction
-        codeBlockCount: 0 // TODO: Implement code block extraction
+        artifactCount: artifactsData.artifactCount,
+        codeBlockCount: artifactsData.codeBlockCount,
+        totalCodeLines: artifactsData.codeBlocks.reduce((sum, cb) => sum + cb.lineCount, 0),
+        languages: [...new Set(artifactsData.codeBlocks.map(cb => cb.language))]
       };
       
       // Format output
@@ -200,6 +322,12 @@ export const conversationOperationMethods = {
         if (statistics.codeBlockCount > 0) {
           markdown += `**Code Blocks:** ${statistics.codeBlockCount}\n`;
         }
+        if (statistics.totalCodeLines > 0) {
+          markdown += `**Total Code Lines:** ${statistics.totalCodeLines}\n`;
+        }
+        if (statistics.languages.length > 0) {
+          markdown += `**Languages:** ${statistics.languages.join(', ')}\n`;
+        }
         markdown += `\n---\n\n`;
         
         // Add messages
@@ -209,7 +337,39 @@ export const conversationOperationMethods = {
           markdown += `---\n\n`;
         });
         
-        // TODO: Add artifacts and code blocks sections when extraction is implemented
+        // Add artifacts section if any exist
+        if (artifactsData.artifacts.length > 0) {
+          markdown += `## Artifacts\n\n`;
+          artifactsData.artifacts.forEach((artifact, index) => {
+            markdown += `### Artifact ${index + 1}: ${artifact.title}\n\n`;
+            markdown += `**Type:** ${artifact.type}\n`;
+            markdown += `**ID:** ${artifact.id}\n\n`;
+            if (artifact.content) {
+              markdown += `\`\`\`${artifact.type === 'code' ? 'javascript' : artifact.type}\n`;
+              markdown += `${artifact.content.substring(0, 2000)}${artifact.content.length > 2000 ? '\n... (truncated)' : ''}\n`;
+              markdown += `\`\`\`\n\n`;
+            }
+            markdown += `---\n\n`;
+          });
+        }
+        
+        // Add code blocks section if any exist
+        if (artifactsData.codeBlocks.length > 0) {
+          markdown += `## Code Blocks\n\n`;
+          artifactsData.codeBlocks.forEach((codeBlock, index) => {
+            markdown += `### Code Block ${index + 1}\n\n`;
+            markdown += `**Language:** ${codeBlock.language}\n`;
+            markdown += `**Lines:** ${codeBlock.lineCount}\n`;
+            markdown += `**Characters:** ${codeBlock.characterCount}\n`;
+            if (codeBlock.parentMessage) {
+              markdown += `**From:** ${codeBlock.parentMessage === 'user' ? 'Human' : 'Assistant'}\n`;
+            }
+            markdown += `\n\`\`\`${codeBlock.language}\n`;
+            markdown += `${codeBlock.content}\n`;
+            markdown += `\`\`\`\n\n`;
+            markdown += `---\n\n`;
+          });
+        }
         
         return {
           success: true,
@@ -227,8 +387,8 @@ export const conversationOperationMethods = {
           content: {
             metadata: messageData.metadata,
             messages: messageData.messages,
-            artifacts: [], // TODO: Implement artifact extraction
-            codeBlocks: [], // TODO: Implement code block extraction
+            artifacts: artifactsData.artifacts,
+            codeBlocks: artifactsData.codeBlocks,
             statistics: statistics
           },
           metadata: messageData.metadata,

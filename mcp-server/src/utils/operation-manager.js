@@ -13,7 +13,8 @@ class OperationManager extends EventEmitter {
   }
 
   createOperation(type, params = {}) {
-    const operationId = `${type}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Generate operation ID with tool name format: op_{tool_name}_{timestamp}
+    const operationId = `op_${type}_${Date.now()}`;
     const operation = {
       id: operationId,
       type,

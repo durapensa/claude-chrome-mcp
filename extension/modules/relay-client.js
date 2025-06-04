@@ -13,6 +13,7 @@ import { MessageQueue } from './message-queue.js';
 import { TabOperationLock } from './tab-operation-lock.js';
 import { MCPClient } from './mcp-client.js';
 import { tabOperationMethods } from './tab-operations.js';
+import { createLogger } from '../utils/logger.js';
 import { conversationOperationMethods } from './conversation-operations.js';
 import { batchOperationMethods } from './batch-operations.js';
 import { debugOperationMethods } from './debug-operations.js';
@@ -20,6 +21,7 @@ import { updateBadge } from '../utils/utils.js';
 
 export class ExtensionRelayClient {
   constructor() {
+    this.logger = createLogger('relay-client');
     this.connectedClients = new Map();
     this.debuggerSessions = new Map();
     this.requestCounter = 0;
@@ -35,15 +37,15 @@ export class ExtensionRelayClient {
     // Track extension startup for reload confirmation
     this.startupTimestamp = Date.now();
     
-    console.log('CCM Extension: WebSocket ExtensionRelayClient created at', this.startupTimestamp);
+    this.logger.info('WebSocket ExtensionRelayClient created', { startupTimestamp: this.startupTimestamp });
   }
 
   async init() {
-    console.log('CCM Extension: Initializing WebSocket ExtensionRelayClient...');
+    this.logger.info('Initializing WebSocket ExtensionRelayClient');
     
     // Setup listeners
     this.setupEventListeners();
-    console.log('CCM Extension: WebSocket ExtensionRelayClient initialized');
+    this.logger.info('WebSocket ExtensionRelayClient initialized');
   }
 
   isConnected() {
@@ -52,12 +54,12 @@ export class ExtensionRelayClient {
 
   async connectToRelay() {
     // Connection is handled by offscreen document
-    console.log('CCM Extension: WebSocket connection handled by offscreen document');
+    this.logger.debug('WebSocket connection handled by offscreen document');
   }
 
 
   async executeCommand(command) {
-    console.log(`CCM Extension: Executing command: ${command.type}`);
+    this.logger.debug('Executing command', { commandType: command.type });
     
     try {
       // Route to appropriate handler based on command type

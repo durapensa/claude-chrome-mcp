@@ -4,8 +4,10 @@
 import { MESSAGE_TYPES } from './modules/config.js';
 import { ExtensionRelayClient } from './modules/relay-client.js';
 import { ContentScriptManager } from './modules/content-script-manager.js';
+import { createLogger } from './utils/logger.js';
 
-console.log('CCM: Balanced background script starting...');
+const logger = createLogger('background');
+logger.info('Balanced background script starting');
 
 // Global variables
 let relayClient = null;
@@ -14,11 +16,11 @@ let initializationComplete = false;
 let offscreenCreated = false;
 
 // Register event listeners
-console.log('CCM: Registering event listeners...');
+logger.info('Registering event listeners');
 
 // Event-driven extension with WebSocket relay
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('CCM Extension: Installed/Updated - WebSocket relay mode');
+  logger.info('Installed/Updated - WebSocket relay mode');
 });
 
 // Message queue for early messages
@@ -35,20 +37,20 @@ async function ensureOffscreenDocument() {
     });
     
     if (existingContexts.length === 0) {
-      console.log('CCM: Creating offscreen document for WebSocket connection...');
+      logger.info('Creating offscreen document for WebSocket connection');
       await chrome.offscreen.createDocument({
         url: 'offscreen.html',
         reasons: ['DOM_SCRAPING'],
         justification: 'Maintain persistent WebSocket connection to relay server for Chrome automation'
       });
       offscreenCreated = true;
-      console.log('CCM: Offscreen document created successfully');
+      logger.info('Offscreen document created successfully');
     } else {
-      console.log('CCM: Offscreen document already exists');
+      logger.info('Offscreen document already exists');
       offscreenCreated = true;
     }
   } catch (error) {
-    console.error('CCM: Failed to create offscreen document:', error);
+    logger.error('Failed to create offscreen document', { error: error.message });
     throw error;
   }
 }
@@ -56,7 +58,7 @@ async function ensureOffscreenDocument() {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // Handle messages from offscreen document
   if (request.type === 'relay_connection_status') {
-    console.log('CCM: Relay connection status:', request.status);
+    logger.debug('Relay connection status', { status: request.status });
     // Forward status to relay client if available
     if (relayClient) {
       relayClient.handleRelayStatus(request);
@@ -65,7 +67,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
   
   if (request.type === 'relay_message') {
-    console.log('CCM: Message from relay:', request.data.type);
+    logger.debug('Message from relay', { messageType: request.data.type });
     // Forward message to relay client
     if (relayClient) {
       relayClient.handleRelayMessage(request.data);
@@ -75,7 +77,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   
   // Handle other relay messages that come directly (not wrapped)
   if (request.type === 'client_list_update' || request.type === 'relay_welcome') {
-    console.log('CCM: Direct relay message:', request.type);
+    logger.debug('Direct relay message', { messageType: request.type });
     // Forward to relay client
     if (relayClient) {
       relayClient.handleRelayMessage(request);
@@ -89,7 +91,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
   
   if (request.type === 'offscreen_status') {
-    console.log('CCM: Offscreen document status:', request.status);
+    logger.debug('Offscreen document status', { status: request.status });
     return false;
   }
   
@@ -118,7 +120,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
   
   if (!initializationComplete) {
-    console.log('CCM Extension: Queuing message - not initialized yet');
+    logger.debug('Queuing message - not initialized yet');
     messageQueue.push({ request, sender, sendResponse });
     return true;
   }
@@ -136,7 +138,7 @@ function handleMessage(request, sender, sendResponse) {
   
   // Handle MCP tool requests
   if (request.type === 'mcp_tool_request' && request.tool && request.params) {
-    console.log(`CCM: MCP tool request: ${request.tool}`);
+    logger.debug('MCP tool request', { tool: request.tool });
     relayClient.handleMCPToolRequest(request.tool, request.params)
       .then(result => sendResponse(result))
       .catch(error => sendResponse({ success: false, error: error.message }));
@@ -153,12 +155,12 @@ function handleMessage(request, sender, sendResponse) {
   
   // Handle force reconnect from popup
   if (request.type === 'force_reconnect') {
-    console.log('CCM Extension: Force reconnect requested from popup');
+    logger.info('Force reconnect requested from popup');
     relayClient.connectToRelay().then(() => {
-      console.log('CCM Extension: Force reconnect succeeded');
+      logger.info('Force reconnect succeeded');
       sendResponse({ success: true });
     }).catch(error => {
-      console.error('CCM Extension: Force reconnect failed:', error);
+      logger.error('Force reconnect failed', { error: error.message });
       sendResponse({ success: false, error: error.message });
     });
     return true;
@@ -169,7 +171,7 @@ function handleMessage(request, sender, sendResponse) {
 
 // Initialization with shorter delay
 setTimeout(async () => {
-  console.log('CCM Extension: Starting initialization...');
+  logger.info('Starting initialization');
   
   try {
     // Create ExtensionRelayClient first (no DOM dependencies)
@@ -177,7 +179,7 @@ setTimeout(async () => {
     
     // Create ContentScriptManager
     contentScriptManager = new ContentScriptManager();
-    console.log('CCM Extension: ContentScriptManager created');
+    logger.info('ContentScriptManager created');
     
     // Create offscreen document for WebSocket connection
     await ensureOffscreenDocument();
@@ -191,7 +193,7 @@ setTimeout(async () => {
     globalThis.contentScriptManager = contentScriptManager;
     
     initializationComplete = true;
-    console.log('CCM Extension: Initialization complete');
+    logger.info('Initialization complete');
     
     // Process queued messages
     while (messageQueue.length > 0) {
@@ -200,13 +202,13 @@ setTimeout(async () => {
     }
     
     // Try connecting immediately after initialization
-    console.log('CCM Extension: Attempting immediate WebSocket connection...');
+    logger.info('Attempting immediate WebSocket connection');
     relayClient.connectToRelay().catch(err => {
-      console.log('CCM Extension: Initial connection failed, will retry via alarms:', err.message);
+      logger.warn('Initial connection failed, will retry via alarms', { error: err.message });
     });
     
   } catch (error) {
-    console.error('CCM Extension: Initialization failed:', error);
+    logger.error('Initialization failed', { error: error.message });
     initializationComplete = false;
   }
 }, 100); // Minimal delay for service worker stability
@@ -223,18 +225,18 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
 // Also try to connect when popup is opened (backup activation method)
 chrome.action.onClicked.addListener(() => {
-  console.log('CCM Extension: Extension icon clicked - activating service worker');
+  logger.info('Extension icon clicked - activating service worker');
   if (!initializationComplete) {
-    console.log('CCM Extension: Icon click triggered initialization');
+    logger.info('Icon click triggered initialization');
   } else if (relayClient && !relayClient.isConnected()) {
-    console.log('CCM Extension: Icon click triggered connection attempt');
+    logger.info('Icon click triggered connection attempt');
     relayClient.connectToRelay().catch(err => {
-      console.error('CCM Extension: Icon-triggered connection failed:', err);
+      logger.error('Icon-triggered connection failed', { error: err.message });
     });
   }
 });
 
 // Try immediate connection on service worker startup
-console.log('CCM Extension: Service worker starting - attempting immediate connection');
+logger.info('Service worker starting - attempting immediate connection');
 
-console.log('CCM Extension: Balanced background script loaded');
+logger.info('Balanced background script loaded');

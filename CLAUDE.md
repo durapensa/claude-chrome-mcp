@@ -3,7 +3,7 @@
 Quick reference for Claude. See README.md for full documentation.
 
 ## System Status
-- Version: 2.5.0 (centralized version management)
+- Version: 2.6.0 (centralized version management)
 - Architecture: WebSocket-only with offscreen documents
 - Structure: Modular architecture with relay-based messaging
 - Connection: Persistent WebSocket via Chrome offscreen documents (port 54322)
@@ -53,7 +53,6 @@ mcp__claude-chrome-mcp__forward_response_to_claude_dot_ai_tab --sourceTabId <sou
 - Architecture: docs/ARCHITECTURE.md
 - Troubleshooting: docs/TROUBLESHOOTING.md
 - TypeScript: docs/TYPESCRIPT.md
-- Roadmap: ROADMAP.md
 
 ## Architecture Overview (WebSocket-Only with Embedded Relay)
 - **Embedded Relay**: WebSocket relay embedded in MCP server with automatic election
@@ -67,17 +66,12 @@ mcp__claude-chrome-mcp__forward_response_to_claude_dot_ai_tab --sourceTabId <sou
 - **Health Endpoint**: http://localhost:54322/health for relay monitoring
 
 ## Continuation Workflow  
-When you type 'continue', follow the standard workflow in docs/CONTINUATION.md
+**CRITICAL**: When you type 'continue', follow docs/CONTINUATION.md (testing workflow now optional)
 
-## Testing Workflow
-1. **System Health**: `get_connection_health` - verify relay and clients connected
-2. **Spawn Tab**: `spawn_claude_dot_ai_tab --injectContentScript true` 
-3. **Async Message**: `send_message_async --message "test" --tabId <id>`
-4. **Get Response**: `get_claude_dot_ai_response --tabId <id>` (auto-completion detection)
-5. **Claude-to-Claude**: `forward_response_to_claude_dot_ai_tab --sourceTabId <src> --targetTabId <tgt>`
 
 ## Session Continuity
-- **Latest Status**: See docs/CONTINUATION.md for current session and continuation workflow
+- **Latest Status**: See docs/CONTINUATION.md for current session status and next priorities
+- **Active Work**: Use TodoRead to see current tasks
 
 ## Development Guidelines
 - **Code Hygiene**: Delete backup/test files immediately after confirming working solution

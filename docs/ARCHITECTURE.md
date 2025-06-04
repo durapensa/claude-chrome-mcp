@@ -60,8 +60,11 @@ Each MCP server (Claude Code, Claude Desktop, Cursor, etc.) runs independently:
 
 - **Implements MCP Protocol** - Exposes tools to AI agents
 - **Embeds Message Relay** - Simple WebSocket server component
-- **Tracks Own Operations** - Manages operation IDs and state
+- **Operation ID Authority** - Sole generator and manager of operation IDs
+- **State Management** - Tracks operation lifecycle and milestones
 - **Sends Notifications** - Reports progress back to AI agents
+
+**Operation ID Design**: MCP servers generate operation IDs using format `op_{tool_name}_{timestamp}` and maintain complete operation state. The extension coordinates using these IDs but never generates its own.
 
 ### 2. Message Relay
 A minimal WebSocket server embedded in each MCP server:
@@ -118,7 +121,7 @@ AI Agent → MCP Server → Relay → Offscreen Doc → Service Worker → Tab
 Example:
 ```json
 {
-  "id": "op_123456_abc",
+  "id": "op_send_message_async_1749063882796",
   "to": "extension",
   "type": "tab.execute",
   "params": {
@@ -137,7 +140,7 @@ Content Script → Service Worker → Offscreen Doc → Relay → MCP Server →
 Example:
 ```json
 {
-  "id": "op_123456_abc",
+  "id": "op_send_message_async_1749063882796",
   "to": "mcp-server-a",
   "type": "operation.complete",
   "result": {
