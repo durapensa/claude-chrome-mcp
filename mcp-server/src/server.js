@@ -32,6 +32,9 @@ if (process.stdout.write.bind) {
 const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
 const { CallToolRequestSchema, ListToolsRequestSchema } = require('@modelcontextprotocol/sdk/types.js');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
 
 // Import modular components
 const { ErrorTracker } = require('./utils/error-tracker');
@@ -95,29 +98,41 @@ class ChromeMCPServer {
       }
       
       // Log complete initialization params to understand what's being sent
-      console.error('CCM: === MCP INITIALIZATION START ===');
-      console.error('CCM: Raw params:', params);
-      console.error('CCM: Params JSON:', JSON.stringify(params, null, 2));
+      this.debug.info('=== MCP INITIALIZATION START ===');
+      this.debug.info('MCP initialization params received', {
+        params: params,
+        paramsJSON: JSON.stringify(params, null, 2),
+        hasClientInfo: !!params?.clientInfo,
+        clientInfoName: params?.clientInfo?.name
+      });
       
       // Get client info from initialization params (authoritative source)
       const clientInfo = params?.clientInfo;
       
       if (!clientInfo) {
-        console.error('CCM: WARNING - No clientInfo object in params');
+        this.debug.warn('No clientInfo object in initialization params', {
+          params: params
+        });
       } else if (!clientInfo.name) {
-        console.error('CCM: WARNING - clientInfo exists but has no name');
-        console.error('CCM: clientInfo object:', JSON.stringify(clientInfo, null, 2));
+        this.debug.warn('clientInfo exists but has no name', {
+          clientInfo: clientInfo
+        });
       } else {
-        console.error('CCM: clientInfo found:', JSON.stringify(clientInfo, null, 2));
+        this.debug.info('clientInfo found', {
+          clientInfo: clientInfo
+        });
       }
       
       // Use exactly what the client provides, no mappings
       const clientName = clientInfo?.name || 'Unknown MCP Client';
       const clientVersion = clientInfo?.version || 'unknown';
       
-      console.error('CCM: Client name from init:', clientName);
-      console.error('CCM: Client version from init:', clientVersion);
-      console.error('CCM: === MCP INITIALIZATION END ===');
+      this.debug.info('MCP client identified', {
+        name: clientName,
+        version: clientVersion,
+        rawClientInfo: clientInfo
+      });
+      this.debug.info('=== MCP INITIALIZATION END ===');
       
       // Update relay with the exact client name from initialization
       this.relayClient.updateClientInfo({
@@ -329,6 +344,11 @@ class ChromeMCPServer {
   async start() {
     try {
       this.startTime = Date.now();
+      
+      // Log where the file logger is writing
+      this.debug.info('MCP Server logs are being written to:', {
+        logDir: `~/.claude-chrome-mcp-logs/mcp-server-${process.pid}.log`
+      });
       
       // Load saved operations
       await this.operationManager.loadState();
