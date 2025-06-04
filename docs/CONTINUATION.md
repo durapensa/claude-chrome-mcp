@@ -39,65 +39,100 @@ Follow systematic debugging approach from [Troubleshooting Guide](TROUBLESHOOTIN
 - **[GitHub Issue Script](create-claude-code-issue.sh)**: Claude Code integration utilities
 
 ## Current System Status
-- **Version**: 2.5.0 (Event-driven architecture with offscreen documents in progress)
-- **Architecture**: Phase 1 complete - Offscreen document infrastructure ready
-- **Key Features**: Async operations, Claude-to-Claude forwarding, network detection, multi-hub coordination
-- **Next Phase**: Phase 2 - WebSocket relay server implementation
+- **Version**: 2.5.0 (Event-driven architecture with WebSocket relay option)
+- **Architecture**: Phase 1 & 2 complete - WebSocket relay mode available
+- **Key Features**: 
+  - Async operations, Claude-to-Claude forwarding
+  - Dual mode: HTTP polling (default) or WebSocket relay (via feature flag)
+  - Persistent connections via offscreen documents (12+ hours)
+  - Pure message routing relay for simplified architecture
+- **Next Phase**: Phase 3 - Testing and optimization
 - **Important**: Extension needs manual reload, Claude Code needs restart after MCP server changes
 
-## Latest Session Summary (2025-01-06 - Part 7: Offscreen Document Implementation)
+## Latest Session Summary (2025-01-06 - Part 8: WebSocket Relay Implementation)
 
 ### What Was Accomplished
-1. **Phase 1 Completed - Offscreen Document Infrastructure**:
-   - Added `offscreen` permission to manifest.json
-   - Created offscreen.html and offscreen.js for persistent WebSocket
-   - Implemented RelayConnection class with auto-reconnection and message queuing
-   - Updated background.js to create and manage offscreen document
-   - Added message bridging between service worker and offscreen
-   - Extended HubClient with relay methods (handleRelayStatus, handleRelayMessage, sendToRelay)
 
-2. **Architecture Foundation Laid**:
-   - Offscreen document can maintain WebSocket connections for 12+ hours
-   - Message queuing ensures no data loss during reconnections
-   - Exponential backoff for reconnection attempts (1s → 30s max)
-   - Heartbeat mechanism keeps service worker aware of connection state
+#### Phase 1 Completed - Offscreen Document Infrastructure:
+1. Added `offscreen` permission to manifest.json
+2. Created offscreen.html and offscreen.js for persistent WebSocket
+3. Implemented RelayConnection class with auto-reconnection and message queuing
+4. Updated background.js to create and manage offscreen document
+5. Added message bridging between service worker and offscreen
+6. Extended HubClient with relay methods
 
-3. **Code Committed**:
-   - All changes committed with message: "Implement Phase 1: Offscreen document infrastructure for WebSocket"
-   - 5 files changed, 258 insertions
-   - Git status clean
+#### Phase 2 Completed - WebSocket Relay Server:
+1. **Created Minimal WebSocket Relay**:
+   - Pure message routing server (message-relay.js)
+   - Support for multiple client connections
+   - Client identification and type-based routing
+   - No business logic - just message passing
 
-### Next Session: Implementation Phase 2 - Hub to Relay Refactor
+2. **Updated MCP Server Integration**:
+   - Added RelayClient for MCP servers to connect as relay clients
+   - Modified AutoHubClient to support both HTTP and WebSocket modes
+   - Feature flag USE_WEBSOCKET_RELAY for mode switching
+   - Backward compatible - falls back to HTTP polling when flag is off
 
-1. **Create Minimal WebSocket Relay** (Port 54321):
-   - Implement pure message routing relay server
-   - Remove all business logic from hub
-   - Support multiple client connections
-   - Add relay election for multi-instance support
+3. **Enhanced Extension Integration**:
+   - Offscreen document identifies itself to relay
+   - Extension hub-client handles relay messages and routes MCP requests
+   - Bidirectional message flow: MCP Server ↔ Relay ↔ Extension
 
-2. **Update MCP Server Integration**:
-   - Add WebSocket client to connect to relay
-   - Route all extension communication through relay
-   - Maintain backward compatibility with HTTP polling
+4. **Testing Infrastructure**:
+   - Created test-websocket-relay.sh for easy testing
+   - Comprehensive relay/README.md documentation
+   - Environment variable configuration
 
-3. **Add Feature Flags**:
-   - `USE_WEBSOCKET_RELAY` environment variable
-   - Gradual migration from HTTP to WebSocket
-   - Easy rollback if issues arise
+### Next Session: Phase 3 - Testing and Optimization
 
-4. **Test WebSocket Flow**:
-   - Extension → Offscreen → Relay → MCP Server
-   - Verify message routing in both directions
-   - Test reconnection scenarios
+1. **End-to-End Testing**:
+   - Run relay server with `./test-websocket-relay.sh`
+   - Test MCP tool execution through relay
+   - Verify bidirectional message flow
    - Monitor connection persistence (1+ hour test)
+
+2. **Performance Optimization**:
+   - Measure latency: HTTP polling vs WebSocket
+   - Optimize message routing paths
+   - Add connection pooling if needed
+   - Implement message compression
+
+3. **Production Readiness**:
+   - Add relay health endpoints
+   - Implement relay clustering/failover
+   - Add monitoring and metrics
+   - Create deployment documentation
+
+4. **Gradual Migration**:
+   - Test with subset of users via feature flag
+   - Monitor for issues in relay mode
+   - Plan deprecation of HTTP polling
+   - Update all documentation
+
+### Testing Commands
+```bash
+# Terminal 1: Start relay server
+./test-websocket-relay.sh
+
+# Terminal 2: Start Claude Code with relay mode
+export USE_WEBSOCKET_RELAY=true
+claude-code
+
+# Test basic functionality
+mcp__claude-chrome-mcp__get_connection_health
+mcp__claude-chrome-mcp__spawn_claude_dot_ai_tab
+```
 
 ### Key Implementation Files
 - `/extension/manifest.json` - ✅ Offscreen permission added
 - `/extension/offscreen.html` - ✅ Created
 - `/extension/offscreen.js` - ✅ WebSocket connection implemented
 - `/extension/background.js` - ✅ Offscreen document management added
-- `/mcp-server/src/relay/message-relay.js` - 🔲 To be created in Phase 2
-- `/mcp-server/src/hub/websocket-hub.js` - 🔲 To be refactored in Phase 2
+- `/mcp-server/src/relay/message-relay.js` - ✅ Created - pure message routing
+- `/mcp-server/src/relay/relay-client.js` - ✅ Created - MCP server relay client
+- `/mcp-server/src/hub/hub-client.js` - ✅ Updated - supports relay mode
+- `/test-websocket-relay.sh` - ✅ Created - test script
 
 ### Testing Commands After Implementation
 ```bash
