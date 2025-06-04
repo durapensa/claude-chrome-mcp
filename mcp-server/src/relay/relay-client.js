@@ -7,7 +7,7 @@ const WebSocket = require('ws');
 const EventEmitter = require('events');
 
 class RelayClient extends EventEmitter {
-  constructor(clientInfo) {
+  constructor(clientInfo, port = 54321) {
     super();
     this.clientInfo = clientInfo;
     this.ws = null;
@@ -16,7 +16,7 @@ class RelayClient extends EventEmitter {
     this.isConnected = false;
     this.messageQueue = [];
     this.reconnectTimer = null;
-    this.relayUrl = process.env.RELAY_URL || 'ws://localhost:54321';
+    this.relayUrl = process.env.RELAY_URL || `ws://localhost:${port}`;
     
     console.log('[RelayClient] Initialized for', this.clientInfo.name);
   }
