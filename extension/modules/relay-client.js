@@ -703,14 +703,14 @@ export class ExtensionRelayClient {
 
   // Offscreen WebSocket relay methods
   handleRelayStatus(message) {
-    console.log('CCM HubClient: Relay status update:', message);
+    console.log('CCM ExtensionRelayClient: Relay status update:', message);
     if (message.status === 'connected') {
-      console.log('CCM HubClient: WebSocket relay connected');
+      console.log('CCM ExtensionRelayClient: WebSocket relay connected');
       this.relayConnected = true;
       this.messageQueue.setConnected(true);
       updateBadge('hub-connected');
     } else if (message.status === 'disconnected') {
-      console.log('CCM HubClient: WebSocket relay disconnected');
+      console.log('CCM ExtensionRelayClient: WebSocket relay disconnected');
       this.relayConnected = false;
       this.messageQueue.setConnected(false);
       updateBadge('hub-disconnected');
@@ -724,7 +724,7 @@ export class ExtensionRelayClient {
   }
 
   handleRelayMessage(message) {
-    console.log('CCM HubClient: Message from relay:', message.type);
+    console.log('CCM ExtensionRelayClient: Message from relay:', message.type, JSON.stringify(message, null, 2));
     
     // Handle different relay message types
     if (message.type === 'relay_message' && message.data) {
@@ -732,7 +732,7 @@ export class ExtensionRelayClient {
       
       // Check if this is an MCP tool request from an MCP server
       if (data.from && data.id && data.type) {
-        console.log('CCM HubClient: MCP tool request via relay:', data.type);
+        console.log('CCM ExtensionRelayClient: MCP tool request via relay:', data.type, 'params:', data.params);
         
         // Execute the command and send response back via relay
         this.executeCommand({
@@ -777,7 +777,7 @@ export class ExtensionRelayClient {
         }
       }
     } else if (message.type === 'client_list_update') {
-      console.log('CCM HubClient: Client list updated:', message.clients);
+      console.log('CCM ExtensionRelayClient: Client list updated:', message.clients);
       // Update connected clients
       this.connectedClients.clear();
       if (message.clients && Array.isArray(message.clients)) {
@@ -807,7 +807,7 @@ export class ExtensionRelayClient {
         data: message
       });
     } catch (error) {
-      console.error('CCM HubClient: Failed to send to relay:', error);
+      console.error('CCM ExtensionRelayClient: Failed to send to relay:', error);
       throw error;
     }
   }
@@ -846,7 +846,7 @@ export class ExtensionRelayClient {
 }
 
 // Mix in all operation methods
-Object.assign(HubClient.prototype, tabOperationMethods);
-Object.assign(HubClient.prototype, conversationOperationMethods);
-Object.assign(HubClient.prototype, batchOperationMethods);
-Object.assign(HubClient.prototype, debugOperationMethods);
+Object.assign(ExtensionRelayClient.prototype, tabOperationMethods);
+Object.assign(ExtensionRelayClient.prototype, conversationOperationMethods);
+Object.assign(ExtensionRelayClient.prototype, batchOperationMethods);
+Object.assign(ExtensionRelayClient.prototype, debugOperationMethods);
