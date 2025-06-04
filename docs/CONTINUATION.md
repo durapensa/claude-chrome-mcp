@@ -46,8 +46,16 @@ Follow systematic debugging approach from [Troubleshooting Guide](TROUBLESHOOTIN
   - WebSocket relay with health monitoring (port 54322)
   - Persistent connections via offscreen documents (12+ hours)
   - Pure message routing relay for simplified architecture
+  - MCP protocol-compliant client identification via clientInfo
 - **Status**: Production-ready WebSocket architecture
 - **Important**: Extension needs manual reload, Claude Code needs restart after MCP server changes
+
+## Latest Updates (2025-01-06)
+- Completed major refactor: All "hub" terminology replaced with "relay"
+- Removed MCPClientDetector and hardcoded client identification
+- System now uses MCP protocol's built-in clientInfo for client names
+- Cleaned up all hardcoded client type mappings and CSS colors
+- Extension displays client names exactly as provided by MCP protocol
 
 ## Latest Session Summary (2025-01-06 - Part 9: Production Features & Housekeeping)
 

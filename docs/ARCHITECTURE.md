@@ -11,6 +11,7 @@ Claude Chrome MCP enables multiple AI agents (Claude Code, Claude Desktop, Curso
 3. **Extension is the Brain** - All coordination, locking, and conflict resolution
 4. **Persistent Connections** - Offscreen documents maintain WebSocket without keepalives
 5. **Event-Driven** - No polling, pure push-based messaging
+6. **Protocol-Compliant** - Uses MCP protocol's clientInfo for identification
 
 ## System Architecture
 

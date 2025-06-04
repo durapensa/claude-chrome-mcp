@@ -52,7 +52,7 @@ class ChromeMCPServer {
     // Initialize core components
     this.server = new Server({
       name: 'claude-chrome-mcp',
-      version: '2.5.0'
+      version: '2.6.0'
     }, {
       capabilities: {
         tools: {}
@@ -73,7 +73,7 @@ class ChromeMCPServer {
     this.relayClient = new MCPRelayClient({
       // This will be replaced with actual client info after initialization
       name: 'Initializing...',
-      version: '0.0.0',
+      version: '2.6.0',
       capabilities: ['chrome_tabs', 'debugger', 'claude_automation']
     }, this.operationManager, this.notificationManager);
 

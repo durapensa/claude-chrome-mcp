@@ -1,6 +1,6 @@
 {
   "name": "mcp-cli",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "description": "Universal MCP CLI Client - Dynamic CLI for any MCP server",
   "main": "dist/mcp.js",
   "bin": {
