@@ -105,29 +105,48 @@ Follow systematic debugging approach from [Troubleshooting Guide](TROUBLESHOOTIN
    - Fixed content script injection timing to wait for URL to be set
    - Fixed Claude-to-Claude forwarding by ensuring proper content script injection
 
+## Latest Session Summary (2025-01-06 - Part 11: Embedded Relay Architecture)
+
+### What Was Accomplished
+
+1. **Implemented Embedded Relay with Election**:
+   - Created EmbeddedRelayManager class for automatic relay election
+   - First MCP server to start becomes relay host
+   - Additional servers connect as clients
+   - Automatic failover when relay host exits
+
+2. **Fixed Architecture to Follow MCP Model**:
+   - Relay no longer requires separate process
+   - Works with MCP server spawning by hosts (Claude Code, etc.)
+   - Simplified startup - just run Claude Code normally
+
+3. **Updated Documentation**:
+   - Updated CLAUDE.md with embedded relay information
+   - Updated test script to explain new architecture
+   - Removed requirement for separate relay process
+
 ### Session Handoff Point
 
 **Current State**:
-- WebSocket relay architecture fully operational
+- WebSocket relay architecture fully operational with embedded relay
 - All MCP tools tested and working correctly
 - Codebase cleaned and streamlined (removed 1,906 lines of obsolete code)
-- Ready for production deployment tasks
+- Relay now embedded in MCP server with automatic election
+- **IMPORTANT**: User needs to restart Claude Code to test embedded relay
 
 ### Running the System
 
-1. **Start WebSocket relay FIRST**:
+1. **Just start Claude Code normally**:
    ```bash
-   # Terminal 1:
-   ./test-websocket-relay.sh
-   ```
-
-2. **Then start Claude Code**:
-   ```bash
-   # Terminal 2:
    claude-code
    ```
+   
+   The embedded relay will automatically start:
+   - First MCP server becomes relay host
+   - Additional servers connect as clients
+   - No separate relay process needed!
 
-3. **Verify relay is working**:
+2. **Verify relay is working**:
    ```bash
    # Check health endpoint:
    curl http://localhost:54322/health
@@ -170,6 +189,12 @@ Follow systematic debugging approach from [Troubleshooting Guide](TROUBLESHOOTIN
 - `/test-websocket-relay.sh` - ✅ Created - test script
 
 ## Previous Sessions
+
+### Session 11: Embedded Relay Architecture
+- Implemented embedded relay with automatic election
+- First MCP server becomes relay host
+- Fixed architecture to follow MCP spawning model
+- No separate relay process needed
 
 ### Session 10: WebSocket-Only Migration
 - Removed all HTTP polling code from system
