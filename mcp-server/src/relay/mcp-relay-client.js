@@ -172,7 +172,7 @@ class MCPRelayClient extends EventEmitter {
       });
       
       // Send via relay - broadcast to extension clients
-      this.relayManager.client.multicast('chrome_extension', {
+      this.relayManager.client.multicast('extension', {
         id: requestId,
         type,
         params,
