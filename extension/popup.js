@@ -1,5 +1,17 @@
 // Extension Popup Script - Event-Driven Version
 
+// Load client display name mappings
+let clientDisplayNames = {};
+fetch('client-display-names.json')
+  .then(response => response.json())
+  .then(data => {
+    clientDisplayNames = data.mappings || {};
+    console.log('CCM Popup: Loaded client display names:', clientDisplayNames);
+  })
+  .catch(err => {
+    console.error('CCM Popup: Failed to load client display names:', err);
+  });
+
 async function getInitialState() {
   console.log('CCM Popup: Getting initial state...');
   
@@ -88,8 +100,8 @@ function updatePopupUI(health) {
   if (clientsList) {
     if (health.connectedClients.length > 0) {
       clientsList.innerHTML = health.connectedClients.map(client => {
-        // Use client-provided name directly from MCP protocol
-        const displayName = client.name || 'Unknown Client';
+        // Use display name from mapping or fall back to original name
+        const displayName = clientDisplayNames[client.name] || client.name || 'Unknown Client';
         const icon = '🔌'; // Default icon for all MCP clients
         
         return `
