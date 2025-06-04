@@ -3,102 +3,46 @@
 Quick reference for Claude. See README.md for full documentation.
 
 ## System Status
-- Version: 2.6.0 (centralized version management)
-- Architecture: WebSocket-only with offscreen documents
-- Structure: Modular architecture with relay-based messaging
-- Connection: Persistent WebSocket via Chrome offscreen documents (port 54322)
-
-## Important System Limitations
-- Claude Code cannot restart its own MCP servers. User must exit and re-run Claude Code if claude-chrome-mcp tools are not available
-- **RESTART REQUIRED**: After making changes to mcp-server code, user must manually exit and re-run Claude Code to reload the MCP server with updates
-- **EMBEDDED RELAY**: WebSocket relay is now embedded in MCP server with automatic election (no separate process needed)
+- Version: 2.6.0 (WebSocket-only architecture)
+- Status: Production-ready with embedded relay
+- **RESTART REQUIRED**: After MCP server code changes, exit and re-run Claude Code
 
 ## Quick Commands
 ```bash
-# 1. Check system health
+# System health
 mcp__claude-chrome-mcp__get_connection_health
 
-# 2. Test async workflow
+# Basic workflow
 mcp__claude-chrome-mcp__spawn_claude_dot_ai_tab --injectContentScript true
-mcp__claude-chrome-mcp__send_message_async --message "Test async: 7*8=?" --tabId <tab_id>
-
-# 3. Get response after completion
+mcp__claude-chrome-mcp__send_message_async --message "Test" --tabId <tab_id>
 mcp__claude-chrome-mcp__get_claude_dot_ai_response --tabId <tab_id>
 
-# 4. Test Claude-to-Claude forwarding
+# Claude-to-Claude forwarding
 mcp__claude-chrome-mcp__forward_response_to_claude_dot_ai_tab --sourceTabId <source> --targetTabId <target>
 ```
 
-## Important Tool Options
-- `send_message_to_claude_tab`: Use `waitForReady: true` (default)
-- `get_claude_response`: Keep `timeoutMs < 30000` for MCP
-- Do not use `waitForCompletion` or similar while testing async operation
-- **ALL claude-chrome-mcp tools should operate in async mode by default, with waitForCompletion flags added only if applicable and only for optional use**
-
-## Project Structure
-- `extension/` - Chrome extension (transitioning from HTTP polling to WebSocket)
-  - `offscreen.html` - (planned) Offscreen document for persistent WebSocket
-  - `offscreen.js` - (planned) WebSocket connection management
-  - `background.js` - Service worker with coordination logic
-- `mcp-server/` - MCP server (modular architecture)
-  - `src/server.js` - Main entry point (382 lines, modular)
-  - `src/relay/` - Message relay for WebSocket communication
-  - `src/utils/` - Error tracking, operation management, debugging
-  - `src/lifecycle/` - Process lifecycle and graceful shutdown
-- `cli/` - Universal MCP CLI client
-- `tests/` - Test suites with lifecycle management
-- `docs/` - Documentation and development notes
-
-## Key References
-- Architecture: docs/ARCHITECTURE.md
-- Troubleshooting: docs/TROUBLESHOOTING.md
-- TypeScript: docs/TYPESCRIPT.md
-
-## Architecture Overview (WebSocket-Only with Embedded Relay)
-- **Embedded Relay**: WebSocket relay embedded in MCP server with automatic election
-  - First MCP server becomes relay host on port 54321
-  - Additional servers connect as clients
-  - Automatic failover on host exit
-- **Offscreen Documents**: Persistent WebSocket connection (12+ hours)
-- **Extension as Brain**: All coordination, locking, and conflict resolution in extension
-- **Event-Driven**: Pure push messaging (no HTTP polling)
-- **Multi-Agent Support**: Multiple MCP servers coordinate through relay
-- **Health Endpoint**: http://localhost:54322/health for relay monitoring
-
 ## Continuation Workflow  
-**CRITICAL**: When you type 'continue', follow docs/CONTINUATION.md (testing workflow now optional)
+**CRITICAL**: When you type 'continue', follow docs/CONTINUATION.md
 
-
-## Session Continuity
-- **Latest Status**: See docs/CONTINUATION.md for current session status and next priorities
-- **Active Work**: Use TodoRead to see current tasks
-
-## Development Guidelines
-- **Code Hygiene**: Delete backup/test files immediately after confirming working solution
-- **Documentation**: Keep docs architectural, not session-specific
-- **Testing**: Use MCP tools first, then test suite for regression
-- **Commits**: Frequent commits after testing each granular change
-- **File Management**: One working version per component - use git for history
-- **Version Management**: Use `node scripts/get-version.js` for current version, `node scripts/update-versions.js` to sync all references
+## Documentation
+- **[Architecture](docs/ARCHITECTURE.md)**: System design and components
+- **[Troubleshooting](docs/TROUBLESHOOTING.md)**: Issues and debugging
+- **[TypeScript](docs/TYPESCRIPT.md)**: Type definitions  
+- **[Restart Capability](docs/RESTART-CAPABILITY.md)**: MCP server lifecycle
+- **[Continuation](docs/CONTINUATION.md)**: Session restart workflow
 
 ## Critical Directives
-- **MAINTAIN CODE HYGIENE**: Prevent file proliferation - "one-in-one-out" rule
-- **ZERO INSTRUCTION DUPLICATION**: Reference other docs, never repeat instructions. One source of truth per instruction set. Prevent maintenance burden of keeping multiple copies in sync.
-- **NO SESSION ARTIFACTS**: Remove temporary context from permanent docs - git history captures accomplishments
-- **STREAMLINE AGGRESSIVELY**: Delete bloat immediately. CONTINUATION.md stays under 100 lines. Session summaries go in git commits, not docs.
-- **GIT FOR HISTORY**: Don't keep backup files in filesystem or detailed session logs in docs
-- **TEST AS YOU GO**: Each change should be immediately testable
-- **CLEAN REFERENCES**: Update doc links when files are moved/deleted
-- **Do not be overconfident about treating fixes and new work as 'production-ready' or 'enterprise-grade' etc.**
+- **MAINTAIN CODE HYGIENE**: "one-in-one-out" rule
+- **ZERO INSTRUCTION DUPLICATION**: Reference other docs, never repeat
+- **NO SESSION ARTIFACTS**: Git history captures accomplishments
+- **STREAMLINE AGGRESSIVELY**: Delete bloat immediately
+- **GIT FOR HISTORY**: No backup files or detailed session logs in docs
+- **TEST AS YOU GO**: Each change immediately testable
 
 ## Essential Workflows
 - Change code → Reload extension → Test
-
-## Tool Usage Directive
-- Use all of the claude-chrome-mcp tools available to debug, test, and develop
-
-## Key Troubleshooting Memory
-- If you encounter missing or broken tools, functions, etc. check git history, including pre-refactor source file content, as they may have been removed during refactor
+- Use TodoRead for active tasks
+- Use MCP tools for debugging and development
 
 ## MCP Specification Reference
-- MCP specification and source code is located at node_modules/@modelcontextprotocol. always reference this when making changes related to MCP
+- Located at node_modules/@modelcontextprotocol for MCP-related changes
