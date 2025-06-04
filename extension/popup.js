@@ -2,15 +2,17 @@
 
 // Load client display name mappings
 let clientDisplayNames = {};
-fetch('client-display-names.json')
-  .then(response => response.json())
-  .then(data => {
+
+async function loadClientDisplayNames() {
+  try {
+    const response = await fetch(chrome.runtime.getURL('client-display-names.json'));
+    const data = await response.json();
     clientDisplayNames = data.mappings || {};
     console.log('CCM Popup: Loaded client display names:', clientDisplayNames);
-  })
-  .catch(err => {
+  } catch (err) {
     console.error('CCM Popup: Failed to load client display names:', err);
-  });
+  }
+}
 
 async function getInitialState() {
   console.log('CCM Popup: Getting initial state...');
@@ -44,7 +46,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('CCM Popup: Initializing event-driven popup...');
   
-  // Get initial state once
+  // Load display names first, then get initial state
+  await loadClientDisplayNames();
   await getInitialState();
   
   // Set up button handlers  

@@ -30,7 +30,8 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "*.js"
+        "*.js",
+        "*.json"
       ],
       "matches": [
         "https://claude.ai/*"
