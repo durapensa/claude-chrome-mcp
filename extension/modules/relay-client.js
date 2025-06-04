@@ -194,7 +194,7 @@ export class ExtensionRelayClient {
     
     this.relayConnected = false;
     this.messageQueue.setConnected(false);
-    updateBadge('hub-disconnected');
+    updateBadge('relay-disconnected');
     
     // Clear any pending requests
     for (const [requestId, { reject }] of this.pendingRequests) {
@@ -216,7 +216,7 @@ export class ExtensionRelayClient {
   // State management
   getCurrentState() {
     return {
-      hubConnected: this.relayConnected,
+      relayConnected: this.relayConnected,
       connectedClients: Array.from(this.connectedClients.values()),
       extensionConnected: this.relayConnected,
       timestamp: Date.now()
@@ -284,7 +284,7 @@ export class ExtensionRelayClient {
     return {
       success: true,
       health: {
-        hubConnected: this.isConnected(),
+        relayConnected: this.isConnected(),
         connectedClients: Array.from(this.connectedClients.entries()).map(([id, info]) => ({
           id,
           ...info
@@ -708,12 +708,12 @@ export class ExtensionRelayClient {
       console.log('CCM ExtensionRelayClient: WebSocket relay connected');
       this.relayConnected = true;
       this.messageQueue.setConnected(true);
-      updateBadge('hub-connected');
+      updateBadge('relay-connected');
     } else if (message.status === 'disconnected') {
       console.log('CCM ExtensionRelayClient: WebSocket relay disconnected');
       this.relayConnected = false;
       this.messageQueue.setConnected(false);
-      updateBadge('hub-disconnected');
+      updateBadge('relay-disconnected');
       
       // Clear pending requests on disconnect
       for (const [requestId, { reject }] of this.pendingRequests) {
@@ -781,7 +781,9 @@ export class ExtensionRelayClient {
       // Update connected clients
       this.connectedClients.clear();
       if (message.clients && Array.isArray(message.clients)) {
-        for (const client of message.clients) {
+        // Filter out self (chrome_extension) from the list
+        const otherClients = message.clients.filter(client => client.type !== 'chrome_extension');
+        for (const client of otherClients) {
           this.connectedClients.set(client.id, client);
         }
         
@@ -789,7 +791,7 @@ export class ExtensionRelayClient {
         if (this.connectedClients.size > 0) {
           updateBadge('mcp-connected');
         } else if (this.relayConnected) {
-          updateBadge('hub-connected');
+          updateBadge('relay-connected');
         }
       }
     }
