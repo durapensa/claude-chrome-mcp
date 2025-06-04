@@ -5,7 +5,7 @@
  */
 
 const { MessageRelay } = require('./message-relay');
-const { RelayClient } = require('./relay-client');
+const { RelayClient } = require('./websocket-relay-client');
 const EventEmitter = require('events');
 
 class EmbeddedRelayManager extends EventEmitter {
