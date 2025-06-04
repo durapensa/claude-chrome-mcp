@@ -94,18 +94,23 @@ class ChromeMCPServer {
         result = await originalHandler.call(this.server, params);
       }
       
-      // After initialization, check both params and server method for client info
-      const clientInfo = this.server.getClientVersion();
-      const initClientInfo = params?.clientInfo;
+      // Log the initialization params to see what clients actually send
+      console.error('CCM: MCP initialization params:', JSON.stringify(params, null, 2));
       
-      this.debug.info('CCM: MCP initialization params:', JSON.stringify(params, null, 2));
-      this.debug.info('CCM: getClientVersion() result:', JSON.stringify(clientInfo, null, 2));
+      // Get client info from initialization params (authoritative source)
+      const clientInfo = params?.clientInfo;
       
-      // Use initialization params client info if available, otherwise fall back to getClientVersion
-      const clientName = initClientInfo?.name || clientInfo?.name || 'Unknown MCP Client';
-      const clientVersion = initClientInfo?.version || clientInfo?.version || 'unknown';
+      if (!clientInfo || !clientInfo.name) {
+        console.error('CCM: Warning - No clientInfo in initialization params');
+      }
       
-      // Update relay to identify as the MCP client that spawned us
+      // Use client name exactly as provided by the MCP client
+      const clientName = clientInfo?.name || 'Unknown MCP Client';
+      const clientVersion = clientInfo?.version || 'unknown';
+      
+      console.error('CCM: Client identified as:', clientName, 'version:', clientVersion);
+      
+      // Update relay with the exact client name from initialization
       this.relayClient.updateClientInfo({
         type: 'mcp-client',
         name: clientName,
@@ -350,17 +355,12 @@ class ChromeMCPServer {
 // Main entry point
 async function main() {
   try {
-    // Set process title to identify which tool spawned this server
-    const spawner = process.env.MCP_SPAWNER || process.argv[2] || 'unknown';
-    const parentPid = process.ppid; // Get parent process ID
+    // Set simple process title
+    const parentPid = process.ppid;
     const myPid = process.pid;
+    process.title = `claude-chrome-mcp[${parentPid}]`;
     
-    // Create detailed process title with spawner and parent PID
-    process.title = `claude-chrome-mcp[${spawner}:${parentPid}]`;
-    
-    // Log spawner info to stderr for debugging
-    console.error(`CCM: Started by ${spawner} (Parent PID: ${parentPid}, My PID: ${myPid})`);
-    console.error(`CCM: Process title set to: ${process.title}`);
+    console.error(`CCM: Started (Parent PID: ${parentPid}, My PID: ${myPid})`);
     
     // MCP-compliant signal handling
     process.on('SIGINT', () => process.exit(0));
