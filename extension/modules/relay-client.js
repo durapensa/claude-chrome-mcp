@@ -781,8 +781,8 @@ export class ExtensionRelayClient {
       // Update connected clients
       this.connectedClients.clear();
       if (message.clients && Array.isArray(message.clients)) {
-        // Filter out self (chrome_extension) from the list
-        const otherClients = message.clients.filter(client => client.type !== 'chrome_extension');
+        // Filter out self (extension) from the list
+        const otherClients = message.clients.filter(client => client.type !== 'extension');
         for (const client of otherClients) {
           this.connectedClients.set(client.id, client);
         }

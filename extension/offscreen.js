@@ -31,8 +31,8 @@ class RelayConnection {
         // Identify ourselves to the relay
         this.ws.send(JSON.stringify({
           type: 'identify',
-          clientType: 'chrome_extension',
-          name: 'Claude Chrome MCP Extension',
+          clientType: 'extension',
+          name: 'Extension',
           capabilities: ['tabs', 'debugger', 'claude_automation']
         }));
         

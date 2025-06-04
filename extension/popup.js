@@ -88,10 +88,9 @@ function updatePopupUI(health) {
   if (clientsList) {
     if (health.connectedClients.length > 0) {
       clientsList.innerHTML = health.connectedClients.map(client => {
-        // Get icon and name from client info or use defaults
-        const icon = client.icon || getMCPClientIcon(client.type || client.name);
-        const displayName = client.name || getDefaultClientName(client.name);
-        const longName = client.longName || displayName;
+        // Use client-provided name directly from MCP protocol
+        const displayName = client.name || 'Unknown Client';
+        const icon = '🔌'; // Default icon for all MCP clients
         
         return `
         <div class="client-card">
@@ -99,7 +98,7 @@ function updatePopupUI(health) {
             <div class="client-info">
               <div class="client-icon">${icon}</div>
               <div>
-                <div class="client-name" title="${longName}">${displayName}</div>
+                <div class="client-name" title="${displayName}">${displayName}</div>
                 <div class="client-id">${client.id}</div>
               </div>
             </div>
@@ -183,16 +182,6 @@ function formatDuration(ms) {
   if (ms < 60000) return `${Math.floor(ms / 1000)}s ago`;
   if (ms < 3600000) return `${Math.floor(ms / 60000)}m ago`;
   return `${Math.floor(ms / 3600000)}h ago`;
-}
-
-function getMCPClientIcon(type) {
-  // Default MCP client icon - clients should provide their own icon in clientInfo
-  return '🔌';
-}
-
-function getDefaultClientName(name) {
-  // Trust the MCP protocol - return name as provided by the client
-  return name || 'Unknown Client';
 }
 
 function setupButtonHandlers() {
