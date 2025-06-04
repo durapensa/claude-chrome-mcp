@@ -121,7 +121,15 @@ class MessageRelay extends EventEmitter {
       case 'unicast':
         // Send to specific client
         if (message.targetId) {
-          this.sendToClientById(message.targetId, message.data);
+          const targetClient = this.clients.get(message.targetId);
+          if (targetClient) {
+            // Wrap in relay_message format like multicast
+            this.sendToClient(targetClient.ws, {
+              type: 'relay_message',
+              from: fromClientId,
+              data: message.data
+            });
+          }
         }
         break;
         
@@ -148,12 +156,6 @@ class MessageRelay extends EventEmitter {
     }
   }
   
-  sendToClientById(clientId, data) {
-    const client = this.clients.get(clientId);
-    if (client) {
-      this.sendToClient(client.ws, data);
-    }
-  }
   
   broadcast(data, excludeClientId = null) {
     this.clients.forEach((client, clientId) => {
