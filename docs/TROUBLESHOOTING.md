@@ -1,58 +1,46 @@
 # Troubleshooting Guide
 
-## Chrome Extension Shows "Hub Not Connected"
+## Chrome Extension Shows "Relay Not Connected"
 
 ### Problem
-The Chrome extension popup shows "WebSocket Hub: Not connected" even when Claude Code is running with the MCP server.
+The Chrome extension popup shows "WebSocket Relay: Not connected" even when Claude Code is running with the MCP server.
 
 ### Diagnosis
-Run the diagnostic script:
+Check relay status:
 ```bash
-node shared/check-hub-status.js
+mcp system_health
 ```
 
-If it shows "No hub is running on port 54321", the MCP server hasn't started the WebSocket hub.
+Look for `"relayConnected": true` in the output.
 
-### Quick Fix (Workaround)
+### Quick Fix
 
 1. **Option 1: Restart Claude Code**
    - Close Claude Code completely
    - Reopen and reconnect to the project
    - Check the extension popup again
 
-2. **Option 2: Manual Hub Start**
-   - Open a terminal in the project directory
-   - Run: `CCM_FORCE_HUB_CREATION=1 node mcp-server/src/server.js`
-   - The extension should connect within 5 seconds
+2. **Option 2: Reload Extension**
+   - Use `mcp chrome_reload_extension` to reload the extension
+   - Wait 5 seconds for reconnection
 
-3. **Option 3: Use the Reconnect Button**
-   - If the hub is actually running but extension shows disconnected
-   - Click the "Reconnect" button in the extension popup (if visible)
-
-### Permanent Fix
-
-The issue is in the MCP server's hub detection logic. To fix:
-
-1. **Set environment variable** (in your MCP host settings or .env):
-   ```
-   CCM_FORCE_HUB_CREATION=1
-   ```
-
-2. **Update MCP server** to force hub creation when needed
+3. **Option 3: Manual Reload**
+   - Open Chrome Extensions page (chrome://extensions/)
+   - Find "Claude Chrome MCP" and click reload button
 
 ### Why This Happens
 
-1. The MCP server tries to connect to an existing hub first
-2. Sometimes this check gives a false positive (thinks hub exists when it doesn't)
-3. The server then skips starting its own hub
-4. Result: No hub running, extension can't connect
+1. The MCP server starts a WebSocket relay on port 54322
+2. Extension may disconnect during development/debugging
+3. Offscreen documents maintain persistent connections
+4. Connection issues usually resolve with extension reload
 
 ### Verification
 
 After applying the fix, verify:
-1. Run `lsof -i :54321` - should show node process listening
-2. Run `node shared/check-hub-status.js` - should show hub running
-3. Extension popup should show "Connected to port 54321"
+1. Run `lsof -i :54322` - should show node process listening
+2. Run `mcp system_health` - should show relay connected
+3. Extension popup should show "Connected to relay"
 
 ## Async Operation Issues
 
