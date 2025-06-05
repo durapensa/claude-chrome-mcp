@@ -125,3 +125,17 @@ mcp system_disable_extension_debug_mode
 - Prioritizing MCP standard compliance over backward compatibility
 - Using standard notifications where possible, custom only where system requires
 - Extension logs now properly categorized with MCP standard log levels
+
+## CLI Improvements (2025-06-05)
+
+### Fixed daemon status Command
+1. **Hanging Issue**: Added disconnect() call after getting status to allow process to exit cleanly
+2. **Enhanced Output**: Shows MCP server processes with PIDs
+   - Clear "MCP Servers:" section listing all servers
+   - Process IDs displayed for each running server
+   - Updated server manager to capture process reference from connection
+
+### Status
+- CLI daemon status now exits properly without hanging
+- MCP server PIDs visible for debugging and monitoring
+- Both stdio-spawned servers (filesystem) and external servers (claude-chrome-mcp) tracked
