@@ -53,7 +53,12 @@ If testing is requested:
 - **Important**: Extension needs manual reload after code changes
 
 ## Current Work Focus
-**Use TodoRead to see active implementation tasks**
+**RESTART REQUIRED**: MCP server changes (system_get_logs tool) require Claude Code restart to load new tool
+
+### Pending Tasks After Restart
+- Debug parameter validation issue in MCP tool calls using new system_get_logs tool
+- Test enhanced logging system for parameter flow debugging
+- Complete workflow validation with reorganized tool architecture
 
 ## Session History
 **See git commit history for detailed session summaries and accomplishments**

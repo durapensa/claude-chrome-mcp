@@ -4,15 +4,16 @@ Quick reference for Claude. See README.md for full documentation.
 
 ## System Status
 - Version: 2.6.0 (WebSocket-only architecture)
-- Status: Production-ready with embedded relay
-- **RESTART REQUIRED**: After MCP server code changes, exit and re-run Claude Code
+- Status: Production-ready with embedded relay + enhanced logging
+- **RESTART REQUIRED**: MCP server changes (system_get_logs tool) require restart
 
 ## Quick Commands
 ```bash
-# System health
+# System health and debugging
 mcp__claude-chrome-mcp__system_health
+mcp__claude-chrome-mcp__system_get_logs --limit 50 --format text
 
-# Basic workflow (NEW reorganized tools)
+# Basic workflow (reorganized tools)
 mcp__claude-chrome-mcp__tab_create --injectContentScript true
 mcp__claude-chrome-mcp__tab_send_message --message "Test" --tabId <tab_id>
 mcp__claude-chrome-mcp__tab_get_response --tabId <tab_id>
@@ -23,6 +24,9 @@ mcp__claude-chrome-mcp__tab_forward_response --sourceTabId <source> --targetTabI
 # API operations (pure conversationId workflows)
 mcp__claude-chrome-mcp__api_list_conversations
 mcp__claude-chrome-mcp__api_get_conversation_url --conversationId <uuid>
+
+# Debug parameter validation issues
+mcp__claude-chrome-mcp__system_get_logs --component relay-client --level DEBUG
 ```
 
 ## Continuation Workflow  
