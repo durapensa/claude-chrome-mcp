@@ -30,7 +30,7 @@ Look for `"relayConnected": true` in the output.
 
 ### Why This Happens
 
-1. The MCP server starts a WebSocket relay on port 54322
+1. The MCP server starts a WebSocket relay on port 54321
 2. Extension may disconnect during development/debugging
 3. Offscreen documents maintain persistent connections
 4. Connection issues usually resolve with extension reload
@@ -38,7 +38,7 @@ Look for `"relayConnected": true` in the output.
 ### Verification
 
 After applying the fix, verify:
-1. Run `lsof -i :54322` - should show node process listening
+1. Run `lsof -i :54321` - should show node process listening
 2. Run `mcp system_health` - should show relay connected
 3. Extension popup should show "Connected to relay"
 

@@ -1,15 +1,14 @@
-# WebSocket Relay Mode
+# WebSocket Relay (Embedded)
 
-The WebSocket relay provides a lightweight alternative to the HTTP polling hub architecture. It enables persistent WebSocket connections between the Chrome extension and MCP servers.
+The WebSocket relay is embedded directly in each MCP server, providing persistent connections between the Chrome extension and MCP servers.
 
 ## Architecture
 
 ```
 Chrome Extension (Offscreen Document)
          ↓ WebSocket
-    Message Relay (Port 54321)
-         ↓ WebSocket
-    MCP Server(s)
+    Embedded Relay (Port 54321)
+      (Part of MCP Server)
 ```
 
 ## Benefits
@@ -17,33 +16,18 @@ Chrome Extension (Offscreen Document)
 - **Persistent Connections**: Offscreen documents can maintain WebSocket connections for 12+ hours
 - **Low Latency**: Direct push messaging instead of polling
 - **Simplified Logic**: Pure message routing with no business logic in the relay
-- **Multi-Client Support**: Multiple MCP servers can connect to the same relay
+- **Multi-Client Support**: Multiple MCP servers can connect, with first-come-first-served port binding
+- **Automatic Failover**: If primary server stops, next server takes over port 54321
 
-## Running in Relay Mode
+## How It Works
 
-### Option 1: Test Script (Recommended for Testing)
+The relay is automatically started when the MCP server starts:
 
-```bash
-./test-websocket-relay.sh
-```
-
-This starts the relay server with appropriate environment variables.
-
-### Option 2: Manual Setup
-
-1. Start the relay server:
-```bash
-export USE_WEBSOCKET_RELAY=true
-node mcp-server/src/relay/start-relay.js
-```
-
-2. Start Claude Code with relay mode:
-```bash
-export USE_WEBSOCKET_RELAY=true
-claude-code
-```
-
-3. The extension will automatically connect to the relay when reloaded.
+1. MCP server attempts to bind to port 54321
+2. If successful, it becomes the active relay
+3. Other MCP servers connect as relay clients
+4. Chrome extension connects to the active relay
+5. All communication flows through the active relay
 
 ## Environment Variables
 

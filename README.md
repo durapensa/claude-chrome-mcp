@@ -3,16 +3,56 @@
 Browser automation tool enabling MCP clients (Claude Desktop, Claude Code, Cursor) to interact with claude.ai through Chrome extension and MCP server.
 
 ## Components
-- **WebSocket Relay** - Simple message relay server for persistent connections (port 54322)
-- **MCP Server** - Connects to relay and exposes Chrome capabilities to MCP clients
-- **Chrome Extension** - WebSocket client with offscreen document for persistent relay connection
-- **CLI Tool** - Direct command-line browser control
+- **MCP Server**
+- **Chrome Extension** (enabled only for claude.ai)
+- **CLI Tool**
 
 ## Quick Start
 
-1. **Install Chrome Extension**: Load `extension/` directory in Chrome developer mode
-2. **Install MCP Server**: Add to your MCP client configuration (see [CLAUDE.md](CLAUDE.md))
-3. **Test Connection**: Run health check and spawn test tab
+### Prerequisites
+- Google Chrome browser
+- Node.js v16 or higher
+- npm installed
+
+### Step 1: Install Chrome Extension
+1. Open Chrome and navigate to [chrome://extensions/](chrome://extensions/)
+2. Enable "Developer mode" (toggle in top right)
+3. Click "Load unpacked" and select the `extension/` directory from this project
+4. The extension icon should appear in your toolbar
+
+### Step 2: Install Dependencies
+```bash
+# From the project root directory
+cd mcp-server
+npm install
+```
+
+### Step 3: Configure Claude Desktop
+1. Open Claude Desktop settings
+2. Navigate to Developer > Edit Config
+3. Add this configuration:
+```json
+{
+  "mcpServers": {
+    "claude-chrome-mcp": {
+      "command": "node",
+      "args": ["<absolute-path-to-project>/mcp-server/src/server.js"]
+    }
+  }
+}
+```
+Replace `<absolute-path-to-project>` with the full path to this project (e.g., `/Users/yourname/claude-chrome-mcp`)
+
+### Step 4: Restart Claude Desktop
+After adding the configuration, restart Claude Desktop to load the MCP server. The server will automatically start its embedded WebSocket relay on port 54321.
+
+### Step 5: Test the Connection
+In Claude Desktop, you can now use natural language commands like:
+- "Check Chrome status"
+- "Open a new tab"
+- "Send 'Hello, World!' to the new Claude tab"
+- "List all open Claude tabs"
+- "Search for Claude chats with 'math'"
 
 ## Key Features
 
@@ -48,11 +88,6 @@ Browser automation tool enabling MCP clients (Claude Desktop, Claude Code, Curso
 3. Click "Load unpacked" and select `extension/` directory
    (No build step required - native ES6 modules)
 
-### WebSocket Relay
-```bash
-# Start the relay server first
-./test-websocket-relay.sh
-```
 
 ### MCP Server
 ```bash
@@ -71,7 +106,7 @@ cd cli && npm install && npm run build && npm link
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │   Claude.ai     │    │ Chrome Extension │    │ WebSocket Relay │
-│   (Browser)     │◄───┤ (Offscreen Doc)  │◄──►│   Port 54322    │
+│   (Browser)     │◄──►┤ (Offscreen Doc)  │◄──►│   Port 54321    │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
                                                          ▲
                                                          │
