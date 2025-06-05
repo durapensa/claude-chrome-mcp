@@ -154,16 +154,28 @@ const tabHandlers = {
         result = await server.forwardToExtension('send_message_async', argsWithOpId);
       }
       
-      // Update operation based on result
-      if (result && result.success) {
+      // Parse MCP-wrapped response from forwardToExtension
+      let actualResult;
+      try {
+        if (result && result.content && result.content[0] && result.content[0].text) {
+          actualResult = JSON.parse(result.content[0].text);
+        } else {
+          actualResult = result;
+        }
+      } catch (parseError) {
+        actualResult = result;
+      }
+      
+      // Update operation based on parsed result
+      if (actualResult && actualResult.success) {
         server.operationManager.updateOperation(operationId, 'completed', { 
           phase: 'extension_completed',
-          result: result
+          result: actualResult
         });
       } else {
         server.operationManager.updateOperation(operationId, 'error', { 
           phase: 'extension_failed',
-          error: result?.error || 'Unknown error'
+          error: actualResult?.error || 'Unknown error'
         });
       }
       

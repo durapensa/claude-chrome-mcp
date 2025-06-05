@@ -401,7 +401,7 @@ export class ExtensionRelayClient {
   // Async message sending
   async sendMessageAsync(params) {
     console.log('CCM Extension: sendMessageAsync called with params:', JSON.stringify(params, null, 2));
-    const { tabId, message } = params;
+    const { tabId, message, operationId } = params;
     
     if (!tabId || !message) {
       console.log('CCM Extension: Missing required parameters - tabId:', tabId, 'message:', message);
@@ -413,7 +413,8 @@ export class ExtensionRelayClient {
       const result = await this.sendMessageToClaudeTab({
         tabId,
         message,
-        waitForReady: true
+        waitForReady: true,
+        operationId  // OPERATION ID UNIFICATION: Pass through server operation ID
       });
       
       if (result.success) {
