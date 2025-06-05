@@ -50,6 +50,7 @@ mcp__claude-chrome-mcp__api_get_conversation_url --conversationId <uuid>
 - Use TodoRead for active tasks
 - Use MCP tools for debugging and development
 - After making changes to extension/ always attempt to reload the extension with MCP tools or, if that fails, ask the user to manually reload the extension
+- When debugging, delete your test conversations and close the tabs to keep chrome running performantly
 
 ## MCP Specification Reference
 - Located at node_modules/@modelcontextprotocol for MCP-related changes
