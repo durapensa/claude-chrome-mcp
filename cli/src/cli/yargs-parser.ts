@@ -130,7 +130,8 @@ export class YargsParser {
     // Handle different argument formats:
     // 1. JSON string: mcp tool '{"key": "value"}'
     // 2. Key-value pairs: mcp tool --key value
-    // 3. Positional args: mcp tool value1 value2
+    // 3. Boolean flags: mcp tool --flag or --no-flag
+    // 4. Positional args: mcp tool value1 value2
 
     for (let i = 0; i < toolArgs.length; i++) {
       const arg = toolArgs[i];
@@ -148,9 +149,18 @@ export class YargsParser {
       // Handle key-value format --key value
       if (arg.startsWith('--')) {
         const key = arg.slice(2);
+        
+        // Handle --no-<flag> convention for false booleans
+        if (key.startsWith('no-')) {
+          const actualKey = key.slice(3);
+          result[actualKey] = false;
+          continue;
+        }
+        
         const value = toolArgs[i + 1];
         if (value && !value.startsWith('--')) {
-          result[key] = value;
+          // Convert value to appropriate type
+          result[key] = this.convertValue(value);
           i++; // Skip next arg since we consumed it
           continue;
         }
@@ -174,6 +184,38 @@ export class YargsParser {
   }
 
   /**
+   * Convert string values to appropriate types following GNU conventions
+   */
+  private static convertValue(value: string): any {
+    // Boolean values
+    if (value === 'true' || value === 'yes' || value === 'on' || value === '1') {
+      return true;
+    }
+    if (value === 'false' || value === 'no' || value === 'off' || value === '0') {
+      return false;
+    }
+    
+    // Numbers
+    if (/^-?\d+$/.test(value)) {
+      return parseInt(value, 10);
+    }
+    if (/^-?\d*\.\d+$/.test(value)) {
+      return parseFloat(value);
+    }
+    
+    // null/undefined
+    if (value === 'null') {
+      return null;
+    }
+    if (value === 'undefined') {
+      return undefined;
+    }
+    
+    // Otherwise return as string
+    return value;
+  }
+
+  /**
    * Show tool-specific help with schema information
    */
   static showToolHelp(toolName: string, schema?: any): void {
@@ -187,17 +229,27 @@ export class YargsParser {
     console.log(`  mcp ${toolName} [OPTIONS]`);
     console.log(`  mcp ${toolName} '{"key": "value"}'`);
     
-    if (schema?.inputSchema?.properties) {
+    if (schema?.properties) {
       console.log('\nParameters:');
-      for (const [key, prop] of Object.entries(schema.inputSchema.properties)) {
-        const required = schema.inputSchema.required?.includes(key);
+      for (const [key, prop] of Object.entries(schema.properties)) {
+        const required = schema.required?.includes(key);
         const propSchema = prop as any;
-        console.log(`  --${key}${required ? ' (required)' : ''}  ${propSchema.description || ''}`);
+        const typeHint = propSchema.type === 'boolean' ? ' (boolean)' : '';
+        console.log(`  --${key}${required ? ' (required)' : ''}${typeHint}  ${propSchema.description || ''}`);
+        
+        // Show --no-<flag> option for booleans
+        if (propSchema.type === 'boolean') {
+          console.log(`  --no-${key}         Set ${key} to false`);
+        }
       }
     }
     
     console.log('\nExamples:');
     console.log(`  mcp ${toolName} --param1 value1 --param2 value2`);
     console.log(`  mcp ${toolName} '{"param1": "value1", "param2": "value2"}'`);
+    
+    console.log('\nBoolean Values:');
+    console.log('  Use --flag for true, --no-flag for false');
+    console.log('  Or: --flag true, --flag false, --flag yes, --flag no');
   }
 }

@@ -476,7 +476,7 @@ class MCPCli {
     // If args already has proper key-value pairs, return as-is
     if (!args.args || args.args.length === 0) {
       const { args: _, ...otherArgs } = args;
-      return otherArgs;
+      return await this.convertArgTypes(otherArgs, undefined, toolName, serverId);
     }
 
     try {
@@ -484,8 +484,8 @@ class MCPCli {
       const toolsData = await this.client.listTools(serverId);
       const tool = toolsData.tools.find((t: any) => t.name === toolName);
       
-      if (tool?.inputSchema?.properties) {
-        const schema = tool.inputSchema;
+      if (tool?.schema?.properties) {
+        const schema = tool.schema;
         const properties = Object.keys(schema.properties);
         const required = schema.required || [];
         const positionalArgs = args.args as string[];
@@ -499,11 +499,11 @@ class MCPCli {
         for (let i = 0; i < positionalArgs.length && i < properties.length; i++) {
           const propName = properties[i];
           if (!mappedArgs.hasOwnProperty(propName)) {
-            mappedArgs[propName] = positionalArgs[i];
+            mappedArgs[propName] = this.convertValueBySchema(positionalArgs[i], schema.properties[propName]);
           }
         }
 
-        return mappedArgs;
+        return await this.convertArgTypes(mappedArgs, schema, toolName, serverId);
       }
     } catch (error) {
       // If schema lookup fails, fall back to positional mapping
@@ -517,11 +517,64 @@ class MCPCli {
     if (positionalArgs && positionalArgs.length > 0) {
       // For tools like list_directory that expect a "path" parameter
       if (positionalArgs.length === 1) {
-        return { path: positionalArgs[0], ...namedArgs };
+        return await this.convertArgTypes({ path: positionalArgs[0], ...namedArgs }, undefined, toolName, serverId);
       }
     }
 
-    return namedArgs;
+    return await this.convertArgTypes(namedArgs, undefined, toolName, serverId);
+  }
+
+  /**
+   * Convert argument types based on schema
+   */
+  private async convertArgTypes(args: Record<string, any>, schema?: any, toolName?: string, serverId?: string): Promise<Record<string, any>> {
+    const converted: Record<string, any> = {};
+    
+    // If no schema provided but we have a tool name, try to get schema
+    if (!schema && toolName) {
+      try {
+        const toolsData = await this.client.listTools(serverId);
+        const tool = toolsData.tools.find((t: any) => t.name === toolName);
+        schema = tool?.schema;
+      } catch (error) {
+        // Ignore schema lookup errors
+      }
+    }
+    
+    for (const [key, value] of Object.entries(args)) {
+      if (schema?.properties?.[key]) {
+        converted[key] = this.convertValueBySchema(value, schema.properties[key]);
+      } else {
+        // Values should already be converted by yargs parser
+        converted[key] = value;
+      }
+    }
+    
+    return converted;
+  }
+
+  /**
+   * Convert a value based on schema type
+   */
+  private convertValueBySchema(value: any, propSchema: any): any {
+    if (propSchema?.type === 'boolean' && typeof value === 'string') {
+      const lower = value.toLowerCase();
+      if (lower === 'true' || lower === 'yes' || lower === 'on' || lower === '1') {
+        return true;
+      }
+      if (lower === 'false' || lower === 'no' || lower === 'off' || lower === '0') {
+        return false;
+      }
+    }
+    
+    if (propSchema?.type === 'number' && typeof value === 'string') {
+      const num = Number(value);
+      if (!isNaN(num)) {
+        return num;
+      }
+    }
+    
+    return value;
   }
 
   /**
