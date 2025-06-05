@@ -40,6 +40,7 @@ mcp__claude-chrome-mcp__api_get_conversation_url --conversationId <uuid>
 - **THEN**: Commit all changes with detailed message
 - **FINALLY**: Request user to restart Claude Code
 **CONSEQUENCE**: Skipping restart = system malfunction, wasted time
+**EXCEPTION**: When testing with CLI MCP tools, restart is NOT needed as CLI spawns its own server instance
 
 ### 2. 🔴 **CODE HYGIENE - ONE IN, ONE OUT** 
 **YOU MUST**:
