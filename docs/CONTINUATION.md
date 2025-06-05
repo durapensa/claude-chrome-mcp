@@ -47,9 +47,9 @@ When you type 'continue' in a fresh Claude Code instance:
 - **Important**: Extension needs manual reload after code changes
 
 ## Latest Session Work
-- Removed client info complexity from MCP server (optimization #8)
-- Deleted setupInitializationHandler() method (-60 lines)
-- Simplified to static "Claude Chrome MCP" client name
+- Fixed client name handling to pass raw MCP client names to extension
+- Extension now properly handles display name mapping via client-display-names.json
+- Changed default client name to "Awaiting MCP Client" until actual client connects
 
 ## CLI Usage
 The CLI daemon auto-spawns when running commands. Use `mcp help` for available commands.

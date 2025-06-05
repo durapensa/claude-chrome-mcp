@@ -73,13 +73,51 @@ class ChromeMCPServer {
     // Force relay mode by setting environment variable
     process.env.USE_WEBSOCKET_RELAY = 'true';
     
-    // Initialize with static client info
+    // Initialize with client info from environment or defaults
+    const clientType = process.env.CCM_CLIENT_TYPE || 'mcp-client';
+    const clientName = process.env.CCM_CLIENT_NAME || 'Awaiting MCP Client';
+    
+    // Log will be done after logger initialization
+    
     this.relayClient = new MCPRelayClient({
-      type: 'mcp-client',
-      name: 'Claude Chrome MCP',
+      type: clientType,
+      name: clientName,
       version: '2.6.0',
       capabilities: ['chrome_tabs', 'debugger', 'claude_automation']
     }, this.operationManager, this.notificationManager);
+    
+    // Set up callback to update relay client info after MCP initialization
+    this.server.oninitialized = () => {
+      try {
+        // Check for environment variable override first
+        const envClientName = process.env.CCM_CLIENT_NAME;
+        
+        if (envClientName) {
+          // Use environment variable if set
+          this.debug.info(`Using client name from environment: ${envClientName}`);
+          return; // Already set in constructor
+        }
+        
+        // Otherwise, get the actual MCP client info from the SDK
+        const clientInfo = this.server.getClientVersion();
+        this.debug.info('getClientVersion() returned:', { clientInfo });
+        
+        if (clientInfo && clientInfo.name) {
+          // Pass raw client name - let extension handle display mapping
+          this.relayClient.updateClientInfo({
+            type: 'mcp-client',
+            name: clientInfo.name,
+            version: clientInfo.version || '2.6.0',
+            capabilities: ['chrome_tabs', 'debugger', 'claude_automation']
+          });
+          this.debug.info(`Updated relay client with raw name: ${clientInfo.name}`);
+        } else {
+          this.debug.warn('getClientVersion() did not return expected client info');
+        }
+      } catch (error) {
+        this.debug.error('Failed to update client info after initialization:', error);
+      }
+    };
 
     this.setupTools();
   }
