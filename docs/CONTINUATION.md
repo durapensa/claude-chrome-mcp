@@ -107,3 +107,21 @@ mcp system_disable_extension_debug_mode
 3. **CLI Tools Edge Case Testing**: Comprehensive validation completed
    - Timeout/extension reload workflow verified working
    - Error handling and parameter validation confirmed functional
+
+## MCP Standard Compliance Updates (2025-06-05)
+
+### Implemented Standard MCP Notifications
+1. **Standard Logging Notifications**: Migrated extension debug logs to use standard `notifications/message`
+   - Added `sendLoggingMessage()` method to NotificationManager using MCP SDK's built-in method
+   - Updated extension log handling to use standard MCP log levels (debug, info, warning, error)
+   - Added proper logger names with format `extension.{component}`
+   - Enabled logging capabilities in server configuration
+
+2. **Standard Progress Notifications**: Added support for MCP standard `notifications/progress`
+   - Added `sendStandardProgress()` method for request-based progress tracking
+   - Maintains custom `notifications/operation/progress` for operations not tied to requests
+
+### Architecture Decisions
+- Prioritizing MCP standard compliance over backward compatibility
+- Using standard notifications where possible, custom only where system requires
+- Extension logs now properly categorized with MCP standard log levels

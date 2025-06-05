@@ -75,6 +75,75 @@ class NotificationManager {
       message: 'Notification delivery test' 
     });
   }
+
+  // MCP Standard: Send a logging message notification (notifications/message)
+  async sendLoggingMessage(level, data, loggerName = null) {
+    const notification = {
+      method: 'notifications/message',
+      params: {
+        level,
+        data,
+        ...(loggerName && { logger: loggerName })
+      }
+    };
+
+    try {
+      if (this.server && this.server.server && typeof this.server.server.sendLoggingMessage === 'function') {
+        // Use the built-in sendLoggingMessage method from MCP SDK
+        await this.server.server.sendLoggingMessage(notification.params);
+        return true;
+      } else {
+        this.logger.debug('MCP sendLoggingMessage method not available', { level, loggerName });
+        return false;
+      }
+    } catch (error) {
+      this.logger.error('Failed to send logging message', error);
+      if (this.errorTracker) {
+        this.errorTracker.logError(error, { 
+          component: 'NotificationManager',
+          method: 'sendLoggingMessage',
+          level,
+          loggerName 
+        });
+      }
+      return false;
+    }
+  }
+
+  // MCP Standard: Send a progress notification (notifications/progress)
+  // Note: This requires a progressToken from the original request
+  async sendStandardProgress(progressToken, progress, total = null, message = null) {
+    const notification = {
+      method: 'notifications/progress', 
+      params: {
+        progressToken,
+        progress,
+        ...(total !== null && { total }),
+        ...(message && { message })
+      }
+    };
+
+    try {
+      if (this.server && this.server.server && typeof this.server.server.notification === 'function') {
+        await this.server.server.notification(notification);
+        return true;
+      } else {
+        this.logger.debug('MCP notification method not available for progress', { progressToken });
+        return false;
+      }
+    } catch (error) {
+      this.logger.error('Failed to send standard progress notification', error);
+      if (this.errorTracker) {
+        this.errorTracker.logError(error, { 
+          component: 'NotificationManager',
+          method: 'sendStandardProgress',
+          progressToken,
+          progress 
+        });
+      }
+      return false;
+    }
+  }
 }
 
 module.exports = { NotificationManager };

@@ -249,16 +249,23 @@ class MCPRelayClient extends EventEmitter {
   // Handle extension log notifications
   async handleExtensionLog(logEntry) {
     try {
-      // Forward to NotificationManager if available
+      // Forward to NotificationManager using standard MCP logging notification
       if (this.notificationManager) {
-        // Send as debug notification
-        await this.notificationManager.sendProgress(
-          `extension_log_${Date.now()}`,
-          'debug_log',
+        const { level, component, message, data } = logEntry;
+        
+        // Map extension log levels to MCP standard levels
+        const mcpLevel = this.mapToMcpLogLevel(level);
+        
+        // Send using standard notifications/message
+        await this.notificationManager.sendLoggingMessage(
+          mcpLevel,
           {
+            message,
+            ...data,
             source: 'extension',
-            log: logEntry
-          }
+            component
+          },
+          `extension.${component}` // Logger name format: extension.{component}
         );
       }
       
@@ -289,6 +296,20 @@ class MCPRelayClient extends EventEmitter {
     } catch (error) {
       this.logger.error('Failed to handle extension log', error);
     }
+  }
+  
+  // Map extension log levels to MCP standard log levels
+  mapToMcpLogLevel(extensionLevel) {
+    // MCP levels: debug, info, notice, warning, error, critical, alert, emergency
+    const levelMap = {
+      'VERBOSE': 'debug',
+      'DEBUG': 'debug',
+      'INFO': 'info',
+      'WARN': 'warning',
+      'ERROR': 'error'
+    };
+    
+    return levelMap[extensionLevel] || 'info';
   }
 }
 

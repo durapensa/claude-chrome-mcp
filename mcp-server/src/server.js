@@ -58,7 +58,8 @@ class ChromeMCPServer {
       version: '2.6.0'
     }, {
       capabilities: {
-        tools: {}
+        tools: {},
+        logging: {}  // Enable logging capabilities for notifications/message
       }
     });
 
