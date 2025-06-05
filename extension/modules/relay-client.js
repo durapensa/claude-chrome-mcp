@@ -150,6 +150,9 @@ export class ExtensionRelayClient {
         case 'get_connection_health':
           result = await this.getConnectionHealth(command.params || {});
           break;
+        case 'get_extension_logs':
+          result = await this.getExtensionLogs(command.params || {});
+          break;
 
         // NEW REORGANIZED TOOL NAMES (backward compatibility routing)
         // System tools
@@ -158,6 +161,9 @@ export class ExtensionRelayClient {
           break;
         case 'system_wait_operation':
           result = await this.waitForOperation(command.params || {});
+          break;
+        case 'system_get_logs':
+          result = await this.getExtensionLogs(command.params || {});
           break;
 
         // Chrome tools
@@ -798,7 +804,8 @@ export class ExtensionRelayClient {
   }
 
   handleRelayMessage(message) {
-    console.log('CCM ExtensionRelayClient: Message from relay:', message.type, JSON.stringify(message, null, 2));
+    // Use proper logger instead of console.log
+    this.logMessage('relay-message', `Message from relay: ${message.type}`, message);
     
     // Handle different relay message types
     if (message.type === 'relay_message' && message.data) {
@@ -806,7 +813,15 @@ export class ExtensionRelayClient {
       
       // Check if this is an MCP tool request from an MCP server
       if (data.from && data.id && data.type) {
-        console.log('CCM ExtensionRelayClient: MCP tool request via relay:', data.type, 'params:', data.params);
+        this.logMessage('mcp-tool-request', `MCP tool request: ${data.type}`, {
+          toolType: data.type,
+          hasParams: !!data.params,
+          paramType: typeof data.params,
+          paramKeys: data.params ? Object.keys(data.params) : null,
+          fullParams: data.params,
+          requestId: data.id,
+          fromClient: data.from
+        });
         
         // Execute the command and send response back via relay
         this.executeCommand({
@@ -918,6 +933,64 @@ export class ExtensionRelayClient {
         reject(error);
       });
     });
+  }
+
+  // Get extension logs with filtering
+  async getExtensionLogs(params = {}) {
+    try {
+      // Import the existing logger system
+      const { extensionLogger } = await import('../utils/logger.js');
+      
+      const { level, component, since, limit = 100, format = 'text' } = params;
+      
+      // Get logs from the existing logger buffer
+      const logData = extensionLogger.exportLogs();
+      let logs = logData.logs || [];
+      
+      // Apply filters
+      if (level) {
+        logs = logs.filter(log => log.level === level);
+      }
+      
+      if (component) {
+        logs = logs.filter(log => log.component === component);
+      }
+      
+      if (since) {
+        logs = logs.filter(log => new Date(log.timestamp).getTime() >= since);
+      }
+      
+      // Limit results
+      logs = logs.slice(-limit);
+      
+      if (format === 'json') {
+        return {
+          success: true,
+          logs,
+          count: logs.length,
+          filters: { level, component, since, limit },
+          config: logData.config
+        };
+      } else {
+        // Format as readable text
+        const formattedLogs = logs.map(log => {
+          const dataStr = log.data && Object.keys(log.data).length > 0 ? ` ${JSON.stringify(log.data)}` : '';
+          return `[${log.timestamp}] ${log.level} ${log.component}: ${log.message}${dataStr}`;
+        }).join('\n');
+        
+        return {
+          success: true,
+          logs: formattedLogs,
+          count: logs.length,
+          filters: { level, component, since, limit }
+        };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to get extension logs: ${error.message}`
+      };
+    }
   }
 }
 

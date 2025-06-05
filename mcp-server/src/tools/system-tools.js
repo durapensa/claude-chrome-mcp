@@ -33,6 +33,40 @@ const systemTools = [
       required: ['operationId'],
       additionalProperties: false
     }
+  },
+  {
+    name: 'system_get_logs',
+    description: 'Get Chrome extension logs for debugging and troubleshooting',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        level: {
+          type: 'string',
+          description: 'Filter by log level',
+          enum: ['ERROR', 'WARN', 'INFO', 'DEBUG', 'VERBOSE']
+        },
+        component: {
+          type: 'string',
+          description: 'Filter by component name'
+        },
+        since: {
+          type: 'number',
+          description: 'Unix timestamp - only show logs since this time'
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum number of logs to return',
+          default: 100
+        },
+        format: {
+          type: 'string',
+          description: 'Output format',
+          enum: ['json', 'text'],
+          default: 'text'
+        }
+      },
+      additionalProperties: false
+    }
   }
 ];
 
@@ -46,6 +80,10 @@ const systemHandlers = {
 
   'system_wait_operation': async (server, args) => {
     return await server.waitForOperation(args);
+  },
+
+  'system_get_logs': async (server, args) => {
+    return await server.forwardToExtension('get_extension_logs', args);
   }
 };
 
