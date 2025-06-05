@@ -73,79 +73,15 @@ class ChromeMCPServer {
     // Force relay mode by setting environment variable
     process.env.USE_WEBSOCKET_RELAY = 'true';
     
-    // Initialize with minimal client info, will be updated after MCP initialization
+    // Initialize with static client info
     this.relayClient = new MCPRelayClient({
-      // This will be replaced with actual MCP client info after initialization
       type: 'mcp-client',
-      name: 'Awaiting MCP Client',
+      name: 'Claude Chrome MCP',
       version: '2.6.0',
       capabilities: ['chrome_tabs', 'debugger', 'claude_automation']
     }, this.operationManager, this.notificationManager);
 
     this.setupTools();
-    this.setupInitializationHandler();
-  }
-
-  setupInitializationHandler() {
-    // Store original initialization handler if any
-    const originalHandler = this.server._oninitialize;
-    
-    // Override initialization handler to capture client info
-    this.server._oninitialize = async (params) => {
-      // Call original handler if exists
-      let result;
-      if (originalHandler) {
-        result = await originalHandler.call(this.server, params);
-      }
-      
-      // Log complete initialization params to understand what's being sent
-      this.debug.info('=== MCP INITIALIZATION START ===');
-      this.debug.info('MCP initialization params received', {
-        params: params,
-        paramsJSON: JSON.stringify(params, null, 2),
-        hasClientInfo: !!params?.params?.clientInfo,
-        clientInfoName: params?.params?.clientInfo?.name
-      });
-      
-      // Get client info from initialization params (authoritative source)
-      // The handler receives the full request, so clientInfo is at params.params.clientInfo
-      const clientInfo = params?.params?.clientInfo;
-      
-      if (!clientInfo) {
-        this.debug.warn('No clientInfo object in initialization params', {
-          params: params
-        });
-      } else if (!clientInfo.name) {
-        this.debug.warn('clientInfo exists but has no name', {
-          clientInfo: clientInfo
-        });
-      } else {
-        this.debug.info('clientInfo found', {
-          clientInfo: clientInfo
-        });
-      }
-      
-      // Use exactly what the client provides, no mappings
-      const clientName = clientInfo?.name || 'Unknown MCP Client';
-      const clientVersion = clientInfo?.version || 'unknown';
-      
-      this.debug.info('MCP client identified', {
-        name: clientName,
-        version: clientVersion,
-        rawClientInfo: clientInfo
-      });
-      this.debug.info('=== MCP INITIALIZATION END ===');
-      
-      // Update relay with the exact client name from initialization
-      this.relayClient.updateClientInfo({
-        type: 'mcp-client',
-        name: clientName,
-        version: clientVersion,
-        capabilities: ['chrome_tabs', 'debugger', 'claude_automation']
-      });
-      
-      return result;
-    };
   }
 
   setupTools() {

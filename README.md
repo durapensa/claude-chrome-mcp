@@ -80,22 +80,6 @@ In Claude Desktop, you can now use natural language commands like:
 - [**Changelog**](CHANGELOG.md) - Release history  
 - [**GitHub Issue Script**](docs/create-claude-code-issue.sh) - Claude Code integration utilities
 
-## Installation
-
-### Chrome Extension
-1. Navigate to `chrome://extensions/` in Chrome
-2. Enable "Developer mode" 
-3. Click "Load unpacked" and select `extension/` directory
-   (No build step required - native ES6 modules)
-
-
-### MCP Server
-```bash
-cd mcp-server && npm install
-```
-
-Add to your MCP client configuration (see [CLAUDE.md](CLAUDE.md) for examples).
-
 ### CLI Tool (Optional)
 ```bash
 cd cli && npm install && npm run build && npm link
