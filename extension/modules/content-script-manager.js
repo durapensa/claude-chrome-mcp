@@ -5,6 +5,7 @@ import { CLAUDE_AI_URL } from './config.js';
 export class ContentScriptManager {
   constructor() {
     this.injectedTabs = new Set();
+    this.injectionTimestamps = new Map(); // Track when injection happened
   }
 
   async injectContentScript(tabId) {
@@ -49,6 +50,7 @@ export class ContentScriptManager {
       console.log(`CCM: Script execution result for tab ${tabId}:`, result);
       
       this.injectedTabs.add(tabId);
+      this.injectionTimestamps.set(tabId, Date.now());
       console.log(`CCM: Content script injected successfully in tab ${tabId}`);
       return { success: true, method: 'inline_isolated_injection', result };
 
@@ -61,6 +63,16 @@ export class ContentScriptManager {
 
   removeTab(tabId) {
     this.injectedTabs.delete(tabId);
+    this.injectionTimestamps.delete(tabId);
+  }
+
+  // Check if enough time has passed since injection to consider navigation legitimate
+  shouldClearOnNavigation(tabId) {
+    const injectionTime = this.injectionTimestamps.get(tabId);
+    if (!injectionTime) return true; // No injection record, safe to clear
+    
+    const timeSinceInjection = Date.now() - injectionTime;
+    return timeSinceInjection > 5000; // Wait 5 seconds after injection before clearing on navigation
   }
 
   getMainWorldScript() {

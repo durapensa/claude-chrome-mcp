@@ -223,6 +223,39 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   }
 });
 
+// Handle tab navigation/reload - content scripts are lost during navigation
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  // Only clear content script tracking for actual navigation (not initial loads during tab creation)
+  if (changeInfo.url && contentScriptManager) {
+    // Check if this is a significant URL change (not just claude.ai -> claude.ai/new during creation)
+    const isSignificantNavigation = !changeInfo.url.includes('claude.ai') || 
+                                   (tab.url && !tab.url.includes('claude.ai'));
+    
+    if (isSignificantNavigation) {
+      logger.debug('Significant navigation detected, clearing content script tracking', { 
+        tabId, 
+        oldUrl: changeInfo.url, 
+        newUrl: tab.url 
+      });
+      contentScriptManager.removeTab(tabId);
+    }
+  }
+});
+
+// Handle web navigation events for page reloads and navigations
+chrome.webNavigation.onCommitted.addListener((details) => {
+  // Clear content script tracking for navigation that could lose content scripts
+  if (details.frameId === 0 && contentScriptManager && 
+      contentScriptManager.shouldClearOnNavigation(details.tabId)) {
+    logger.debug('Navigation event detected, clearing content script tracking', { 
+      tabId: details.tabId, 
+      url: details.url,
+      transitionType: details.transitionType
+    });
+    contentScriptManager.removeTab(details.tabId);
+  }
+}, { url: [{ hostContains: 'claude.ai' }] });
+
 // Also try to connect when popup is opened (backup activation method)
 chrome.action.onClicked.addListener(() => {
   logger.info('Extension icon clicked - activating service worker');
