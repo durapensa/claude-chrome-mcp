@@ -231,7 +231,9 @@ export const tabOperationMethods = {
   },
 
   async sendMessageToClaudeTab(params) {
-    const { tabId, message, waitForReady = true } = params;
+    console.log(`CCM Extension: sendMessageToClaudeTab received params:`, params);
+    const { tabId, message, waitForReady = true, operationId: serverOperationId } = params;
+    console.log(`CCM Extension: extracted serverOperationId:`, serverOperationId);
     
     if (!tabId || !message) {
       return { success: false, error: 'Missing required parameters' };
@@ -241,8 +243,9 @@ export const tabOperationMethods = {
       // Acquire lock for this tab operation
       await this.operationLock.acquireLock(tabId, 'send_message');
       
-      // Generate operation ID
-      const operationId = generateOperationId();
+      // OPERATION ID UNIFICATION: Use server operation ID if provided, otherwise generate one
+      const operationId = serverOperationId || generateOperationId();
+      console.log(`CCM Extension: Using operation ID: ${operationId} (from server: ${!!serverOperationId})`);
       
       // Register operation in content script with error handling
       try {

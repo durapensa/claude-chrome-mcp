@@ -62,7 +62,7 @@ const tabTools = [
     zodSchema: {
       sourceTabId: z.number().describe('Source tab ID to get response from'),
       targetTabId: z.number().describe('Target tab ID to send response to'),
-      transformTemplate: z.string().optional().describe('Optional transformation template with ${response} placeholder')
+      transformTemplate: z.string().optional().describe('Optional transformation template with  placeholder')
     }
   },
   {
@@ -126,13 +126,54 @@ const tabHandlers = {
   },
 
   'tab_send_message': async (server, args) => {
-    // Route to appropriate underlying tool based on waitForCompletion
-    if (args.waitForCompletion) {
-      // Use sync version with retry logic
-      return await server.forwardToExtension('send_message_to_claude_dot_ai_tab', args);
-    } else {
-      // Use async version
-      return await server.forwardToExtension('send_message_async', args);
+    // OPERATION ID UNIFICATION FIX: Create MCP server operation first
+    const operationId = server.operationManager.createOperation('tab_send_message', {
+      tabId: args.tabId,
+      message: args.message,
+      waitForCompletion: args.waitForCompletion
+    });
+    
+    // Add server operation ID to args for extension to use
+    const argsWithOpId = {
+      ...args,
+      operationId: operationId
+    };
+    
+    server.operationManager.updateOperation(operationId, 'started', { 
+      phase: 'forwarding_to_extension'
+    });
+    
+    try {
+      // Route to appropriate underlying tool based on waitForCompletion
+      let result;
+      if (args.waitForCompletion) {
+        // Use sync version with retry logic
+        result = await server.forwardToExtension('send_message_to_claude_dot_ai_tab', argsWithOpId);
+      } else {
+        // Use async version
+        result = await server.forwardToExtension('send_message_async', argsWithOpId);
+      }
+      
+      // Update operation based on result
+      if (result && result.success) {
+        server.operationManager.updateOperation(operationId, 'completed', { 
+          phase: 'extension_completed',
+          result: result
+        });
+      } else {
+        server.operationManager.updateOperation(operationId, 'error', { 
+          phase: 'extension_failed',
+          error: result?.error || 'Unknown error'
+        });
+      }
+      
+      return result;
+    } catch (error) {
+      server.operationManager.updateOperation(operationId, 'error', { 
+        phase: 'forwarding_failed',
+        error: error.message
+      });
+      throw error;
     }
   },
 
@@ -195,16 +236,19 @@ const tabHandlers = {
             waitForAll: args.waitForAll,
             pollIntervalMs: args.pollIntervalMs
           });
-          return { sendResult, getResult };
+          
+          return {
+            success: getResult.success,
+            sendResult: sendResult,
+            getResult: getResult
+          };
+        } else {
+          return sendResult;
         }
-        return sendResult;
       default:
-        throw new Error(`Unknown batch operation: ${args.operation}`);
+        throw new Error();
     }
   }
 };
 
-module.exports = {
-  tabTools,
-  tabHandlers
-};
+module.exports = { tabTools, tabHandlers };
