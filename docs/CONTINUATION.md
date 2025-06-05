@@ -50,12 +50,10 @@ If testing is requested:
   - MCP protocol-compliant client identification via clientInfo
   - Operation IDs: `op_{tool_name}_{timestamp}` format with MCP server as sole authority
 - **Status**: Production-ready WebSocket architecture
-- **Important**: Extension needs manual reload, Claude Code needs restart after MCP server changes
+- **Important**: Extension needs manual reload after code changes
 
 ## Current Work Focus
 **Use TodoRead to see active implementation tasks**
-
-**RESTART REQUIRED**: MCP server changes require restart to load reorganized tool architecture
 
 ## Session History
 **See git commit history for detailed session summaries and accomplishments**
