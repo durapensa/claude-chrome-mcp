@@ -157,6 +157,51 @@ mcp__claude-chrome-mcp__chrome_stop_network_monitoring --tabId <id>
 
 ✅ **Do use evidence-based approach**
 - Capture actual network traffic before making assumptions
+
+## MCP Tool Timeout Issues
+
+### When MCP tools are timing out
+
+**Symptoms**: 
+- MCP commands hang or timeout
+- `mcp daemon status` times out
+- Tools that usually work suddenly stop responding
+
+**Troubleshooting Steps**:
+
+1. **Reload the Extension First** (Most Common Fix)
+   ```bash
+   mcp chrome_reload_extension
+   ```
+   Wait 5 seconds for reconnection
+
+2. **Check System Health**
+   ```bash
+   mcp system_health
+   ```
+   
+3. **Restart the Daemon** (if extension reload doesn't help)
+   ```bash
+   mcp daemon stop && sleep 1 && mcp daemon start
+   ```
+
+4. **Manual Extension Reload** (if CLI reload fails)
+   - Open chrome://extensions/
+   - Find "Claude Chrome MCP" 
+   - Click the reload button
+   
+5. **Check Logs for Errors**
+   ```bash
+   tail -50 ~/.claude-chrome-mcp/logs/claude-chrome-mcp-server-PID-*.log | grep -i error
+   ```
+
+**Why Extension Reload Helps**:
+- Extension may lose WebSocket connection to relay
+- Background scripts can enter suspended state
+- Content scripts may become stale
+- Offscreen documents might need reinitialization
+
+**Best Practice**: Always try reloading the extension first when experiencing timeouts before deeper debugging.
 - Use systematic tool sequences
 - Verify each component independently
 

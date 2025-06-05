@@ -89,6 +89,7 @@ mcp__claude-chrome-mcp__api_get_conversation_url --conversationId <uuid>
 - **CLI Tool Usage**: When using cli/ tools, ALWAYS first run `cd cli && npm run build && npm install -g` then use the globally installed `mcp` command (not npm run ccm)
 - After making changes to extension/ always attempt to reload the extension with cli/ MCP tools or, if that fails, ask the user to manually reload the extension
 - When debugging, delete your test conversations and close the tabs to keep chrome running performantly
+- **MCP Tool Timeouts**: When tools timeout, FIRST try `mcp chrome_reload_extension` before other debugging (see [Troubleshooting](docs/TROUBLESHOOTING.md#mcp-tool-timeout-issues))
 
 ## MCP Specification Reference
 - Located at node_modules/@modelcontextprotocol for MCP-related changes
