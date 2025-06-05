@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { EventEmitter } = require('events');
+const { createLogger } = require('./logger');
 
 // Manages async operations with state persistence for MCP operations
 class OperationManager extends EventEmitter {
@@ -9,6 +10,7 @@ class OperationManager extends EventEmitter {
     this.operations = new Map();
     this.stateFile = path.join(__dirname, '../../.operations-state.json');
     this.pendingCompletions = new Map(); // Track completion promises
+    this.logger = createLogger('OperationManager');
     this.loadState();
   }
 
@@ -178,7 +180,7 @@ class OperationManager extends EventEmitter {
       };
       fs.writeFileSync(this.stateFile, JSON.stringify(data, null, 2));
     } catch (error) {
-      console.warn('[OperationManager] Failed to save state:', error.message);
+      this.logger.warn('Failed to save state', { error: error.message });
     }
   }
 }

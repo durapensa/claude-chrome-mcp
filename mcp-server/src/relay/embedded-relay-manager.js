@@ -7,6 +7,7 @@
 const { MessageRelay } = require('./message-relay');
 const { RelayClient } = require('./websocket-relay-client');
 const EventEmitter = require('events');
+const { createLogger } = require('../utils/logger');
 
 class EmbeddedRelayManager extends EventEmitter {
   constructor(clientInfo, port = 54321) {
@@ -18,6 +19,7 @@ class EmbeddedRelayManager extends EventEmitter {
     this.client = null;
     this.connectionAttempts = 0;
     this.maxConnectionAttempts = 3;
+    this.logger = createLogger('EmbeddedRelay');
   }
 
   async initialize() {
@@ -43,7 +45,7 @@ class EmbeddedRelayManager extends EventEmitter {
       await this.startAsRelayHost();
     } catch (error) {
       if (error.code === 'EADDRINUSE' || error.message?.includes('already in use')) {
-        console.error('[EmbeddedRelay] Port in use, connecting as client...');
+        this.logger.info('Port in use, connecting as client...');
         await this.connectAsClient();
       } else {
         throw error;

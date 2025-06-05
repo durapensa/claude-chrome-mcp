@@ -1,8 +1,11 @@
 // Handles MCP notification sending for operation progress and completion
+const { createLogger } = require('./logger');
+
 class NotificationManager {
   constructor(server, errorTracker = null) {
     this.server = server;
     this.errorTracker = errorTracker;
+    this.logger = createLogger('NotificationManager');
   }
 
   sendProgress(operationId, milestone, data = {}) {
@@ -16,15 +19,15 @@ class NotificationManager {
       }
     };
     
-    console.log(`[NotificationManager] Sending progress: ${operationId} - ${milestone}`);
+    this.logger.info('Sending progress', { operationId, milestone });
     
     try {
       if (this.server && typeof this.server.sendNotification === 'function') {
         this.server.sendNotification('operation/progress', notification.params);
-        console.log(`[NotificationManager] Successfully sent notification for ${operationId}`);
+        this.logger.info('Successfully sent notification', { operationId });
       } else {
         const errorMsg = 'Server not properly initialized or sendNotification method missing';
-        console.error(`[NotificationManager] ${errorMsg}`);
+        this.logger.error(errorMsg);
         if (this.errorTracker) {
           this.errorTracker.logError(new Error(errorMsg), { 
             operationId, 
@@ -35,8 +38,8 @@ class NotificationManager {
         return false;
       }
     } catch (error) {
-      console.error('[NotificationManager] Failed to send notification:', error.message);
-      console.error('[NotificationManager] Error details:', error);
+      this.logger.error('Failed to send notification', error);
+      // Error details already logged above
       
       // Track notification delivery errors
       if (this.errorTracker) {
@@ -65,7 +68,7 @@ class NotificationManager {
   // Test method to verify notification delivery
   testNotificationDelivery() {
     const testId = `test_${Date.now()}`;
-    console.log('[NotificationManager] Testing notification delivery...');
+    this.logger.info('Testing notification delivery...');
     return this.sendProgress(testId, 'test', { 
       message: 'Notification delivery test' 
     });

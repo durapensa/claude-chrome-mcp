@@ -38,7 +38,7 @@ const os = require('os');
 
 // Import modular components
 const { ErrorTracker } = require('./utils/error-tracker');
-const { DebugMode } = require('./utils/debug-mode');
+const { createLogger } = require('./utils/logger');
 const { OperationManager } = require('./utils/operation-manager');
 const { NotificationManager } = require('./utils/notification-manager');
 const { MCPRelayClient } = require('./relay/mcp-relay-client');
@@ -64,7 +64,7 @@ class ChromeMCPServer {
 
     // Initialize utility modules
     this.errorTracker = new ErrorTracker();
-    this.debug = new DebugMode().createLogger('ChromeMCPServer');
+    this.debug = createLogger('ChromeMCPServer');
     this.operationManager = new OperationManager();
     this.notificationManager = new NotificationManager(this.server, this.errorTracker);
     
@@ -221,7 +221,7 @@ class ChromeMCPServer {
         extensionHealth = extensionResult.health;
       }
     } catch (error) {
-      console.warn('Failed to get extension health:', error.message);
+      this.debug.warn('Failed to get extension health', { error: error.message });
       extensionHealth = { error: 'Extension health unavailable', message: error.message };
     }
 
@@ -273,7 +273,7 @@ class ChromeMCPServer {
       
       // Log where the file logger is writing
       this.debug.info('MCP Server logs are being written to:', {
-        logDir: `~/.claude-chrome-mcp-logs/mcp-server-${process.pid}.log`
+        logDir: `~/.claude-chrome-mcp/logs/claude-chrome-mcp-server-PID-${process.pid}.log`
       });
       
       // Load saved operations
@@ -307,6 +307,9 @@ class ChromeMCPServer {
   }
 }
 
+// Create main logger for module-level logging
+const mainLogger = require('./utils/logger').createLogger('Main');
+
 // Main entry point
 async function main() {
   try {
@@ -315,7 +318,7 @@ async function main() {
     const myPid = process.pid;
     process.title = `claude-chrome-mcp[${parentPid}]`;
     
-    console.error(`CCM: Started (Parent PID: ${parentPid}, My PID: ${myPid})`);
+    mainLogger.info('CCM Server started', { parentPid, myPid });
     
     // MCP-compliant signal handling
     process.on('SIGINT', () => process.exit(0));
@@ -326,7 +329,7 @@ async function main() {
     await server.start();
     
   } catch (error) {
-    console.error('CCM: Fatal error:', error);
+    mainLogger.error('CCM: Fatal error', error);
     process.exit(1);
   }
 }
@@ -334,7 +337,7 @@ async function main() {
 // Run the server
 if (require.main === module) {
   main().catch(error => {
-    console.error('CCM: Unhandled error:', error);
+    mainLogger.error('CCM: Unhandled error', error);
     process.exit(1);
   });
 }

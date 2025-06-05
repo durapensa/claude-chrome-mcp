@@ -5,6 +5,7 @@
 
 const WebSocket = require('ws');
 const EventEmitter = require('events');
+const { createLogger } = require('../utils/logger');
 
 class RelayClient extends EventEmitter {
   constructor(clientInfo, port = 54321) {
@@ -17,18 +18,19 @@ class RelayClient extends EventEmitter {
     this.messageQueue = [];
     this.reconnectTimer = null;
     this.relayUrl = process.env.RELAY_URL || `ws://localhost:${port}`;
+    this.logger = createLogger('RelayClient');
     
-    console.log('[RelayClient] Initialized for', this.clientInfo.name);
+    this.logger.info('Initialized', { clientName: this.clientInfo.name });
   }
   
   async connect() {
     return new Promise((resolve, reject) => {
       try {
-        console.log('[RelayClient] Connecting to relay at', this.relayUrl);
+        this.logger.info('Connecting to relay', { url: this.relayUrl });
         this.ws = new WebSocket(this.relayUrl);
         
         this.ws.on('open', () => {
-          console.log('[RelayClient] Connected to relay');
+          this.logger.info('Connected to relay');
           this.isConnected = true;
           this.reconnectDelay = 1000; // Reset delay
           
@@ -50,14 +52,14 @@ class RelayClient extends EventEmitter {
         });
         
         this.ws.on('close', (code, reason) => {
-          console.log('[RelayClient] Disconnected from relay:', code, reason);
+          this.logger.info('Disconnected from relay', { code, reason });
           this.isConnected = false;
           this.emit('disconnected', { code, reason });
           this.scheduleReconnect();
         });
         
         this.ws.on('error', (error) => {
-          console.error('[RelayClient] WebSocket error:', error);
+          this.logger.error('WebSocket error', error);
           if (!this.isConnected) {
             reject(error);
           } else {
@@ -70,23 +72,23 @@ class RelayClient extends EventEmitter {
             const message = JSON.parse(data.toString());
             this.handleMessage(message);
           } catch (error) {
-            console.error('[RelayClient] Failed to parse message:', error);
+            this.logger.error('Failed to parse message', error);
           }
         });
         
       } catch (error) {
-        console.error('[RelayClient] Connection error:', error);
+        this.logger.error('Connection error', error);
         reject(error);
       }
     });
   }
   
   handleMessage(message) {
-    console.log('[RelayClient] Received message:', message.type);
+    this.logger.info('Received message', { messageType: message.type });
     
     switch (message.type) {
       case 'relay_welcome':
-        console.log('[RelayClient] Welcome from relay, client ID:', message.clientId);
+        this.logger.info('Welcome from relay', { clientId: message.clientId });
         this.clientId = message.clientId;
         this.emit('connected', { clientId: message.clientId });
         break;
@@ -101,7 +103,7 @@ class RelayClient extends EventEmitter {
         break;
         
       case 'relay_shutdown':
-        console.log('[RelayClient] Relay is shutting down');
+        this.logger.info('Relay is shutting down');
         this.emit('relay_shutdown');
         break;
         
@@ -115,7 +117,7 @@ class RelayClient extends EventEmitter {
     if (this.isConnected && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(message));
     } else {
-      console.log('[RelayClient] Queueing message, not connected');
+      this.logger.info('Queueing message, not connected');
       this.messageQueue.push(message);
     }
   }
@@ -148,11 +150,11 @@ class RelayClient extends EventEmitter {
       clearTimeout(this.reconnectTimer);
     }
     
-    console.log(`[RelayClient] Reconnecting in ${this.reconnectDelay}ms`);
+    this.logger.info('Reconnecting', { delayMs: this.reconnectDelay });
     
     this.reconnectTimer = setTimeout(() => {
       this.connect().catch(error => {
-        console.error('[RelayClient] Reconnection failed:', error);
+        this.logger.error('Reconnection failed', error);
       });
     }, this.reconnectDelay);
     

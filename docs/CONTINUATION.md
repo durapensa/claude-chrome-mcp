@@ -5,9 +5,9 @@
 When you type 'continue' in a fresh Claude Code instance:
 
 ### Step 1: System Health Check
-```bash
-mcp__claude-chrome-mcp__get_connection_health
-```
+cli/ MCP tool system_health
+or
+MCP tool system_health
 
 ### Step 2: Verify System Readiness
 Check connection health output for:
@@ -18,7 +18,7 @@ Check connection health output for:
 ### Step 3: Standard Testing Workflow (OPTIONAL - only if user requests)
 **Rule: Skip testing workflow by default unless user specifically asks for it**
 
-If testing is requested:
+If testing is requested, use cli/ MCP tools:
 1. **Create Tab**: `tab_create --injectContentScript true`
 2. **Send Message**: `tab_send_message --message "test" --tabId <id>`
 3. **Get Response**: `tab_get_response --tabId <id>`
@@ -33,7 +33,6 @@ If testing is requested:
 - **[Architecture](ARCHITECTURE.md)**: System design and components
 - **[Troubleshooting](TROUBLESHOOTING.md)**: Issues, debugging methodology, and solutions  
 - **[TypeScript](TYPESCRIPT.md)**: Type definitions and development guidelines
-- **[Restart Capability](RESTART-CAPABILITY.md)**: MCP lifecycle and restart mechanisms
 
 ## Development Resources
 - **[Event-Driven Architecture](event-driven-architecture-diagram.md)**: Visual system overview
@@ -53,9 +52,15 @@ If testing is requested:
 - **Important**: Extension needs manual reload after code changes
 
 ## Current Work Focus
-**✅ TAB MANAGEMENT REFACTOR COMPLETED**: Shared utilities eliminate code duplication
+**✅ WINSTON LOGGING REFACTOR COMPLETED**: All console statements replaced with structured logging
 
 ### ✅ Major Accomplishments
+- **Winston Logger**: Created comprehensive `logger.js` replacing `debug-mode.js`
+- **Structured Logging**: All 88 console statements migrated to winston with proper log levels
+- **Component-based Logging**: Each module has its own logger with component identification
+- **File Rotation**: Logs saved to `~/.claude-chrome-mcp/logs/` with 10MB rotation (5 files max)
+- **MCP Compliance**: All output to stderr, stdout remains clean for JSON-RPC protocol
+- **Error Tracking Integration**: ErrorTracker enhanced with winston while maintaining in-memory analytics
 - **Shared Tab Management**: Created unified `tab-management.js` utilities for all tools
 - **Code Deduplication**: `ensureClaudeTabForApi()` and `ensureConversationTab()` shared across tools
 - **API Tab Creation**: Consistent `/new` tab creation when no Claude.ai tabs exist
@@ -86,11 +91,10 @@ done
 ./bin/mcp system_wait_operation --operationId op_* # Works end-to-end
 ```
 
-## Session History
-**See git commit history for detailed session summaries and accomplishments**
+## Logging System
+**Winston-based Structured Logging**: Professional logging with file rotation
 
-## Critical Directive Compliance
-- **✅ ZERO INSTRUCTION DUPLICATION**: References other docs, no repetition
-- **✅ STREAMLINED CONTENT**: Removed completed/obsolete sections
-- **✅ GIT FOR HISTORY**: Session accomplishments in commit messages
-- **✅ NO SESSION ARTIFACTS**: Clean documentation state
+- **Log Location**: `~/.claude-chrome-mcp/logs/claude-chrome-mcp-server-PID-{pid}.log`
+- **Log Levels**: error, warn, info, debug, verbose (set via LOG_LEVEL env)
+- **Components**: Each module has named logger (e.g., 'Relay', 'ChromeMCPServer')
+- **Viewing Logs**: `tail -f ~/.claude-chrome-mcp/logs/claude-chrome-mcp-server-PID-*.log`

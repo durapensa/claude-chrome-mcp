@@ -6,6 +6,7 @@
 const WebSocket = require('ws');
 const EventEmitter = require('events');
 const http = require('http');
+const { createLogger } = require('../utils/logger');
 
 const RELAY_PORT = 54321;
 
@@ -17,6 +18,7 @@ class MessageRelay extends EventEmitter {
     this.wss = null;
     this.clientCounter = 0;
     this.isShuttingDown = false;
+    this.logger = createLogger('Relay');
     
     // Metrics
     this.metrics = {
@@ -27,7 +29,7 @@ class MessageRelay extends EventEmitter {
       errors: 0
     };
     
-    console.log('[Relay] Message relay initialized on port', this.port);
+    this.logger.info('Message relay initialized', { port: this.port });
   }
   
   start() {
@@ -39,7 +41,7 @@ class MessageRelay extends EventEmitter {
       });
       
       this.wss.on('listening', () => {
-        console.log('[Relay] WebSocket relay listening on port', this.port);
+        this.logger.info('WebSocket relay listening', { port: this.port });
         
         // Start health endpoint
         this.startHealthEndpoint();
@@ -50,12 +52,12 @@ class MessageRelay extends EventEmitter {
       this.wss.on('error', (error) => {
         this.metrics.errors++;
         if (error.code === 'EADDRINUSE') {
-          console.error('[Relay] Port', this.port, 'already in use');
+          this.logger.error('Port already in use', { port: this.port });
           const addrInUseError = new Error(`Port ${this.port} already in use`);
           addrInUseError.code = 'EADDRINUSE';
           reject(addrInUseError);
         } else {
-          console.error('[Relay] Server error:', error);
+          this.logger.error('Server error', error);
           reject(error);
         }
       });
@@ -93,7 +95,7 @@ class MessageRelay extends EventEmitter {
     });
     
     server.listen(healthPort, () => {
-      console.log('[Relay] Health endpoint listening on port', healthPort);
+      this.logger.info('Health endpoint listening', { port: healthPort });
     });
     
     this.healthServer = server;
@@ -108,7 +110,7 @@ class MessageRelay extends EventEmitter {
       remoteAddress: req.socket.remoteAddress
     };
     
-    console.log('[Relay] New connection:', clientId, 'from', clientInfo.remoteAddress);
+    this.logger.info('New connection', { clientId, remoteAddress: clientInfo.remoteAddress });
     
     // Update metrics
     this.metrics.clientsConnected++;
@@ -129,13 +131,13 @@ class MessageRelay extends EventEmitter {
         const message = JSON.parse(data.toString());
         this.handleMessage(clientId, message);
       } catch (error) {
-        console.error('[Relay] Failed to parse message from', clientId, ':', error);
+        this.logger.error('Failed to parse message', { clientId, error });
       }
     });
     
     // Handle close
     ws.on('close', () => {
-      console.log('[Relay] Client disconnected:', clientId);
+      this.logger.info('Client disconnected', { clientId });
       this.metrics.clientsDisconnected++;
       this.clients.delete(clientId);
       this.broadcastClientList();
@@ -143,7 +145,7 @@ class MessageRelay extends EventEmitter {
     
     // Handle errors
     ws.on('error', (error) => {
-      console.error('[Relay] WebSocket error for', clientId, ':', error);
+      this.logger.error('WebSocket error', { clientId, error });
       this.metrics.errors++;
     });
     
@@ -154,17 +156,17 @@ class MessageRelay extends EventEmitter {
   handleMessage(fromClientId, message) {
     const client = this.clients.get(fromClientId);
     if (!client) {
-      console.error('[Relay] Message from unknown client:', fromClientId);
+      this.logger.error('Message from unknown client', { fromClientId });
       return;
     }
     
-    console.log('[Relay] Message from', fromClientId, ':', message.type);
+    this.logger.info('Message received', { fromClientId, messageType: message.type });
     
     // Handle client identification
     if (message.type === 'identify') {
       client.info.type = message.clientType || 'unknown';
       client.info.name = message.name || fromClientId;
-      console.log('[Relay] Client identified:', fromClientId, 'as', client.info.type, '-', client.info.name);
+      this.logger.info('Client identified', { fromClientId, clientType: client.info.type, clientName: client.info.name });
       this.broadcastClientList();
       return;
     }
@@ -257,7 +259,7 @@ class MessageRelay extends EventEmitter {
     if (this.isShuttingDown) return;
     
     this.isShuttingDown = true;
-    console.log('[Relay] Shutting down...');
+    this.logger.info('Shutting down...');
     
     // Notify all clients
     this.broadcast({
@@ -267,7 +269,7 @@ class MessageRelay extends EventEmitter {
     
     // Close all client connections
     this.clients.forEach((client, clientId) => {
-      console.log('[Relay] Closing connection:', clientId);
+      this.logger.info('Closing connection', { clientId });
       client.ws.close();
     });
     
@@ -275,7 +277,7 @@ class MessageRelay extends EventEmitter {
     if (this.wss) {
       await new Promise((resolve) => {
         this.wss.close(() => {
-          console.log('[Relay] WebSocket server closed');
+          this.logger.info('WebSocket server closed');
           resolve();
         });
       });
@@ -285,13 +287,13 @@ class MessageRelay extends EventEmitter {
     if (this.healthServer) {
       await new Promise((resolve) => {
         this.healthServer.close(() => {
-          console.log('[Relay] Health server closed');
+          this.logger.info('Health server closed');
           resolve();
         });
       });
     }
     
-    console.log('[Relay] Shutdown complete');
+    this.logger.info('Shutdown complete');
   }
 }
 

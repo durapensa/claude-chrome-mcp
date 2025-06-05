@@ -1,9 +1,12 @@
 // Enhanced error handling and debugging utilities
+const { createLogger } = require('./logger');
+
 class ErrorTracker {
   constructor(maxErrors = 100) {
     this.errors = [];
     this.maxErrors = maxErrors;
     this.errorCounts = new Map();
+    this.logger = createLogger('ErrorTracker');
   }
 
   logError(error, context = {}) {
@@ -24,7 +27,7 @@ class ErrorTracker {
     const errorKey = error.message || error.toString();
     this.errorCounts.set(errorKey, (this.errorCounts.get(errorKey) || 0) + 1);
 
-    console.error(`[${errorEntry.id}] Error:`, error.message, context);
+    this.logger.error('Error tracked', error, { errorId: errorEntry.id, ...context });
     
     return errorEntry.id;
   }

@@ -1,6 +1,6 @@
 const EventEmitter = require('events');
 const { ErrorTracker } = require('../utils/error-tracker');
-const { DebugMode } = require('../utils/debug-mode');
+const { createLogger } = require('../utils/logger');
 const { EmbeddedRelayManager } = require('./embedded-relay-manager');
 
 // MCP Relay Client for MCP server
@@ -25,9 +25,9 @@ class MCPRelayClient extends EventEmitter {
     
     // Enhanced debugging and error tracking
     this.errorTracker = new ErrorTracker();
-    this.debug = new DebugMode().createLogger('RelayClient');
+    this.logger = createLogger('RelayClient');
     
-    console.error('RelayClient: Initializing WebSocket relay mode');
+    this.logger.info('Initializing WebSocket relay mode');
     this.initializeRelayClient();
   }
 
@@ -36,7 +36,7 @@ class MCPRelayClient extends EventEmitter {
     
     // Handle relay events
     this.relayManager.on('connected', () => {
-      console.error('RelayClient: Connected to relay');
+      this.logger.info('Connected to relay');
       this.connected = true;
       this.connectionState = 'connected';
       this.lastSuccessfulConnection = Date.now();
@@ -44,7 +44,7 @@ class MCPRelayClient extends EventEmitter {
     });
     
     this.relayManager.on('disconnected', () => {
-      console.error('RelayClient: Disconnected from relay');
+      this.logger.info('Disconnected from relay');
       this.connected = false;
       this.connectionState = 'disconnected';
       this.emit('connection_lost');
@@ -55,11 +55,11 @@ class MCPRelayClient extends EventEmitter {
     });
     
     this.relayManager.on('relayClientConnected', (client) => {
-      console.error('RelayClient: New client connected to relay:', client.name);
+      this.logger.info('New client connected to relay', { clientName: client.name });
     });
     
     this.relayManager.on('relayClientDisconnected', (clientId) => {
-      console.error('RelayClient: Client disconnected from relay:', clientId);
+      this.logger.info('Client disconnected from relay', { clientId });
     });
   }
 
@@ -92,7 +92,7 @@ class MCPRelayClient extends EventEmitter {
 
   updateClientInfo(clientInfo) {
     this.clientInfo = clientInfo;
-    console.error('RelayClient: Updated client info:', clientInfo);
+    this.logger.info('Updated client info', { clientInfo });
     
     // Update relay manager with new client info if initialized
     if (this.relayManager && this.relayManager.client) {
@@ -102,25 +102,25 @@ class MCPRelayClient extends EventEmitter {
 
   async connect() {
     if (this.connectionState === 'connecting') {
-      console.error('RelayClient: Connection already in progress');
+      this.logger.warn('Connection already in progress');
       return;
     }
 
     this.connectionState = 'connecting';
     
     try {
-      console.error('RelayClient: Initializing embedded relay...');
+      this.logger.info('Initializing embedded relay...');
       await this.relayManager.initialize();
       // Events will be handled by the relay manager listeners
       
       const status = this.relayManager.getStatus();
       if (status.isRelayHost) {
-        console.error('RelayClient: Running as relay host');
+        this.logger.info('Running as relay host');
       } else {
-        console.error('RelayClient: Connected to existing relay');
+        this.logger.info('Connected to existing relay');
       }
     } catch (error) {
-      console.error('RelayClient: Failed to initialize relay:', error);
+      this.logger.error('Failed to initialize relay', error);
       this.connectionState = 'disconnected';
       throw error;
     }
@@ -131,7 +131,7 @@ class MCPRelayClient extends EventEmitter {
   handleOperationMilestone(message) {
     const { operationId, milestone, timestamp, tabId, ...data } = message;
     
-    console.error(`[RelayClient] Received milestone: ${operationId} - ${milestone}`);
+    this.logger.info('Received milestone', { operationId, milestone });
     
     // Update operation manager
     if (this.operationManager) {
@@ -148,7 +148,7 @@ class MCPRelayClient extends EventEmitter {
     // Handle relay mode only
     if (!this.relayManager || !this.relayManager.client || !this.relayManager.client.isConnected) {
       if (this.connectionState === 'disconnected') {
-        this.debug.info('Attempting to reconnect to relay for request');
+        this.logger.info('Attempting to reconnect to relay for request');
         await this.connect();
       }
       
@@ -190,7 +190,7 @@ class MCPRelayClient extends EventEmitter {
   }
 
   async gracefulShutdown() {
-    console.error('RelayClient: Initiating graceful shutdown');
+    this.logger.info('Initiating graceful shutdown');
     this.connectionState = 'shutting_down';
     
     // Close connection

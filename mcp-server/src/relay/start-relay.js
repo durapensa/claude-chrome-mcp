@@ -6,6 +6,10 @@
  */
 
 const { MessageRelay } = require('./message-relay');
+const { createLogger } = require('../utils/logger');
+
+// Create logger
+const logger = createLogger('RelayStandalone');
 
 // Check if running in relay mode
 const USE_RELAY = process.env.USE_WEBSOCKET_RELAY === 'true';
@@ -13,39 +17,39 @@ const RELAY_PORT = process.env.RELAY_PORT || 54321;
 
 async function main() {
   if (!USE_RELAY) {
-    console.log('[Relay] USE_WEBSOCKET_RELAY is not set to true. Exiting.');
+    logger.info('USE_WEBSOCKET_RELAY is not set to true. Exiting.');
     process.exit(0);
   }
   
-  console.log('[Relay] Starting WebSocket relay server...');
+  logger.info('Starting WebSocket relay server...');
   
   const relay = new MessageRelay(Number(RELAY_PORT));
   
   // Handle shutdown signals
   process.on('SIGINT', async () => {
-    console.log('[Relay] Received SIGINT, shutting down...');
+    logger.info('Received SIGINT, shutting down...');
     await relay.stop();
     process.exit(0);
   });
   
   process.on('SIGTERM', async () => {
-    console.log('[Relay] Received SIGTERM, shutting down...');
+    logger.info('Received SIGTERM, shutting down...');
     await relay.stop();
     process.exit(0);
   });
   
   try {
     await relay.start();
-    console.log('[Relay] WebSocket relay server running on port', RELAY_PORT);
+    logger.info('WebSocket relay server running', { port: RELAY_PORT });
   } catch (error) {
-    console.error('[Relay] Failed to start:', error);
+    logger.error('Failed to start', error);
     process.exit(1);
   }
 }
 
 if (require.main === module) {
   main().catch(error => {
-    console.error('[Relay] Unhandled error:', error);
+    logger.error('Unhandled error', error);
     process.exit(1);
   });
 }
