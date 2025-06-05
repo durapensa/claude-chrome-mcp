@@ -166,6 +166,16 @@ function handleMessage(request, sender, sendResponse) {
     return true;
   }
   
+  // Handle LOG_ERROR from extension logger
+  if (request.type === 'LOG_ERROR' && request.data) {
+    // Forward error logs to MCP if debug mode is enabled
+    if (relayClient && relayClient.sendLogToMCP) {
+      relayClient.sendLogToMCP(request.data);
+    }
+    // No response needed
+    return false;
+  }
+  
   return false;
 }
 

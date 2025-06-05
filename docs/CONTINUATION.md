@@ -67,6 +67,13 @@ If testing is requested, use cli/ MCP tools:
 - **Operation ID System**: Fixed dual ID issue, `system_wait_operation` works across MCP boundary
 - **Parameter Passing**: All 20 tools converted from inputSchema to zodSchema
 - **CLI Debugging**: Rapid iteration workflow without Claude Code restarts
+- **On-Demand Debug Logging**: Hybrid real-time log forwarding from extension to MCP server
+  - Added `system_enable_extension_debug_mode`, `system_disable_extension_debug_mode`, `system_set_extension_log_level` tools
+  - ERROR logs sent immediately, other logs batched every 2 seconds  
+  - Component filtering and error-only mode supported
+  - Extension logger enhanced with debug mode toggle and MCP forwarding
+  - LOG_ERROR messages handled in background.js
+  - MCP relay client processes log notifications and forwards to NotificationManager
 
 ### ✅ Performance Debugging Workflow Established
 ```bash

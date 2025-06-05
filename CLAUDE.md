@@ -85,6 +85,7 @@ mcp__claude-chrome-mcp__api_get_conversation_url --conversationId <uuid>
 - Change code → Reload extension → Test
 - Use TodoRead for active tasks
 - Use cli/ MCP tools for debugging and development
+- **CLI Tool Usage**: When using cli/ tools, ALWAYS first run `cd cli && npm run build && npm install -g` then use the globally installed `mcp` command (not npm run ccm)
 - After making changes to extension/ always attempt to reload the extension with cli/ MCP tools or, if that fails, ask the user to manually reload the extension
 - When debugging, delete your test conversations and close the tabs to keep chrome running performantly
 

@@ -85,6 +85,18 @@ class MCPRelayClient extends EventEmitter {
         return;
       }
       
+      // Handle log notifications from extension
+      if (data.type === 'log_notification' && data.log) {
+        this.handleExtensionLog(data.log);
+        return;
+      }
+      
+      // Handle batched logs from extension
+      if (data.type === 'log_batch' && data.logs) {
+        data.logs.forEach(log => this.handleExtensionLog(log));
+        return;
+      }
+      
       // Otherwise, emit the message for other handlers
       this.emit('message', data);
     }
@@ -232,6 +244,51 @@ class MCPRelayClient extends EventEmitter {
       relayMode: true,
       ...relayStatus
     };
+  }
+  
+  // Handle extension log notifications
+  handleExtensionLog(logEntry) {
+    try {
+      // Forward to NotificationManager if available
+      if (this.notificationManager) {
+        // Send as debug notification
+        this.notificationManager.sendProgress(
+          `extension_log_${Date.now()}`,
+          'debug_log',
+          {
+            source: 'extension',
+            log: logEntry
+          }
+        );
+      }
+      
+      // Also log locally for debugging
+      const { level, component, message, data } = logEntry;
+      const prefix = `[Extension:${component}]`;
+      
+      // Map extension log levels to server logger methods
+      switch (level) {
+        case 'ERROR':
+          this.logger.error(`${prefix} ${message}`, null, data);
+          break;
+        case 'WARN':
+          this.logger.warn(`${prefix} ${message}`, data);
+          break;
+        case 'INFO':
+          this.logger.info(`${prefix} ${message}`, data);
+          break;
+        case 'DEBUG':
+          this.logger.debug(`${prefix} ${message}`, data);
+          break;
+        case 'VERBOSE':
+          this.logger.verbose(`${prefix} ${message}`, data);
+          break;
+        default:
+          this.logger.info(`${prefix} ${message}`, data);
+      }
+    } catch (error) {
+      this.logger.error('Failed to handle extension log', error);
+    }
   }
 }
 

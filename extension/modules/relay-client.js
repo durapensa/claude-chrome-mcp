@@ -179,6 +179,15 @@ export class ExtensionRelayClient {
         case 'system_get_logs':
           result = await this.getExtensionLogs(command.params || {});
           break;
+        case 'enable_debug_mode':
+          result = await this.enableDebugMode(command.params || {});
+          break;
+        case 'disable_debug_mode':
+          result = await this.disableDebugMode(command.params || {});
+          break;
+        case 'set_log_level':
+          result = await this.setLogLevel(command.params || {});
+          break;
 
         // Chrome tools
         case 'chrome_reload_extension':
@@ -1209,6 +1218,124 @@ export class ExtensionRelayClient {
         success: false,
         error: `Failed to get extension logs: ${error.message}`
       };
+    }
+  }
+
+  // Enable debug mode for real-time log forwarding
+  async enableDebugMode(params = {}) {
+    try {
+      const { components = [], errorOnly = false, batchIntervalMs = 2000 } = params;
+      
+      // Store debug mode settings
+      await chrome.storage.local.set({
+        'ccm-debug-mode-enabled': true,
+        'ccm-debug-components': components,
+        'ccm-debug-error-only': errorOnly,
+        'ccm-debug-batch-interval': batchIntervalMs
+      });
+
+      // Update logger settings
+      extensionLogger.setDebugMode(true, {
+        components,
+        errorOnly,
+        batchIntervalMs,
+        sendToMCP: (logEntry) => this.sendLogToMCP(logEntry)
+      });
+
+      this.logger.info('Extension debug mode enabled', params);
+      
+      return {
+        success: true,
+        message: 'Debug mode enabled',
+        settings: { components, errorOnly, batchIntervalMs }
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to enable debug mode: ${error.message}`
+      };
+    }
+  }
+
+  // Disable debug mode
+  async disableDebugMode(params = {}) {
+    try {
+      // Clear debug mode settings
+      await chrome.storage.local.set({
+        'ccm-debug-mode-enabled': false
+      });
+
+      // Update logger settings
+      extensionLogger.setDebugMode(false);
+
+      this.logger.info('Extension debug mode disabled');
+      
+      return {
+        success: true,
+        message: 'Debug mode disabled'
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to disable debug mode: ${error.message}`
+      };
+    }
+  }
+
+  // Set extension log level
+  async setLogLevel(params = {}) {
+    try {
+      const { level } = params;
+      
+      if (!level) {
+        return {
+          success: false,
+          error: 'Log level is required'
+        };
+      }
+
+      // Update logger level
+      extensionLogger.setLogLevel(level);
+
+      this.logger.info('Extension log level updated', { level });
+      
+      return {
+        success: true,
+        message: `Log level set to ${level}`,
+        level
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to set log level: ${error.message}`
+      };
+    }
+  }
+
+  // Send log entry to MCP server via relay
+  async sendLogToMCP(logEntry) {
+    // Only send if connected to MCP client
+    if (this.connectedClients.size === 0) {
+      return;
+    }
+
+    try {
+      // Get first connected MCP client
+      const mcpClient = Array.from(this.connectedClients.values())[0];
+      
+      // Send log as notification via relay
+      await this.sendToRelay({
+        type: 'unicast',
+        targetId: mcpClient.id,
+        data: {
+          type: 'log_notification',
+          log: logEntry,
+          timestamp: Date.now()
+        }
+      });
+    } catch (error) {
+      // Silently fail - we don't want logging to break the extension
+      this.logger.error('Failed to send log to MCP', { error: error.message });
     }
   }
 }

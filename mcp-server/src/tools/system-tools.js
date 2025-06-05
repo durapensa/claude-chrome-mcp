@@ -30,6 +30,27 @@ const systemTools = [
       limit: z.number().describe('Maximum number of logs to return').default(100),
       format: z.enum(['json', 'text']).describe('Output format').default('text')
     }
+  },
+  {
+    name: 'system_enable_extension_debug_mode',
+    description: 'Enable real-time debug log forwarding from Chrome extension to MCP server',
+    zodSchema: {
+      components: z.array(z.string()).describe('Specific extension components to monitor (empty = all)').default([]),
+      errorOnly: z.boolean().describe('Only forward ERROR level logs from extension').default(false),
+      batchIntervalMs: z.number().describe('Batch interval for non-error logs in milliseconds').default(2000)
+    }
+  },
+  {
+    name: 'system_disable_extension_debug_mode',
+    description: 'Disable real-time debug log forwarding from Chrome extension',
+    zodSchema: {}
+  },
+  {
+    name: 'system_set_extension_log_level',
+    description: 'Set the minimum log level captured by the Chrome extension',
+    zodSchema: {
+      level: z.enum(['ERROR', 'WARN', 'INFO', 'DEBUG', 'VERBOSE']).describe('Minimum log level to capture in extension')
+    }
   }
 ];
 
@@ -47,6 +68,18 @@ const systemHandlers = {
 
   'system_get_logs': async (server, args) => {
     return await server.forwardToExtension('get_extension_logs', args);
+  },
+
+  'system_enable_extension_debug_mode': async (server, args) => {
+    return await server.forwardToExtension('enable_debug_mode', args);
+  },
+
+  'system_disable_extension_debug_mode': async (server, args) => {
+    return await server.forwardToExtension('disable_debug_mode', args);
+  },
+
+  'system_set_extension_log_level': async (server, args) => {
+    return await server.forwardToExtension('set_log_level', args);
   }
 };
 
