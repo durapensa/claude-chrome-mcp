@@ -48,55 +48,49 @@ If testing is requested:
   - Persistent connections via offscreen documents (12+ hours)
   - Pure message routing relay for simplified architecture
   - MCP protocol-compliant client identification via clientInfo
-  - Operation IDs: `op_{tool_name}_{timestamp}` format with MCP server as sole authority
-- **Status**: Production-ready WebSocket architecture
+  - **✅ Unified Operation IDs**: Server-generated `op_{tool_name}_{timestamp}` format
+- **Status**: Production-ready with unified operation tracking
 - **Important**: Extension needs manual reload after code changes
 
 ## Current Work Focus
-**COMPREHENSIVE DEBUGGING COMPLETED**: Systematic error analysis and fixes implemented
+**✅ OPERATION ID UNIFICATION COMPLETED**: Async operation tracking works end-to-end
 
-### ✅ Fixed Issues (Extension Reload Required)
+### ✅ Major Accomplishments
+- **Operation ID System**: Fixed dual ID issue, `system_wait_operation` works across MCP boundary
 - **Parameter Passing**: All 20 tools converted from inputSchema to zodSchema
-- **Service Worker Imports**: Fixed dynamic import restriction in system_get_logs  
-- **Content Script Tracking**: Fixed stale hasContentScript state after navigation
-- **Tab Forwarding**: Enhanced connection error handling with auto-injection
-- **Debugger Lifecycle**: Comprehensive attachment/detachment management
-- **Batch Operations**: Analyzed response timeout issues (status detection gaps)
+- **CLI Debugging**: Rapid iteration workflow without Claude Code restarts
+- **Performance Practices**: Bulk conversation cleanup with immediate tab management
+- **Service Worker Fixes**: Dynamic import restrictions resolved
+- **Content Script Management**: Navigation state tracking and lifecycle improvements
 
-### ⚠️ Critical Issue: Dual Operation ID Systems
-**ARCHITECTURE BUG**: MCP server (`op_*`) and extension (`ext_op_*`) generate separate operation IDs
-
-**Impact**: `system_wait_operation` fails because server doesn't track extension-generated IDs
-
-**Fix Required** (Post-Restart):
-1. Modify `tab_send_message` handler to create MCP server operation first
-2. Pass server operation ID to extension instead of extension self-generating
-3. Update extension to report operation milestones back to server
-4. Test `system_wait_operation` with unified operation tracking
-
-### Next Steps After Restart  
-**CLI DEBUGGING SETUP COMPLETE**: Use CLI for rapid iteration without Claude Code restarts
-
-#### CLI-First Development Workflow
+### ✅ Performance Debugging Workflow Established
 ```bash
-# CLI daemon configured with both servers:
-./bin/mcp servers     # claude-chrome-mcp: 28 tools, filesystem: 11 tools
-./bin/mcp system_health    # Test MCP server changes instantly
-./bin/mcp edit_file /path  # Edit code without restarts
+# Bulk conversation cleanup
+./bin/mcp api_delete_conversations --conversationIds id1 --conversationIds id2
+
+# Immediate tab cleanup (critical for Chrome performance)
+for tabId in $(./bin/mcp tab_list | grep -o '"id": [0-9]*' | grep -o '[0-9]*' | tail -n +2); do 
+  ./bin/mcp tab_close --tabId $tabId
+done
 ```
 
-#### Operation ID Unification (HIGH PRIORITY)
-**Current Bug**: MCP server generates `op_*` IDs, extension generates `ext_op_*` IDs
-**Fix Plan**:
-1. Edit `mcp-server/src/tools/tab-tools.js` via CLI to create operation first  
-2. Pass server operation ID to extension instead of self-generating
-3. Update extension to report milestones back to server
-4. Test `system_wait_operation` with unified tracking
+## CLI-First Development Environment
+**Fully Functional**: CLI daemon configured with both servers for rapid iteration
 
-#### Secondary Tasks
-1. **Extension Reload**: Manual reload for tested changes
-2. **Performance**: Address batch operation timeout detection gaps  
-3. **Testing**: Verify all error handling improvements
+```bash
+# CLI tools available:
+./bin/mcp servers           # claude-chrome-mcp: 28 tools, filesystem: 11 tools
+./bin/mcp system_health     # Test MCP server changes instantly
+./bin/mcp edit_file /path   # Edit code without restarts
+./bin/mcp tab_send_message  # Returns unified server operation IDs
+./bin/mcp system_wait_operation --operationId op_* # Works end-to-end
+```
 
 ## Session History
 **See git commit history for detailed session summaries and accomplishments**
+
+## Critical Directive Compliance
+- **✅ ZERO INSTRUCTION DUPLICATION**: References other docs, no repetition
+- **✅ STREAMLINED CONTENT**: Removed completed/obsolete sections
+- **✅ GIT FOR HISTORY**: Session accomplishments in commit messages
+- **✅ NO SESSION ARTIFACTS**: Clean documentation state
