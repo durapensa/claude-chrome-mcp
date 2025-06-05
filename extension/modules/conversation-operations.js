@@ -983,5 +983,53 @@ export const conversationOperationMethods = {
       console.error(`CCM Extension: Error opening conversation ${conversationId}:`, error);
       throw new Error(`Failed to open conversation: ${error.message}`);
     }
+  },
+
+  // NEW REORGANIZED TOOL METHODS
+
+  /**
+   * Get conversation URL for a specific conversation ID
+   * Pure URL generation without tab creation (for api_get_conversation_url)
+   */
+  async getConversationUrl(params) {
+    const { conversationId } = params;
+    
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(conversationId)) {
+      throw new Error('conversationId must be a valid UUID format');
+    }
+
+    // Return the conversation URL
+    return {
+      success: true,
+      conversationId: conversationId,
+      url: `https://claude.ai/chat/${conversationId}`
+    };
+  },
+
+  /**
+   * Handle API delete conversations - routes to single or bulk deletion
+   * Supports single or multiple conversation deletions (for api_delete_conversations)
+   */
+  async handleApiDeleteConversations(params) {
+    const { conversationIds, batchSize = 5, delayMs = 1000 } = params;
+    
+    if (!conversationIds || !Array.isArray(conversationIds) || conversationIds.length === 0) {
+      throw new Error('conversationIds must be a non-empty array');
+    }
+    
+    // Handle single vs bulk deletion
+    if (conversationIds.length === 1) {
+      // Route to single deletion for efficiency
+      return await this.deleteClaudeConversation({ conversationId: conversationIds[0] });
+    } else {
+      // Route to bulk deletion
+      return await this.bulkDeleteConversations({
+        conversationIds: conversationIds,
+        batchSize: batchSize,
+        delayMs: delayMs
+      });
+    }
   }
 };

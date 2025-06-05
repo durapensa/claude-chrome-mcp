@@ -29,9 +29,8 @@ if (process.stdout.write.bind) {
   };
 }
 
-const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
+const { McpServer } = require('@modelcontextprotocol/sdk/server/mcp.js');
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
-const { CallToolRequestSchema, ListToolsRequestSchema } = require('@modelcontextprotocol/sdk/types.js');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -53,7 +52,7 @@ const { allTools, getToolHandler, hasHandler } = require('./tools/index');
 class ChromeMCPServer {
   constructor() {
     // Initialize core components
-    this.server = new Server({
+    this.server = new McpServer({
       name: 'claude-chrome-mcp',
       version: '2.6.0'
     }, {
@@ -148,26 +147,46 @@ class ChromeMCPServer {
   }
 
   setupTools() {
-    this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
-      tools: allTools
-    }));
-
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-      const { name, arguments: args } = request.params;
-
-      try {
-        // Use dynamic handler lookup
-        if (!hasHandler(name)) {
-          throw new Error(`Unknown tool: ${name}`);
-        }
-
-        const handler = getToolHandler(name);
-        return await handler(this, args);
-      } catch (error) {
-        this.errorTracker.logError(error, { tool: name, args });
-        throw error;
+    // Register each tool using modern MCP server.tool() method
+    for (const tool of allTools) {
+      const handler = getToolHandler(tool.name);
+      
+      if (!handler) {
+        this.debug.warn(`Warning: No handler found for tool: ${tool.name}`);
+        continue;
       }
-    });
+
+      // Register tool with modern MCP approach
+      this.server.tool(
+        tool.name,
+        tool.description,
+        tool.inputSchema,
+        async (args) => {
+          try {
+            const result = await handler(this, args);
+            
+            // Convert result to MCP format if needed
+            if (result && typeof result === 'object' && !result.content) {
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: typeof result === 'string' ? result : JSON.stringify(result, null, 2)
+                  }
+                ]
+              };
+            }
+            
+            return result;
+          } catch (error) {
+            this.errorTracker.logError(error, { tool: tool.name, args });
+            throw error;
+          }
+        }
+      );
+    }
+    
+    this.debug.info(`Registered ${allTools.length} tools using modern MCP server.tool() method`);
   }
 
   async getConnectionHealth() {
@@ -236,130 +255,6 @@ class ChromeMCPServer {
     };
   }
 
-  async executeWorkflowTemplate(params) {
-    // Workflow implementation placeholder
-    return {
-      content: [{
-        type: 'text',
-        text: JSON.stringify({
-          success: true,
-          message: 'Workflow template execution not yet implemented',
-          params
-        }, null, 2)
-      }]
-    };
-  }
-
-  async listWorkflowTemplates() {
-    return {
-      content: [{
-        type: 'text',
-        text: JSON.stringify({
-          templates: []
-        }, null, 2)
-      }]
-    };
-  }
-
-  async createWorkflowTemplate(params) {
-    return {
-      content: [{
-        type: 'text',
-        text: JSON.stringify({
-          success: true,
-          message: 'Workflow template creation not yet implemented',
-          params
-        }, null, 2)
-      }]
-    };
-  }
-
-  async executeWorkflowOrchestration(params) {
-    return {
-      content: [{
-        type: 'text',
-        text: JSON.stringify({
-          success: true,
-          message: 'Workflow orchestration not yet implemented',
-          params
-        }, null, 2)
-      }]
-    };
-  }
-
-  async createWorkflowOrchestration(params) {
-    return {
-      content: [{
-        type: 'text',
-        text: JSON.stringify({
-          success: true,
-          message: 'Workflow orchestration creation not yet implemented',
-          params
-        }, null, 2)
-      }]
-    };
-  }
-
-  async listWorkflowOrchestrations() {
-    return {
-      content: [{
-        type: 'text',
-        text: JSON.stringify({
-          orchestrations: []
-        }, null, 2)
-      }]
-    };
-  }
-
-  async saveWorkflowState(params) {
-    return {
-      content: [{
-        type: 'text',
-        text: JSON.stringify({
-          success: true,
-          message: 'Workflow state saving not yet implemented',
-          params
-        }, null, 2)
-      }]
-    };
-  }
-
-  async loadWorkflowState(params) {
-    return {
-      content: [{
-        type: 'text',
-        text: JSON.stringify({
-          success: true,
-          message: 'Workflow state loading not yet implemented',
-          params
-        }, null, 2)
-      }]
-    };
-  }
-
-  async listWorkflowStates(params) {
-    return {
-      content: [{
-        type: 'text',
-        text: JSON.stringify({
-          states: []
-        }, null, 2)
-      }]
-    };
-  }
-
-  async deleteWorkflowState(params) {
-    return {
-      content: [{
-        type: 'text',
-        text: JSON.stringify({
-          success: true,
-          message: 'Workflow state deletion not yet implemented',
-          params
-        }, null, 2)
-      }]
-    };
-  }
 
   async start() {
     try {

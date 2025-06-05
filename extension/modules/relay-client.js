@@ -144,42 +144,102 @@ export class ExtensionRelayClient {
         case 'debug_claude_dot_ai_page':
           result = await this.debugClaudePage(command.params || {});
           break;
-        case 'execute_workflow_template':
-          result = await this.executeWorkflowTemplate(command.params || {});
-          break;
-        case 'list_workflow_templates':
-          result = await this.listWorkflowTemplates(command.params || {});
-          break;
-        case 'create_workflow_template':
-          result = await this.createWorkflowTemplate(command.params || {});
-          break;
-        case 'execute_workflow_orchestration':
-          result = await this.executeWorkflowOrchestration(command.params || {});
-          break;
-        case 'create_workflow_orchestration':
-          result = await this.createWorkflowOrchestration(command.params || {});
-          break;
-        case 'list_workflow_orchestrations':
-          result = await this.listWorkflowOrchestrations(command.params || {});
-          break;
-        case 'save_workflow_state':
-          result = await this.saveWorkflowState(command.params || {});
-          break;
-        case 'load_workflow_state':
-          result = await this.loadWorkflowState(command.params || {});
-          break;
-        case 'list_workflow_states':
-          result = await this.listWorkflowStates(command.params || {});
-          break;
-        case 'delete_workflow_state':
-          result = await this.deleteWorkflowState(command.params || {});
-          break;
         case 'wait_for_operation':
           result = await this.waitForOperation(command.params || {});
           break;
         case 'get_connection_health':
           result = await this.getConnectionHealth(command.params || {});
           break;
+
+        // NEW REORGANIZED TOOL NAMES (backward compatibility routing)
+        // System tools
+        case 'system_health':
+          result = await this.getConnectionHealth(command.params || {});
+          break;
+        case 'system_wait_operation':
+          result = await this.waitForOperation(command.params || {});
+          break;
+
+        // Chrome tools
+        case 'chrome_reload_extension':
+          result = await this.reloadExtension(command.params || {});
+          break;
+        case 'chrome_debug_attach':
+          result = await this.attachDebugger((command.params || {}).tabId);
+          break;
+        case 'chrome_execute_script':
+          result = await this.executeScript(command.params || {});
+          break;
+        case 'chrome_get_dom_elements':
+          result = await this.getDomElements(command.params || {});
+          break;
+        case 'chrome_start_network_monitoring':
+          result = await this.startNetworkInspection(command.params || {});
+          break;
+        case 'chrome_stop_network_monitoring':
+          result = await this.stopNetworkInspection(command.params || {});
+          break;
+        case 'chrome_get_network_requests':
+          result = await this.getCapturedRequests(command.params || {});
+          break;
+
+        // Tab tools
+        case 'tab_create':
+          result = await this.spawnClaudeTab(command.params || {});
+          break;
+        case 'tab_list':
+          result = await this.getClaudeTabs(command.params || {});
+          break;
+        case 'tab_close':
+          result = await this.closeClaudeTab(command.params || {});
+          break;
+        case 'tab_send_message':
+          // Route based on waitForCompletion parameter
+          if (command.params && command.params.waitForCompletion) {
+            result = await this.sendMessageToClaudeTab(command.params);
+          } else {
+            result = await this.sendMessageAsync(command.params || {});
+          }
+          break;
+        case 'tab_get_response':
+          result = await this.getClaudeResponse(command.params || {});
+          break;
+        case 'tab_get_response_status':
+          result = await this.getClaudeResponseStatus(command.params || {});
+          break;
+        case 'tab_forward_response':
+          result = await this.forwardResponseToClaudeTab(command.params || {});
+          break;
+        case 'tab_extract_elements':
+          result = await this.extractConversationElements(command.params || {});
+          break;
+        case 'tab_export_conversation':
+          result = await this.exportConversationTranscript(command.params || {});
+          break;
+        case 'tab_debug_page':
+          result = await this.debugClaudePage(command.params || {});
+          break;
+        case 'tab_batch_operations':
+          result = await this.handleTabBatchOperations(command.params || {});
+          break;
+
+        // API tools
+        case 'api_list_conversations':
+          result = await this.getClaudeConversations(command.params || {});
+          break;
+        case 'api_search_conversations':
+          result = await this.searchClaudeConversations(command.params || {});
+          break;
+        case 'api_get_conversation_metadata':
+          result = await this.getConversationMetadata(command.params || {});
+          break;
+        case 'api_get_conversation_url':
+          result = await this.getConversationUrl(command.params || {});
+          break;
+        case 'api_delete_conversations':
+          result = await this.handleApiDeleteConversations(command.params || {});
+          break;
+
         default:
           throw new Error(`Unknown command type: ${command.type}`);
       }

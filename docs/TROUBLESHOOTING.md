@@ -80,7 +80,7 @@ After applying the fix, verify:
 ### MCP Notification Delays
 **Symptoms**: Operations complete but notifications arrive late or not at all.
 
-**Diagnosis**: Check WebSocket connection health with `get_connection_health`
+**Diagnosis**: Check WebSocket connection health with `system_health`
 
 **Fixes**:
 1. **Restart extension**: May resolve WebSocket notification issues
@@ -124,22 +124,22 @@ When debugging async operations or network-related issues, use systematic eviden
 
 **Step 1: Health Check**
 ```bash
-mcp__claude-chrome-mcp__get_connection_health
+mcp__claude-chrome-mcp__system_health
 ```
 
 **Step 2: Network Inspection** (for async/network issues)
 ```bash
 # Start monitoring BEFORE sending messages
-mcp__claude-chrome-mcp__start_network_inspection --tabId <id>
+mcp__claude-chrome-mcp__chrome_start_network_monitoring --tabId <id>
 
 # Send test message
-mcp__claude-chrome-mcp__send_message_async --message "test" --tabId <id>
+mcp__claude-chrome-mcp__tab_send_message --message "test" --tabId <id>
 
 # Analyze actual traffic patterns
-mcp__claude-chrome-mcp__get_captured_requests --tabId <id>
+mcp__claude-chrome-mcp__chrome_get_network_requests --tabId <id>
 
 # Stop monitoring
-mcp__claude-chrome-mcp__stop_network_inspection --tabId <id>
+mcp__claude-chrome-mcp__chrome_stop_network_monitoring --tabId <id>
 ```
 
 **Step 3: Analyze Evidence**
@@ -175,20 +175,20 @@ mcp__claude-chrome-mcp__stop_network_inspection --tabId <id>
 ### Tool Selection Guide
 
 **For async operation issues**:
-1. `get_connection_health` - System status
-2. `start_network_inspection` - Traffic analysis
-3. `get_claude_dot_ai_response` - Response verification
-4. `debug_claude_dot_ai_page` - Page state
+1. `system_health` - System status
+2. `chrome_start_network_monitoring` - Traffic analysis
+3. `tab_get_response` - Response verification
+4. `tab_debug_page` - Page state
 
 **For connection issues**:
-1. `get_connection_health` - Hub and client status
-2. `get_claude_dot_ai_tabs` - Tab verification
-3. `debug_attach` - Advanced debugging
+1. `system_health` - Relay and client status
+2. `tab_list` - Tab verification
+3. `chrome_debug_attach` - Advanced debugging
 
 **For response detection**:
-1. `start_network_inspection` - Monitor `/latest` endpoints
-2. `execute_script` - Manual completion triggers
-3. `get_captured_requests` - Network pattern analysis
+1. `chrome_start_network_monitoring` - Monitor `/latest` endpoints
+2. `chrome_execute_script` - Manual completion triggers
+3. `chrome_get_network_requests` - Network pattern analysis
 
 ## Debug Mode
 

@@ -176,14 +176,13 @@ class ExtensionLogger {
 // Create singleton instance
 const extensionLogger = new ExtensionLogger();
 
-// Export factory function for component loggers
-window.createLogger = (component) => {
+// Note: No window object in service worker context (Manifest V3)
+
+// Export factory function  
+export function createLogger(component) {
   return extensionLogger.createComponentLogger(component);
-};
+}
 
-// Export main logger for configuration
-window.extensionLogger = extensionLogger;
-
-// Export for ES6 modules
-export { extensionLogger, createLogger };
+// Export main logger
+export { extensionLogger };
 export default extensionLogger;

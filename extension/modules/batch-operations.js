@@ -335,5 +335,68 @@ export const batchOperationMethods = {
         status: 'error'
       };
     }
+  },
+
+  // NEW REORGANIZED TOOL METHODS
+
+  /**
+   * Handle tab batch operations - consolidated routing for tab_batch_operations
+   * Supports send_messages, get_responses, and send_and_get operations
+   */
+  async handleTabBatchOperations(params) {
+    const { operation, messages, tabIds, ...batchParams } = params;
+    
+    switch (operation) {
+      case 'send_messages':
+        if (!messages || !Array.isArray(messages)) {
+          throw new Error('messages parameter required for send_messages operation');
+        }
+        return await this.batchSendMessages({
+          messages: messages,
+          sequential: batchParams.sequential,
+          delayMs: batchParams.delayMs,
+          maxConcurrent: batchParams.maxConcurrent
+        });
+        
+      case 'get_responses':
+        if (!tabIds || !Array.isArray(tabIds)) {
+          throw new Error('tabIds parameter required for get_responses operation');
+        }
+        return await this.batchGetResponses({
+          tabIds: tabIds,
+          timeoutMs: batchParams.timeoutMs,
+          waitForAll: batchParams.waitForAll,
+          pollIntervalMs: batchParams.pollIntervalMs
+        });
+        
+      case 'send_and_get':
+        if (!messages || !Array.isArray(messages)) {
+          throw new Error('messages parameter required for send_and_get operation');
+        }
+        
+        // First send messages
+        const sendResult = await this.batchSendMessages({
+          messages: messages,
+          sequential: batchParams.sequential,
+          delayMs: batchParams.delayMs,
+          maxConcurrent: batchParams.maxConcurrent
+        });
+        
+        if (sendResult.success) {
+          // Extract tabIds from messages for getting responses
+          const responseTabIds = messages.map(msg => msg.tabId);
+          const getResult = await this.batchGetResponses({
+            tabIds: responseTabIds,
+            timeoutMs: batchParams.timeoutMs,
+            waitForAll: batchParams.waitForAll,
+            pollIntervalMs: batchParams.pollIntervalMs
+          });
+          return { sendResult, getResult };
+        }
+        return sendResult;
+        
+      default:
+        throw new Error(`Unknown batch operation: ${operation}`);
+    }
   }
 };

@@ -10,15 +10,19 @@ Quick reference for Claude. See README.md for full documentation.
 ## Quick Commands
 ```bash
 # System health
-mcp__claude-chrome-mcp__get_connection_health
+mcp__claude-chrome-mcp__system_health
 
-# Basic workflow
-mcp__claude-chrome-mcp__spawn_claude_dot_ai_tab --injectContentScript true
-mcp__claude-chrome-mcp__send_message_async --message "Test" --tabId <tab_id>
-mcp__claude-chrome-mcp__get_claude_dot_ai_response --tabId <tab_id>
+# Basic workflow (NEW reorganized tools)
+mcp__claude-chrome-mcp__tab_create --injectContentScript true
+mcp__claude-chrome-mcp__tab_send_message --message "Test" --tabId <tab_id>
+mcp__claude-chrome-mcp__tab_get_response --tabId <tab_id>
 
 # Claude-to-Claude forwarding
-mcp__claude-chrome-mcp__forward_response_to_claude_dot_ai_tab --sourceTabId <source> --targetTabId <target>
+mcp__claude-chrome-mcp__tab_forward_response --sourceTabId <source> --targetTabId <target>
+
+# API operations (pure conversationId workflows)
+mcp__claude-chrome-mcp__api_list_conversations
+mcp__claude-chrome-mcp__api_get_conversation_url --conversationId <uuid>
 ```
 
 ## Continuation Workflow  
@@ -43,6 +47,10 @@ mcp__claude-chrome-mcp__forward_response_to_claude_dot_ai_tab --sourceTabId <sou
 - Change code → Reload extension → Test
 - Use TodoRead for active tasks
 - Use MCP tools for debugging and development
+- After making changes to extension/ always attempt to reload the extension with MCP tools or, if that fails, ask the user to manually reload the extension
 
 ## MCP Specification Reference
 - Located at node_modules/@modelcontextprotocol for MCP-related changes
+
+## Restart Procedure
+- In the case RESTART REQUIRED: Exit and restart Claude Code or similar, ensure that docs/CONTINUATION.md and other system documentation is updated per Critical Directives, before asking the user to restart. (ultrathink)
