@@ -46,6 +46,11 @@ When you type 'continue' in a fresh Claude Code instance:
 - **Status**: Production-ready with unified operation tracking
 - **Important**: Extension needs manual reload after code changes
 
+## Latest Session Work
+- Removed client info complexity from MCP server (optimization #8)
+- Deleted setupInitializationHandler() method (-60 lines)
+- Simplified to static "Claude Chrome MCP" client name
+
 ## CLI Usage
 The CLI daemon auto-spawns when running commands. Use `mcp help` for available commands.
 
