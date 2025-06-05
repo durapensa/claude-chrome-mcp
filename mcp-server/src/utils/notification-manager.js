@@ -8,7 +8,7 @@ class NotificationManager {
     this.logger = createLogger('NotificationManager');
   }
 
-  sendProgress(operationId, milestone, data = {}) {
+  async sendProgress(operationId, milestone, data = {}) {
     const notification = {
       method: 'notifications/operation/progress',
       params: {
@@ -57,21 +57,21 @@ class NotificationManager {
     return true;
   }
 
-  sendCompletion(operationId, result = {}) {
-    return this.sendProgress(operationId, 'completed', { result });
+  async sendCompletion(operationId, result = {}) {
+    return await this.sendProgress(operationId, 'completed', { result });
   }
 
-  sendError(operationId, error) {
-    return this.sendProgress(operationId, 'error', { 
+  async sendError(operationId, error) {
+    return await this.sendProgress(operationId, 'error', { 
       error: error.message || error.toString() 
     });
   }
 
   // Test method to verify notification delivery
-  testNotificationDelivery() {
+  async testNotificationDelivery() {
     const testId = `test_${Date.now()}`;
     this.logger.info('Testing notification delivery...');
-    return this.sendProgress(testId, 'test', { 
+    return await this.sendProgress(testId, 'test', { 
       message: 'Notification delivery test' 
     });
   }

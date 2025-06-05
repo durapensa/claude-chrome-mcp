@@ -45,7 +45,7 @@ Transform the existing claude-chrome-mcp CLI into a **Universal MCP Client** tha
 - **Connection Pool** - Manage stdio connections to multiple servers
 
 ### 3. Configuration System (`src/config/`)
-- **Config Parser** - Load and validate `~/.mcp-cli/config.json`
+- **Config Parser** - Load and validate `~/.config/mcp/config.json`
 - **Server Definitions** - Command, environment, and lifecycle settings
 - **Runtime Settings** - Defaults, output preferences, timeouts
 
@@ -105,7 +105,7 @@ interface ParsedCommand {
 
 ## Configuration Format
 
-### `~/.mcp-cli/config.json`
+### `~/.config/mcp/config.json`
 ```json
 {
   "servers": {
@@ -136,8 +136,8 @@ interface ParsedCommand {
     }
   },
   "daemon": {
-    "socket": "~/.mcp-cli/daemon.sock",
-    "log_file": "~/.mcp-cli/daemon.log",
+    "socket": "~/.config/mcp/daemon.sock",
+    "log_file": "~/.config/mcp/daemon.log",
     "log_level": "info",
     "idle_timeout": "1h"
   },

@@ -140,7 +140,7 @@ class MCPRelayClient extends EventEmitter {
 
 
 
-  handleOperationMilestone(message) {
+  async handleOperationMilestone(message) {
     const { operationId, milestone, timestamp, tabId, ...data } = message;
     
     this.logger.info('Received milestone', { operationId, milestone });
@@ -152,7 +152,7 @@ class MCPRelayClient extends EventEmitter {
     
     // Send MCP notification
     if (this.notificationManager) {
-      this.notificationManager.sendProgress(operationId, milestone, { tabId, ...data });
+      await this.notificationManager.sendProgress(operationId, milestone, { tabId, ...data });
     }
   }
 
@@ -247,12 +247,12 @@ class MCPRelayClient extends EventEmitter {
   }
   
   // Handle extension log notifications
-  handleExtensionLog(logEntry) {
+  async handleExtensionLog(logEntry) {
     try {
       // Forward to NotificationManager if available
       if (this.notificationManager) {
         // Send as debug notification
-        this.notificationManager.sendProgress(
+        await this.notificationManager.sendProgress(
           `extension_log_${Date.now()}`,
           'debug_log',
           {

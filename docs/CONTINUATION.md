@@ -82,3 +82,19 @@ mcp system_disable_extension_debug_mode
 **Known Issues**:
 - Log structure shows `[Extension:undefined] undefined` - needs fix
 - CLI array parameter handling for components filter needs improvement
+
+## Recent Accomplishments (2025-06-05)
+
+### Fixed Critical Issues
+1. **CLI Config Location**: Updated documentation to reflect correct config location at `~/.config/mcp/config.json`
+   - Updated `cli/ARCHITECTURE.md` with correct paths
+
+2. **MCP Notification Async/Await Issues**: Fixed missing async/await in NotificationManager
+   - Made all NotificationManager methods async (sendProgress, sendCompletion, sendError, testNotificationDelivery)
+   - Added await to all NotificationManager method calls in mcp-relay-client.js
+   - Fixed handleOperationMilestone and handleExtensionLog to be async functions
+
+### Status
+- MCP server starts without syntax errors
+- CLI daemon connects to filesystem server successfully
+- claude-chrome-mcp server still has timeout issues - requires Claude Code restart to load fixed code
