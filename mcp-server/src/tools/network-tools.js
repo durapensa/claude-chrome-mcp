@@ -56,15 +56,15 @@ const networkTools = [
  * Network tool handlers
  */
 const networkHandlers = {
-  async 'start_network_inspection'(server, args) {
+  'start_network_inspection': async (server, args) => {
     return await server.forwardToExtension('start_network_inspection', args);
   },
 
-  async 'stop_network_inspection'(server, args) {
+  'stop_network_inspection': async (server, args) => {
     return await server.forwardToExtension('stop_network_inspection', args);
   },
 
-  async 'get_captured_requests'(server, args) {
+  'get_captured_requests': async (server, args) => {
     return await server.forwardToExtension('get_captured_requests', args);
   }
 };

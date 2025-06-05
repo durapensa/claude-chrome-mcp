@@ -36,6 +36,7 @@ mcp__claude-chrome-mcp__api_get_conversation_url --conversationId <uuid>
 - **[Continuation](docs/CONTINUATION.md)**: Session restart workflow
 
 ## Critical Directives
+- **RESTART REQUIRED**: Any MCP server code changes require Claude Code restart
 - **MAINTAIN CODE HYGIENE**: "one-in-one-out" rule
 - **ZERO INSTRUCTION DUPLICATION**: Reference other docs, never repeat
 - **NO SESSION ARTIFACTS**: Git history captures accomplishments

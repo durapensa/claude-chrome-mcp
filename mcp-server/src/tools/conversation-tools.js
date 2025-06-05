@@ -168,31 +168,31 @@ const conversationTools = [
  * Conversation tool handlers
  */
 const conversationHandlers = {
-  async 'extract_conversation_elements'(server, args) {
+  'extract_conversation_elements': async (server, args) => {
     return await server.forwardToExtension('extract_conversation_elements', args);
   },
 
-  async 'export_conversation_transcript'(server, args) {
+  'export_conversation_transcript': async (server, args) => {
     return await server.forwardToExtension('export_conversation_transcript', args);
   },
 
-  async 'get_claude_conversations'(server, args) {
+  'get_claude_conversations': async (server, args) => {
     return await server.forwardToExtension('get_claude_conversations', args);
   },
 
-  async 'search_claude_conversations'(server, args) {
+  'search_claude_conversations': async (server, args) => {
     return await server.forwardToExtension('search_claude_conversations', args);
   },
 
-  async 'get_conversation_metadata'(server, args) {
+  'get_conversation_metadata': async (server, args) => {
     return await server.forwardToExtension('get_conversation_metadata', args);
   },
 
-  async 'delete_claude_conversation'(server, args) {
+  'delete_claude_conversation': async (server, args) => {
     return await server.forwardToExtension('delete_claude_conversation', args);
   },
 
-  async 'bulk_delete_conversations'(server, args) {
+  'bulk_delete_conversations': async (server, args) => {
     return await server.forwardToExtension('bulk_delete_conversations', args);
   }
 };

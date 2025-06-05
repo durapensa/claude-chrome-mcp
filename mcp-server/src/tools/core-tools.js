@@ -49,15 +49,15 @@ const coreTools = [
  * Core tool handlers
  */
 const coreHandlers = {
-  async 'get_connection_health'(server, args) {
+  'get_connection_health': async (server, args) => {
     return await server.getConnectionHealth();
   },
 
-  async 'wait_for_operation'(server, args) {
+  'wait_for_operation': async (server, args) => {
     return await server.waitForOperation(args);
   },
 
-  async 'reload_extension'(server, args) {
+  'reload_extension': async (server, args) => {
     return await server.forwardToExtension('reload_extension', args);
   }
 };

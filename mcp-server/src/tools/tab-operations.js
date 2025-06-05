@@ -103,19 +103,19 @@ const tabOperationTools = [
  * Tab operation tool handlers
  */
 const tabOperationHandlers = {
-  async 'spawn_claude_dot_ai_tab'(server, args) {
+  'spawn_claude_dot_ai_tab': async (server, args) => {
     return await server.forwardToExtension('spawn_claude_dot_ai_tab', args);
   },
 
-  async 'send_message_async'(server, args) {
+  'send_message_async': async (server, args) => {
     return await server.forwardToExtension('send_message_async', args);
   },
 
-  async 'get_claude_dot_ai_response'(server, args) {
+  'get_claude_dot_ai_response': async (server, args) => {
     return await server.forwardToExtension('get_claude_dot_ai_response', args);
   },
 
-  async 'forward_response_to_claude_dot_ai_tab'(server, args) {
+  'forward_response_to_claude_dot_ai_tab': async (server, args) => {
     return await server.forwardToExtension('forward_response_to_claude_dot_ai_tab', args);
   }
 };

@@ -194,31 +194,31 @@ const tabManagementTools = [
  * Tab management tool handlers
  */
 const tabManagementHandlers = {
-  async 'get_claude_dot_ai_tabs'(server, args) {
+  'get_claude_dot_ai_tabs': async (server, args) => {
     return await server.forwardToExtension('get_claude_dot_ai_tabs', args);
   },
 
-  async 'close_claude_dot_ai_tab'(server, args) {
+  'close_claude_dot_ai_tab': async (server, args) => {
     return await server.forwardToExtension('close_claude_dot_ai_tab', args);
   },
 
-  async 'open_claude_dot_ai_conversation_tab'(server, args) {
+  'open_claude_dot_ai_conversation_tab': async (server, args) => {
     return await server.forwardToExtension('open_claude_dot_ai_conversation_tab', args);
   },
 
-  async 'send_message_to_claude_dot_ai_tab'(server, args) {
+  'send_message_to_claude_dot_ai_tab': async (server, args) => {
     return await server.forwardToExtension('send_message_to_claude_dot_ai_tab', args);
   },
 
-  async 'batch_send_messages'(server, args) {
+  'batch_send_messages': async (server, args) => {
     return await server.forwardToExtension('batch_send_messages', args);
   },
 
-  async 'batch_get_responses'(server, args) {
+  'batch_get_responses': async (server, args) => {
     return await server.forwardToExtension('batch_get_responses', args);
   },
 
-  async 'get_claude_dot_ai_response_status'(server, args) {
+  'get_claude_dot_ai_response_status': async (server, args) => {
     return await server.forwardToExtension('get_claude_dot_ai_response_status', args);
   }
 };

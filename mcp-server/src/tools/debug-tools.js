@@ -79,19 +79,19 @@ const debugTools = [
  * Debug tool handlers
  */
 const debugHandlers = {
-  async 'debug_attach'(server, args) {
+  'debug_attach': async (server, args) => {
     return await server.forwardToExtension('debug_attach', args);
   },
 
-  async 'execute_script'(server, args) {
+  'execute_script': async (server, args) => {
     return await server.forwardToExtension('execute_script', args);
   },
 
-  async 'get_dom_elements'(server, args) {
+  'get_dom_elements': async (server, args) => {
     return await server.forwardToExtension('get_dom_elements', args);
   },
 
-  async 'debug_claude_dot_ai_page'(server, args) {
+  'debug_claude_dot_ai_page': async (server, args) => {
     return await server.forwardToExtension('debug_claude_dot_ai_page', args);
   }
 };
