@@ -87,37 +87,47 @@ class ChromeMCPServer {
     }, this.operationManager, this.notificationManager);
     
     // Set up callback to update relay client info after MCP initialization
-    this.server.oninitialized = () => {
-      try {
-        // Check for environment variable override first
-        const envClientName = process.env.CCM_CLIENT_NAME;
+    this.server._handleRequest = new Proxy(this.server._handleRequest, {
+      apply: async (target, thisArg, args) => {
+        const [request] = args;
         
-        if (envClientName) {
-          // Use environment variable if set
-          this.debug.info(`Using client name from environment: ${envClientName}`);
-          return; // Already set in constructor
+        // Intercept the initialize response to update client info
+        if (request.method === 'initialize') {
+          const result = await target.apply(thisArg, args);
+          
+          // After successful initialization, update relay with client info
+          try {
+            // Check for environment variable override first
+            const envClientName = process.env.CCM_CLIENT_NAME;
+            
+            if (!envClientName) {
+              // Get the actual MCP client info from the SDK
+              const clientInfo = this.server.getClientVersion();
+              this.debug.info('After initialize, getClientVersion() returned:', { clientInfo });
+              
+              if (clientInfo && clientInfo.name) {
+                // Pass raw client name - let extension handle display mapping
+                this.relayClient.updateClientInfo({
+                  type: 'mcp-client',
+                  name: clientInfo.name,
+                  version: clientInfo.version || '2.6.0',
+                  capabilities: ['chrome_tabs', 'debugger', 'claude_automation']
+                });
+                this.debug.info(`Updated relay client with raw name: ${clientInfo.name}`);
+              } else {
+                this.debug.warn('getClientVersion() did not return expected client info');
+              }
+            }
+          } catch (error) {
+            this.debug.error('Failed to update client info after initialization:', error);
+          }
+          
+          return result;
         }
         
-        // Otherwise, get the actual MCP client info from the SDK
-        const clientInfo = this.server.getClientVersion();
-        this.debug.info('getClientVersion() returned:', { clientInfo });
-        
-        if (clientInfo && clientInfo.name) {
-          // Pass raw client name - let extension handle display mapping
-          this.relayClient.updateClientInfo({
-            type: 'mcp-client',
-            name: clientInfo.name,
-            version: clientInfo.version || '2.6.0',
-            capabilities: ['chrome_tabs', 'debugger', 'claude_automation']
-          });
-          this.debug.info(`Updated relay client with raw name: ${clientInfo.name}`);
-        } else {
-          this.debug.warn('getClientVersion() did not return expected client info');
-        }
-      } catch (error) {
-        this.debug.error('Failed to update client info after initialization:', error);
+        return target.apply(thisArg, args);
       }
-    };
+    });
 
     this.setupTools();
   }
