@@ -53,15 +53,15 @@ If testing is requested:
 - **Important**: Extension needs manual reload after code changes
 
 ## Current Work Focus
-**✅ OPERATION ID UNIFICATION COMPLETED**: Async operation tracking works end-to-end
+**✅ TAB MANAGEMENT REFACTOR COMPLETED**: Shared utilities eliminate code duplication
 
 ### ✅ Major Accomplishments
+- **Shared Tab Management**: Created unified `tab-management.js` utilities for all tools
+- **Code Deduplication**: `ensureClaudeTabForApi()` and `ensureConversationTab()` shared across tools
+- **API Tab Creation**: Consistent `/new` tab creation when no Claude.ai tabs exist
 - **Operation ID System**: Fixed dual ID issue, `system_wait_operation` works across MCP boundary
 - **Parameter Passing**: All 20 tools converted from inputSchema to zodSchema
 - **CLI Debugging**: Rapid iteration workflow without Claude Code restarts
-- **Performance Practices**: Bulk conversation cleanup with immediate tab management
-- **Service Worker Fixes**: Dynamic import restrictions resolved
-- **Content Script Management**: Navigation state tracking and lifecycle improvements
 
 ### ✅ Performance Debugging Workflow Established
 ```bash

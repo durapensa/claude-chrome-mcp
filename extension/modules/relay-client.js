@@ -1001,14 +1001,6 @@ export class ExtensionRelayClient {
     }
   }
 
-  // Helper method for createClaudeTab used by conversation operations
-  async createClaudeTab() {
-    const tab = await chrome.tabs.create({ 
-      url: 'https://claude.ai/new',
-      active: false
-    });
-    return tab;
-  }
 
   // Offscreen WebSocket relay methods
   handleRelayStatus(message) {

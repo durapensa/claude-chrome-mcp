@@ -1,30 +1,24 @@
 // Conversation Operations for Chrome Extension
 // Methods for managing Claude conversations, metadata, and transcripts
 
+import { ensureClaudeTabForApi, ensureConversationTab, getClaudeTabsWithConversations } from '../utils/tab-management.js';
+
 export const conversationOperationMethods = {
   async getClaudeConversations() {
     try {
-      // First get current Claude tabs to match with conversations
-      const claudeTabsResult = await this.getClaudeTabs();
-      const claudeTabs = claudeTabsResult.tabs || [];
-      const tabsByConversationId = new Map();
-      
-      claudeTabs.forEach(tab => {
-        // Extract conversation ID from URL if available
-        const urlMatch = tab.url?.match(/\/chat\/([a-f0-9-]+)/);
-        if (urlMatch) {
-          tabsByConversationId.set(urlMatch[1], tab.id);
-        }
-      });
-
-      // Find a Claude tab to execute the API call from
-      let claudeTab = claudeTabs.find(tab => tab.url?.includes('claude.ai'));
-      
-      if (!claudeTab) {
-        // Create a temporary Claude tab for the API call
-        claudeTab = await this.createClaudeTab();
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for page load
+      // Get current Claude tabs with conversation ID mapping
+      const tabsResult = await getClaudeTabsWithConversations(this);
+      if (!tabsResult.success) {
+        throw new Error(`Failed to get Claude tabs: ${tabsResult.error}`);
       }
+      const { tabsByConversationId } = tabsResult;
+
+      // Ensure we have a Claude tab for the API call
+      const claudeTabResult = await ensureClaudeTabForApi(this);
+      if (!claudeTabResult.success) {
+        throw new Error(`Failed to ensure Claude tab: ${claudeTabResult.error}`);
+      }
+      const claudeTab = claudeTabResult.tab;
 
       // Attach debugger to execute script
       await this.ensureDebuggerAttached(claudeTab.id);
@@ -408,23 +402,19 @@ export const conversationOperationMethods = {
   async getConversationMetadata(params) {
     const { conversationId, includeMessages = false } = params;
     
-    // If conversationId provided, find or open the tab
+    // Ensure conversation tab exists
     let tabId;
     if (conversationId) {
-      // First check if conversation is already open
-      const tabs = await this.getClaudeTabs();
-      const existingTab = tabs.tabs?.find(tab => tab.url?.includes(`/chat/${conversationId}`));
+      const tabResult = await ensureConversationTab(this, conversationId, {
+        activate: false,
+        waitForLoad: true
+      });
       
-      if (existingTab) {
-        tabId = existingTab.id;
-      } else {
-        // Open the conversation
-        const openResult = await this.openClaudeConversationTab({ conversationId });
-        if (!openResult.success) {
-          return { success: false, error: `Failed to open conversation: ${openResult.error}` };
-        }
-        tabId = openResult.tabId;
+      if (!tabResult.success) {
+        return { success: false, error: `Failed to open conversation: ${tabResult.error}` };
       }
+      
+      tabId = tabResult.tabId;
     } else {
       return { success: false, error: 'conversationId is required' };
     }
@@ -531,19 +521,19 @@ export const conversationOperationMethods = {
     
     // If only conversationId provided, find or open the tab
     if (!tabId && conversationId) {
-      const tabs = await this.getClaudeTabs();
-      const existingTab = tabs.tabs?.find(tab => tab.url?.includes(`/chat/${conversationId}`));
+      const tabResult = await ensureConversationTab(this, conversationId, {
+        activate: false,
+        waitForLoad: true
+      });
       
-      if (existingTab) {
-        tabId = existingTab.id;
-      } else {
-        // Open the conversation
-        const openResult = await this.openClaudeConversationTab({ conversationId });
-        if (!openResult.success) {
-          return { success: false, error: `Failed to open conversation: ${openResult.error}` };
-        }
-        tabId = openResult.tabId;
-        // Wait a bit for page to load
+      if (!tabResult.success) {
+        return { success: false, error: `Failed to open conversation: ${tabResult.error}` };
+      }
+      
+      tabId = tabResult.tabId;
+      
+      // Wait a bit for page to load if tab was newly created
+      if (!tabResult.wasExisting) {
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
     }
@@ -814,103 +804,27 @@ export const conversationOperationMethods = {
       throw new Error('conversationId is required and must be a string');
     }
 
-    // Validate conversation ID format (UUID)
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(conversationId)) {
-      throw new Error('conversationId must be a valid UUID format');
-    }
-
     try {
-      // Check if conversation is already open in an existing tab
-      const existingTabs = await new Promise((resolve) => {
-        chrome.tabs.query({ url: `https://claude.ai/chat/${conversationId}` }, resolve);
+      // Use shared utility to ensure conversation tab exists
+      const tabResult = await ensureConversationTab(this, conversationId, {
+        activate,
+        waitForLoad,
+        loadTimeoutMs
       });
-
-      if (existingTabs.length > 0) {
-        const existingTab = existingTabs[0];
-        
-        // Activate the existing tab if requested
-        if (activate) {
-          await new Promise((resolve, reject) => {
-            chrome.tabs.update(existingTab.id, { active: true }, (tab) => {
-              if (chrome.runtime.lastError) {
-                reject(new Error(chrome.runtime.lastError.message));
-              } else {
-                resolve(tab);
-              }
-            });
-          });
-        }
-
-        return {
-          success: true,
-          tabId: existingTab.id,
-          conversationId: conversationId,
-          url: existingTab.url,
-          title: existingTab.title,
-          wasExisting: true,
-          activated: activate,
-          createdAt: Date.now()
-        };
+      
+      if (!tabResult.success) {
+        throw new Error(`Failed to open conversation: ${tabResult.error}`);
       }
 
-      // Create new tab with conversation URL
-      const conversationUrl = `https://claude.ai/chat/${conversationId}`;
-      const newTab = await new Promise((resolve, reject) => {
-        chrome.tabs.create({ 
-          url: conversationUrl, 
-          active: activate 
-        }, (tab) => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message));
-          } else {
-            resolve(tab);
-          }
-        });
-      });
-
-      console.log(`CCM Extension: Created new tab ${newTab.id} for conversation ${conversationId}`);
-
-      let loadVerified = false;
-      let loadTimeMs = 0;
+      // Add additional verification if tab was newly created and load was requested
       let conversationTitle = null;
       let hasMessages = false;
-
-      // Wait for page to load if requested
-      if (waitForLoad) {
-        const loadStartTime = Date.now();
-        
+      let loadVerified = tabResult.loadVerified || false;
+      
+      if (waitForLoad && !tabResult.wasExisting) {
         try {
-          // Wait for tab to finish loading
-          await new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => {
-              reject(new Error(`Load timeout after ${loadTimeoutMs}ms`));
-            }, loadTimeoutMs);
-
-            const checkLoading = () => {
-              chrome.tabs.get(newTab.id, (tab) => {
-                if (chrome.runtime.lastError) {
-                  clearTimeout(timeout);
-                  reject(new Error(chrome.runtime.lastError.message));
-                  return;
-                }
-
-                if (tab.status === 'complete') {
-                  clearTimeout(timeout);
-                  resolve();
-                } else {
-                  setTimeout(checkLoading, 500);
-                }
-              });
-            };
-
-            checkLoading();
-          });
-
-          loadTimeMs = Date.now() - loadStartTime;
-
           // Verify conversation loaded correctly
-          await this.ensureDebuggerAttached(newTab.id);
+          await this.ensureDebuggerAttached(tabResult.tabId);
           
           const verifyScript = `
             (function() {
@@ -949,7 +863,7 @@ export const conversationOperationMethods = {
             })()
           `;
           
-          const verifyResult = await this.executeScript({ tabId: newTab.id, script: verifyScript });
+          const verifyResult = await this.executeScript({ tabId: tabResult.tabId, script: verifyScript });
           const verification = verifyResult.result?.value;
           
           if (verification && !verification.error) {
@@ -966,15 +880,15 @@ export const conversationOperationMethods = {
 
       return {
         success: true,
-        tabId: newTab.id,
+        tabId: tabResult.tabId,
         conversationId: conversationId,
-        url: conversationUrl,
-        title: newTab.title,
-        wasExisting: false,
-        activated: activate,
+        url: tabResult.url,
+        title: tabResult.title,
+        wasExisting: tabResult.wasExisting,
+        activated: tabResult.activated,
         createdAt: Date.now(),
         loadVerified: loadVerified,
-        loadTimeMs: loadTimeMs,
+        loadTimeMs: tabResult.loadTimeMs || 0,
         conversationTitle: conversationTitle,
         hasMessages: hasMessages
       };
