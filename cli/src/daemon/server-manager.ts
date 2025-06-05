@@ -80,6 +80,8 @@ export class ServerManager {
 
       // Update server state
       server.connection = connection;
+      // Get process reference from connection for PID tracking
+      server.process = (connection as any).process || null;
       server.status = 'ready';
       server.tools = tools.map(tool => ({
         name: tool.name,

@@ -321,9 +321,37 @@ class MCPCli {
         console.log(`  Running: ${chalk.green('Yes')}`);
         console.log(`  Servers: ${status.stats.running_servers}/${status.stats.total_servers}`);
         console.log(`  Tools: ${status.stats.total_tools}`);
+        
+        // Show MCP server processes if any are running
+        if (status.servers && status.servers.length > 0) {
+          console.log(chalk.bold('\nMCP Servers:'));
+          for (const server of status.servers) {
+            const statusColor = 
+              server.status === 'ready' ? chalk.green :
+              server.status === 'error' ? chalk.red :
+              server.status === 'starting' ? chalk.yellow :
+              chalk.gray;
+            
+            const pid = server.process && server.process.pid ? 
+              ` (PID: ${server.process.pid})` : '';
+            
+            console.log(`  ${chalk.cyan(server.id)}: ${statusColor(server.status)}${pid}`);
+            
+            if (server.error) {
+              console.log(`    Error: ${chalk.red(server.error)}`);
+            }
+            if (server.tools && server.tools.length > 0) {
+              console.log(`    Tools: ${server.tools.length}`);
+            }
+          }
+        }
       }
+      
+      // Disconnect to allow process to exit cleanly
+      this.client.disconnect();
     } catch (error) {
       console.error(chalk.red('Failed to get daemon status:'), (error as Error).message);
+      this.client.disconnect();
     }
   }
 
