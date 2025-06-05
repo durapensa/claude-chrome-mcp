@@ -201,6 +201,10 @@ mcp__claude-chrome-mcp__chrome_stop_network_monitoring --tabId <id>
 - Content scripts may become stale
 - Offscreen documents might need reinitialization
 
+**Important**: After extension reload, existing tabs lose their content scripts. You must:
+1. Close old tabs with `mcp tab_close --tabId <id> --force`
+2. Create fresh tabs with `mcp tab_create --injectContentScript`
+
 **Best Practice**: Always try reloading the extension first when experiencing timeouts before deeper debugging.
 - Use systematic tool sequences
 - Verify each component independently
@@ -217,6 +221,133 @@ mcp__claude-chrome-mcp__chrome_stop_network_monitoring --tabId <id>
 1. `system_health` - Relay and client status
 2. `tab_list` - Tab verification
 3. `chrome_debug_attach` - Advanced debugging
+
+## Logging and Debugging
+
+### Understanding Log Sources
+
+There are **two distinct log systems**:
+
+1. **MCP Server Logs** (winston files)
+   - Location: `~/.claude-chrome-mcp/logs/claude-chrome-mcp-server-PID-*.log`
+   - Contains: MCP server operations, relay client activity, tool executions
+   - Always active, written to disk
+   - View: `tail -f ~/.claude-chrome-mcp/logs/claude-chrome-mcp-server-PID-*.log`
+
+2. **Chrome Extension Logs** (forwarded to MCP server)
+   - Source: Chrome extension background/content scripts
+   - Contains: Extension initialization, tab operations, content script activity
+   - Requires debug mode enabled to forward to MCP server
+   - View: `mcp system_get_extension_logs`
+
+### Development Logging Workflow
+
+**Step 1: Enable Extension Debug Mode**
+```bash
+# Enable all extension logs
+mcp system_enable_extension_debug_mode
+
+# Or enable only ERROR level logs
+mcp system_enable_extension_debug_mode --errorOnly
+
+# Set extension log level
+mcp system_set_extension_log_level --level DEBUG
+```
+
+**Step 2: Perform Operations**
+```bash
+# Execute your test operations
+mcp tab_create --injectContentScript
+mcp tab_send_message --message "test" --tabId <id>
+```
+
+**Step 3: Review Extension Logs**
+```bash
+# Get recent extension logs
+mcp system_get_extension_logs --limit 50 --format text
+
+# Filter by component
+mcp system_get_extension_logs --component background --limit 20
+
+# Get specific log levels
+mcp system_get_extension_logs --level ERROR --limit 10
+```
+
+**Step 4: Check MCP Server Logs**
+```bash
+# View real-time MCP server logs
+tail -f ~/.claude-chrome-mcp/logs/claude-chrome-mcp-server-PID-*.log
+
+# Search for errors
+grep -i error ~/.claude-chrome-mcp/logs/claude-chrome-mcp-server-PID-*.log
+```
+
+**Step 5: Disable Debug Mode** (optional)
+```bash
+mcp system_disable_extension_debug_mode
+```
+
+### Common Extension Components
+
+When filtering extension logs by component:
+- `background` - Extension background script
+- `relay-client` - WebSocket relay communication
+- `content-script` - Claude.ai page interactions
+- `batch-operations` - Multi-tab operations
+- `tab-operations` - Individual tab management
+
+### Testing Flow Best Practices
+
+1. **After extension code changes - reload extension**
+   ```bash
+   mcp chrome_reload_extension
+   ```
+
+2. **After MCP server/tool changes - restart CLI daemon**
+   ```bash
+   mcp daemon stop && sleep 2 && mcp daemon start
+   ```
+
+3. **Enable debug mode before testing**
+   ```bash
+   mcp system_enable_extension_debug_mode --errorOnly
+   ```
+
+4. **Clean up test tabs (especially after extension reload)**
+   ```bash
+   mcp tab_list
+   mcp tab_close --tabId <id> --force
+   # After extension reload, always create fresh tabs
+   mcp tab_create --injectContentScript
+   ```
+
+5. **Monitor both log sources during testing**
+   - Terminal 1: `tail -f ~/.claude-chrome-mcp/logs/claude-chrome-mcp-server-PID-*.log`
+   - Terminal 2: `mcp system_get_extension_logs --limit 20` (run periodically)
+
+### Critical Testing Findings
+
+> **Note**: This section documents verified testing behaviors discovered during development. Update immediately when new workflow patterns are discovered.
+
+**Extension Reload Content Script Behavior** ⚠️ *(Verified 2025-06-05)*
+- Extension reload (`mcp chrome_reload_extension`) clears ALL content scripts from existing tabs
+- Tabs created before reload will show "Content script not available" errors
+- **Required workflow**: Close old tabs → Create fresh tabs after any extension reload
+- This is expected behavior, not a bug
+
+### Log Level Guidelines
+
+**Extension Log Levels** (from most to least verbose):
+- `VERBOSE` - Everything (development debugging)
+- `DEBUG` - Detailed operation tracking
+- `INFO` - Normal operations
+- `WARN` - Potential issues
+- `ERROR` - Critical failures only
+
+**MCP Server Log Levels**:
+- Set via `LOG_LEVEL` environment variable
+- Same hierarchy as extension levels
+- Controls what gets written to winston files
 
 **For response detection**:
 1. `chrome_start_network_monitoring` - Monitor `/latest` endpoints

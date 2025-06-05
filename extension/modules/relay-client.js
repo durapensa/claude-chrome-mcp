@@ -176,7 +176,7 @@ export class ExtensionRelayClient {
         case 'system_wait_operation':
           result = await this.waitForOperation(command.params || {});
           break;
-        case 'system_get_logs':
+        case 'system_get_extension_logs':
           result = await this.getExtensionLogs(command.params || {});
           break;
         case 'enable_debug_mode':

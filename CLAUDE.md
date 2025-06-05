@@ -3,20 +3,20 @@
 ## Quick Commands
 ```bash
 # System health
-mcp__claude-chrome-mcp__system_health
-mcp__claude-chrome-mcp__system_get_logs --limit 50 --format text
+mcp system_health
+mcp system_get_extension_logs --limit 50 --format text
 
 # Basic workflow
-mcp__claude-chrome-mcp__tab_create --injectContentScript true
-mcp__claude-chrome-mcp__tab_send_message --message "Test" --tabId <tab_id>
-mcp__claude-chrome-mcp__tab_get_response --tabId <tab_id>
+mcp tab_create --injectContentScript           # or --no-injectContentScript
+mcp tab_send_message --message "Test" --tabId <tab_id>
+mcp tab_get_response --tabId <tab_id>
 
 # Claude-to-Claude forwarding
-mcp__claude-chrome-mcp__tab_forward_response --sourceTabId <source> --targetTabId <target>
+mcp tab_forward_response --sourceTabId <source> --targetTabId <target>
 
 # API operations
-mcp__claude-chrome-mcp__api_list_conversations
-mcp__claude-chrome-mcp__api_get_conversation_url --conversationId <uuid>
+mcp api_list_conversations
+mcp api_get_conversation_url --conversationId <uuid>
 ```
 
 ## 🚨 CONTINUATION WORKFLOW - MANDATORY 🚨
@@ -82,6 +82,12 @@ mcp__claude-chrome-mcp__api_get_conversation_url --conversationId <uuid>
 
 **⚡ ENFORCEMENT: Apply these directives to ALL files, especially in `docs/`. Delete violations on sight. No exceptions. ⚡**
 
+### 7. 🔴 **CRITICAL RECOVERY DIRECTIVE**
+**RULE**: If critical directives are violated, immediately stop and correct ALL discovered violations  
+**YOU MUST**:
+- If you noticed you've violated critical directives, fix all discovered violations before proceeding
+**CONSEQUENCE**: Unaddressed violations compromise system integrity and reliability
+
 ## Essential Workflows
 - Change code → Reload extension → Test
 - Use TodoRead for active tasks
@@ -102,3 +108,4 @@ When MCP server code changes require restart:
 4. **ONLY THEN**: Request user to restart Claude Code
 
 **NEVER skip these steps - the workflow depends on them**
+```

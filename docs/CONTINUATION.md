@@ -75,26 +75,35 @@ mcp system_enable_extension_debug_mode --errorOnly
 # Set log level
 mcp system_set_extension_log_level --level DEBUG
 
+# Get extension logs
+mcp system_get_extension_logs --limit 50 --format text
+
 # Disable debug mode
 mcp system_disable_extension_debug_mode
 ```
 
-**Known Issues**:
-- Log structure shows `[Extension:undefined] undefined` - needs fix
-- CLI array parameter handling for components filter needs improvement
-
 ## Recent Accomplishments (2025-06-05)
 
-### Fixed Critical Issues
-1. **CLI Config Location**: Updated documentation to reflect correct config location at `~/.config/mcp/config.json`
-   - Updated `cli/ARCHITECTURE.md` with correct paths
+### Tool Naming and Logging Improvements
+1. **MCP Tool Clarity**: Renamed `system_get_logs` → `system_get_extension_logs` for clear distinction
+   - Updated tool descriptions to clarify extension vs MCP server logs
+   - Updated extension handlers in `relay-client.js`
+   - Enhanced CLI command documentation
 
-2. **MCP Notification Async/Await Issues**: Fixed missing async/await in NotificationManager
-   - Made all NotificationManager methods async (sendProgress, sendCompletion, sendError, testNotificationDelivery)
-   - Added await to all NotificationManager method calls in mcp-relay-client.js
-   - Fixed handleOperationMilestone and handleExtensionLog to be async functions
+2. **Comprehensive Testing Workflow Documentation**: 
+   - Added detailed logging section to `docs/TROUBLESHOOTING.md`
+   - Documented two distinct log systems (MCP server winston vs extension logs)
+   - Added testing workflow best practices with proper restart procedures
 
-### Status
-- MCP server starts without syntax errors
-- CLI daemon connects to filesystem server successfully
-- claude-chrome-mcp server still has timeout issues - requires Claude Code restart to load fixed code
+### Verified System Functionality
+1. **NotificationManager Async Implementation**: Confirmed working correctly
+   - Async methods properly implemented with MCP SDK compliance
+   - Uses correct `await this.server.server.notification()` pattern
+
+2. **Extension Reload Workflow**: Verified and documented behavior
+   - Extension reload clears content scripts from existing tabs (expected)
+   - Proper workflow: close old tabs → create fresh tabs after reload
+
+3. **CLI Tools Edge Case Testing**: Comprehensive validation completed
+   - Timeout/extension reload workflow verified working
+   - Error handling and parameter validation confirmed functional
