@@ -5,27 +5,12 @@
 When you type 'continue' in a fresh Claude Code instance:
 
 ### Step 1: System Health Check
-cli/ MCP tool system_health
-or
-MCP tool system_health
+`mcp system_health`
 
-### Step 2: Verify System Readiness
-Check connection health output for:
-- Relay connected status (WebSocket mode)
-- Active client connections
-- Any connection issues
+### Step 2: Read TodoList  
+`TodoRead` to see active tasks
 
-### Step 3: Standard Testing Workflow (OPTIONAL - only if user requests)
-**Rule: Skip testing workflow by default unless user specifically asks for it**
-
-If testing is requested, use cli/ MCP tools:
-1. **Create Tab**: `tab_create --injectContentScript true`
-2. **Send Message**: `tab_send_message --message "test" --tabId <id>`
-3. **Get Response**: `tab_get_response --tabId <id>`
-4. **Forward Response**: `tab_forward_response --sourceTabId <src> --targetTabId <tgt>`
-
-### Step 4: Resume Active Work
-- Read current todo list with TodoRead
+### Step 3: Resume Active Work
 - Continue with pending tasks from previous session
 - If issues arise, follow [Troubleshooting Guide](TROUBLESHOOTING.md#debugging-methodology)
 
@@ -34,20 +19,8 @@ If testing is requested, use cli/ MCP tools:
 - **[Troubleshooting](TROUBLESHOOTING.md)**: Issues, debugging methodology, and solutions  
 - **[TypeScript](TYPESCRIPT.md)**: Type definitions and development guidelines
 
-## Development Resources
-- **[Event-Driven Architecture](event-driven-architecture-diagram.md)**: Visual system overview
-- **[GitHub Issue Script](create-claude-code-issue.sh)**: Claude Code integration utilities
-
 ## Current System Status
 - **Version**: 2.6.0 (WebSocket-only architecture)
-- **Architecture**: WebSocket relay with offscreen documents
-- **Key Features**: 
-  - Async operations, Claude-to-Claude forwarding
-  - WebSocket relay with health monitoring (port 54322)
-  - Persistent connections via offscreen documents (12+ hours)
-  - Pure message routing relay for simplified architecture
-  - MCP protocol-compliant client identification via clientInfo
-  - Unified Operation IDs: Server-generated `op_{tool_name}_{timestamp}` format
 - **Status**: Production-ready with unified operation tracking
 - **Important**: Extension needs manual reload after code changes
 
@@ -55,87 +28,13 @@ If testing is requested, use cli/ MCP tools:
 The CLI daemon auto-spawns when running commands. Use `mcp help` for available commands.
 
 ## Logging System
-**Winston-based Structured Logging**: Professional logging with file rotation
-
 - **Log Location**: `~/.claude-chrome-mcp/logs/claude-chrome-mcp-server-PID-{pid}.log`
-- **Log Levels**: error, warn, info, debug, verbose (set via LOG_LEVEL env)
-- **Components**: Each module has named logger (e.g., 'Relay', 'ChromeMCPServer')
 - **Viewing Logs**: `tail -f ~/.claude-chrome-mcp/logs/claude-chrome-mcp-server-PID-*.log`
 
 ### Extension Debug Logging
-On-demand debug log forwarding from Chrome extension to MCP server:
-
 ```bash
-# Enable debug mode (all logs)
-mcp system_enable_extension_debug_mode
-
-# Enable error-only mode
-mcp system_enable_extension_debug_mode --errorOnly
-
-# Set log level
-mcp system_set_extension_log_level --level DEBUG
-
-# Get extension logs
-mcp system_get_extension_logs --limit 50 --format text
-
-# Disable debug mode
-mcp system_disable_extension_debug_mode
+mcp system_enable_extension_debug_mode  # Enable debug mode
+mcp system_get_extension_logs --limit 50 --format text  # Get logs
+mcp system_disable_extension_debug_mode  # Disable debug mode
 ```
 
-## Recent Accomplishments (2025-06-05)
-
-### Tool Naming and Logging Improvements
-1. **MCP Tool Clarity**: Renamed `system_get_logs` → `system_get_extension_logs` for clear distinction
-   - Updated tool descriptions to clarify extension vs MCP server logs
-   - Updated extension handlers in `relay-client.js`
-   - Enhanced CLI command documentation
-
-2. **Comprehensive Testing Workflow Documentation**: 
-   - Added detailed logging section to `docs/TROUBLESHOOTING.md`
-   - Documented two distinct log systems (MCP server winston vs extension logs)
-   - Added testing workflow best practices with proper restart procedures
-
-### Verified System Functionality
-1. **NotificationManager Async Implementation**: Confirmed working correctly
-   - Async methods properly implemented with MCP SDK compliance
-   - Uses correct `await this.server.server.notification()` pattern
-
-2. **Extension Reload Workflow**: Verified and documented behavior
-   - Extension reload clears content scripts from existing tabs (expected)
-   - Proper workflow: close old tabs → create fresh tabs after reload
-
-3. **CLI Tools Edge Case Testing**: Comprehensive validation completed
-   - Timeout/extension reload workflow verified working
-   - Error handling and parameter validation confirmed functional
-
-## MCP Standard Compliance Updates (2025-06-05)
-
-### Implemented Standard MCP Notifications
-1. **Standard Logging Notifications**: Migrated extension debug logs to use standard `notifications/message`
-   - Added `sendLoggingMessage()` method to NotificationManager using MCP SDK's built-in method
-   - Updated extension log handling to use standard MCP log levels (debug, info, warning, error)
-   - Added proper logger names with format `extension.{component}`
-   - Enabled logging capabilities in server configuration
-
-2. **Standard Progress Notifications**: Added support for MCP standard `notifications/progress`
-   - Added `sendStandardProgress()` method for request-based progress tracking
-   - Maintains custom `notifications/operation/progress` for operations not tied to requests
-
-### Architecture Decisions
-- Prioritizing MCP standard compliance over backward compatibility
-- Using standard notifications where possible, custom only where system requires
-- Extension logs now properly categorized with MCP standard log levels
-
-## CLI Improvements (2025-06-05)
-
-### Fixed daemon status Command
-1. **Hanging Issue**: Added disconnect() call after getting status to allow process to exit cleanly
-2. **Enhanced Output**: Shows MCP server processes with PIDs
-   - Clear "MCP Servers:" section listing all servers
-   - Process IDs displayed for each running server
-   - Updated server manager to capture process reference from connection
-
-### Status
-- CLI daemon status now exits properly without hanging
-- MCP server PIDs visible for debugging and monitoring
-- Both stdio-spawned servers (filesystem) and external servers (claude-chrome-mcp) tracked
