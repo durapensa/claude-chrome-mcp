@@ -58,6 +58,14 @@ export interface DebugAttachParams {
   tabId: number;
 }
 
+export interface DebugDetachParams {
+  tabId: number;
+}
+
+export interface DebugStatusParams {
+  tabId?: number;
+}
+
 export interface ExecuteScriptParams {
   tabId: number;
   script: string;
@@ -551,6 +559,8 @@ export type ToolParams =
   // Chrome tools  
   | { tool: 'chrome_reload_extension'; params: ReloadExtensionParams }
   | { tool: 'chrome_debug_attach'; params: DebugAttachParams }
+  | { tool: 'chrome_debug_detach'; params: DebugDetachParams }
+  | { tool: 'chrome_debug_status'; params: DebugStatusParams }
   | { tool: 'chrome_execute_script'; params: ExecuteScriptParams }
   | { tool: 'chrome_get_dom_elements'; params: GetDomElementsParams }
   | { tool: 'chrome_start_network_monitoring'; params: StartNetworkInspectionParams }
@@ -609,7 +619,9 @@ export type ToolResponse =
   | { tool: 'system_wait_operation'; result: { success: boolean; message?: string } }
   // Chrome tools
   | { tool: 'chrome_reload_extension'; result: { success: boolean } }
-  | { tool: 'chrome_debug_attach'; result: { success: boolean } }
+  | { tool: 'chrome_debug_attach'; result: { success: boolean; alreadyAttached?: boolean; external?: boolean } }
+  | { tool: 'chrome_debug_detach'; result: { success: boolean; wasDetached?: boolean; reason?: string; error?: string } }
+  | { tool: 'chrome_debug_status'; result: { success: boolean; tabId?: number; attached?: boolean; functional?: boolean; session?: any; totalSessions?: number; sessions?: any[] } }
   | { tool: 'chrome_execute_script'; result: any }
   | { tool: 'chrome_get_dom_elements'; result: any[] }
   | { tool: 'chrome_start_network_monitoring'; result: { success: boolean } }

@@ -1,6 +1,8 @@
 // API Tools
 // Claude.ai API operations via conversationId only - managing conversations, metadata, and URLs
 
+const { z } = require('zod');
+
 /**
  * API tool definitions
  */
@@ -8,112 +10,43 @@ const apiTools = [
   {
     name: 'api_list_conversations',
     description: 'Get list of recent Claude conversations from API with UUIDs and current tab IDs (if open). Returns up to 30 recent conversations.',
-    inputSchema: {
-      type: 'object',
-      properties: {},
-      additionalProperties: false
-    }
+    zodSchema: {}
   },
   {
     name: 'api_search_conversations',
     description: 'Search and filter Claude conversations with advanced criteria (title search, date ranges, message counts, open status)',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        titleSearch: {
-          type: 'string',
-          description: 'Search text to match against conversation titles (supports partial matching)'
-        },
-        titleRegex: {
-          type: 'string', 
-          description: 'Regular expression pattern for title matching'
-        },
-        createdAfter: {
-          type: 'string',
-          description: 'ISO date string - only return conversations created after this date'
-        },
-        createdBefore: {
-          type: 'string', 
-          description: 'ISO date string - only return conversations created before this date'
-        },
-        minMessages: {
-          type: 'number',
-          description: 'Minimum number of messages in conversation'
-        },
-        maxMessages: {
-          type: 'number', 
-          description: 'Maximum number of messages in conversation'
-        },
-        openOnly: {
-          type: 'boolean',
-          description: 'Only return conversations currently open in tabs',
-          default: false
-        },
-        limit: {
-          type: 'number',
-          description: 'Maximum number of results to return (default: 30)',
-          default: 30
-        }
-      },
-      additionalProperties: false
+    zodSchema: {
+      titleSearch: z.string().optional().describe('Search text to match against conversation titles (supports partial matching)'),
+      titleRegex: z.string().optional().describe('Regular expression pattern for title matching'),
+      createdAfter: z.string().optional().describe('ISO date string - only return conversations created after this date'),
+      createdBefore: z.string().optional().describe('ISO date string - only return conversations created before this date'),
+      minMessages: z.number().optional().describe('Minimum number of messages in conversation'),
+      maxMessages: z.number().optional().describe('Maximum number of messages in conversation'),
+      openOnly: z.boolean().default(false).describe('Only return conversations currently open in tabs'),
+      limit: z.number().default(30).describe('Maximum number of results to return (default: 30)')
     }
   },
   {
     name: 'api_get_conversation_metadata',
     description: 'Get metadata for a specific conversation including title, message count, creation date',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        conversationId: {
-          type: 'string',
-          description: 'The UUID of the Claude conversation (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)'
-        }
-      },
-      required: ['conversationId'],
-      additionalProperties: false
+    zodSchema: {
+      conversationId: z.string().describe('The UUID of the Claude conversation (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)')
     }
   },
   {
     name: 'api_get_conversation_url',
     description: 'Generate Claude.ai URL for a specific conversation ID. Enables api_get_conversation_url → tab_create workflow.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        conversationId: {
-          type: 'string',
-          description: 'The UUID of the Claude conversation (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)'
-        }
-      },
-      required: ['conversationId'],
-      additionalProperties: false
+    zodSchema: {
+      conversationId: z.string().describe('The UUID of the Claude conversation (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)')
     }
   },
   {
     name: 'api_delete_conversations',
     description: 'Delete Claude conversations permanently - supports single or bulk deletion with progress tracking',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        conversationIds: {
-          type: 'array',
-          items: {
-            type: 'string'
-          },
-          description: 'Array of conversation UUIDs to delete (single item for individual deletion)'
-        },
-        batchSize: {
-          type: 'number',
-          description: 'Number of deletions to process per batch (default: 5)',
-          default: 5
-        },
-        delayMs: {
-          type: 'number',
-          description: 'Delay between batches in milliseconds (default: 1000)',
-          default: 1000
-        }
-      },
-      required: ['conversationIds'],
-      additionalProperties: false
+    zodSchema: {
+      conversationIds: z.array(z.string()).describe('Array of conversation UUIDs to delete (single item for individual deletion)'),
+      batchSize: z.number().default(5).describe('Number of deletions to process per batch (default: 5)'),
+      delayMs: z.number().default(1000).describe('Delay between batches in milliseconds (default: 1000)')
     }
   }
 ];

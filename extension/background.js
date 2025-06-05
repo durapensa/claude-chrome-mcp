@@ -214,12 +214,41 @@ setTimeout(async () => {
 }, 100); // Minimal delay for service worker stability
 
 // Handle tab cleanup
-chrome.tabs.onRemoved.addListener((tabId) => {
+chrome.tabs.onRemoved.addListener(async (tabId) => {
   if (contentScriptManager) {
     contentScriptManager.removeTab(tabId);
   }
   if (relayClient && relayClient.operationLock) {
     relayClient.operationLock.releaseLock(tabId);
+  }
+  // Clean up debugger session if exists
+  if (relayClient && relayClient.debuggerSessions && relayClient.debuggerSessions.has(tabId)) {
+    await relayClient.detachDebugger(tabId);
+  }
+});
+
+// Handle debugger detach events
+chrome.debugger.onDetach.addListener((source, reason) => {
+  const tabId = source.tabId;
+  if (relayClient && relayClient.debuggerSessions && relayClient.debuggerSessions.has(tabId)) {
+    logger.debug(`Debugger detached from tab ${tabId}, reason: ${reason}`);
+    relayClient.debuggerSessions.delete(tabId);
+  }
+});
+
+// Handle debugger events for network monitoring
+chrome.debugger.onEvent.addListener((source, method, params) => {
+  const tabId = source.tabId;
+  
+  if (method === 'Network.responseReceived' && relayClient && relayClient.capturedRequests) {
+    const capturedRequests = relayClient.capturedRequests.get(tabId);
+    if (capturedRequests) {
+      capturedRequests.push({
+        method: method,
+        params: params,
+        timestamp: Date.now()
+      });
+    }
   }
 });
 

@@ -24,21 +24,9 @@ const tabTools = [
   {
     name: 'tab_close',
     description: 'Close a specific Claude.ai tab by tab ID. SAFETY WARNING: Will close tab and lose any unsaved work. Use force=true only when necessary.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        tabId: {
-          type: 'number',
-          description: 'The Chrome tab ID to close'
-        },
-        force: {
-          type: 'boolean',
-          description: 'Force close even if there are unsaved changes',
-          default: false
-        }
-      },
-      required: ['tabId'],
-      additionalProperties: false
+    zodSchema: {
+      tabId: z.number().describe('The Chrome tab ID to close'),
+      force: z.boolean().default(false).describe('Force close even if there are unsaved changes')
     }
   },
   {
@@ -56,189 +44,67 @@ const tabTools = [
   {
     name: 'tab_get_response',
     description: 'Get the latest response from Claude tab with auto-completion detection',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        tabId: {
-          type: 'number',
-          description: 'Tab ID to get response from'
-        },
-        timeoutMs: {
-          type: 'number',
-          description: 'Timeout in milliseconds',
-          default: 30000
-        }
-      },
-      required: ['tabId'],
-      additionalProperties: false
+    zodSchema: {
+      tabId: z.number().describe('Tab ID to get response from'),
+      timeoutMs: z.number().default(30000).describe('Timeout in milliseconds')
     }
   },
   {
     name: 'tab_get_response_status',
     description: 'Get real-time status of Claude response generation including progress estimation',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        tabId: {
-          type: 'number',
-          description: 'The tab ID to check response status for'
-        }
-      },
-      required: ['tabId'],
-      additionalProperties: false
+    zodSchema: {
+      tabId: z.number().describe('The tab ID to check response status for')
     }
   },
   {
     name: 'tab_forward_response',
     description: 'Forward Claude response from source tab to target tab',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        sourceTabId: {
-          type: 'number',
-          description: 'Source tab ID to get response from'
-        },
-        targetTabId: {
-          type: 'number',
-          description: 'Target tab ID to send response to'
-        },
-        transformTemplate: {
-          type: 'string',
-          description: 'Optional transformation template with ${response} placeholder'
-        }
-      },
-      required: ['sourceTabId', 'targetTabId'],
-      additionalProperties: false
+    zodSchema: {
+      sourceTabId: z.number().describe('Source tab ID to get response from'),
+      targetTabId: z.number().describe('Target tab ID to send response to'),
+      transformTemplate: z.string().optional().describe('Optional transformation template with ${response} placeholder')
     }
   },
   {
     name: 'tab_extract_elements',
     description: 'Extract conversation elements including artifacts, code blocks, and tool usage',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        tabId: {
-          type: 'number',
-          description: 'The tab ID of the Claude conversation'
-        },
-        batchSize: {
-          type: 'number',
-          description: 'Max elements to process per type (default: 50)',
-          default: 50
-        },
-        maxElements: {
-          type: 'number',
-          description: 'Max total elements to extract before stopping (default: 1000)',
-          default: 1000
-        }
-      },
-      required: ['tabId'],
-      additionalProperties: false
+    zodSchema: {
+      tabId: z.number().describe('The tab ID of the Claude conversation'),
+      batchSize: z.number().default(50).describe('Max elements to process per type (default: 50)'),
+      maxElements: z.number().default(1000).describe('Max total elements to extract before stopping (default: 1000)')
     }
   },
   {
     name: 'tab_export_conversation',
     description: 'Export a full conversation transcript with metadata in markdown or JSON format',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        tabId: {
-          type: 'number',
-          description: 'The tab ID of the Claude conversation to export'
-        },
-        format: {
-          type: 'string',
-          enum: ['markdown', 'json'],
-          description: 'Export format (markdown or json)',
-          default: 'markdown'
-        }
-      },
-      required: ['tabId'],
-      additionalProperties: false
+    zodSchema: {
+      tabId: z.number().describe('The tab ID of the Claude conversation to export'),
+      format: z.enum(['markdown', 'json']).default('markdown').describe('Export format (markdown or json)')
     }
   },
   {
     name: 'tab_debug_page',
     description: 'Debug Claude page readiness and get page information',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        tabId: {
-          type: 'number',
-          description: 'The tab ID of the Claude page to debug'
-        }
-      },
-      required: ['tabId'],
-      additionalProperties: false
+    zodSchema: {
+      tabId: z.number().describe('The tab ID of the Claude page to debug')
     }
   },
   {
     name: 'tab_batch_operations',
     description: 'Perform batch operations on multiple tabs: send messages and/or get responses. ASYNC-BY-DEFAULT: Optimal for parallel operations.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        operation: {
-          type: 'string',
-          enum: ['send_messages', 'get_responses', 'send_and_get'],
-          description: 'Type of batch operation to perform'
-        },
-        messages: {
-          type: 'array',
-          description: 'Array of message objects for send operations',
-          items: {
-            type: 'object',
-            properties: {
-              tabId: {
-                type: 'number',
-                description: 'The tab ID to send the message to'
-              },
-              message: {
-                type: 'string',
-                description: 'The message to send'
-              }
-            },
-            required: ['tabId', 'message']
-          }
-        },
-        tabIds: {
-          type: 'array',
-          items: { type: 'number' },
-          description: 'Array of tab IDs for get_responses operations'
-        },
-        sequential: {
-          type: 'boolean',
-          description: 'Whether to process sequentially (true) or in parallel (false)',
-          default: false
-        },
-        delayMs: {
-          type: 'number',
-          description: 'Delay between sequential operations in milliseconds',
-          default: 1000
-        },
-        maxConcurrent: {
-          type: 'number',
-          description: 'Maximum concurrent operations for parallel mode',
-          default: 5
-        },
-        timeoutMs: {
-          type: 'number',
-          description: 'Maximum time to wait for operations in milliseconds',
-          default: 30000
-        },
-        waitForAll: {
-          type: 'boolean',
-          description: 'Whether to wait for all operations or return as they complete',
-          default: true
-        },
-        pollIntervalMs: {
-          type: 'number',
-          description: 'How often to check for completion in milliseconds',
-          default: 1000
-        }
-      },
-      required: ['operation'],
-      additionalProperties: false
+    zodSchema: {
+      operation: z.enum(['send_messages', 'get_responses', 'send_and_get']).describe('Type of batch operation to perform'),
+      messages: z.array(z.object({
+        tabId: z.number().describe('The tab ID to send the message to'),
+        message: z.string().describe('The message to send')
+      })).optional().describe('Array of message objects for send operations'),
+      tabIds: z.array(z.number()).optional().describe('Array of tab IDs for get_responses operations'),
+      sequential: z.boolean().default(false).describe('Whether to process sequentially (true) or in parallel (false)'),
+      delayMs: z.number().default(1000).describe('Delay between sequential operations in milliseconds'),
+      maxConcurrent: z.number().default(5).describe('Maximum concurrent operations for parallel mode'),
+      timeoutMs: z.number().default(30000).describe('Maximum time to wait for operations in milliseconds'),
+      waitForAll: z.boolean().default(true).describe('Whether to wait for all operations or return as they complete'),
+      pollIntervalMs: z.number().default(1000).describe('How often to check for completion in milliseconds')
     }
   }
 ];

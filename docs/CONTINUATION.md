@@ -53,25 +53,50 @@ If testing is requested:
 - **Important**: Extension needs manual reload after code changes
 
 ## Current Work Focus
-**PARAMETER PASSING BUG FIXED**: Major refactor to Zod schemas complete
+**COMPREHENSIVE DEBUGGING COMPLETED**: Systematic error analysis and fixes implemented
 
-### Fixed Issues
-- **Tool Registration**: Fixed handler signature from `(extra)` to `(args, extra)`
-- **Schema System**: Replaced JSON Schema with native Zod schemas
-- **Dependencies**: Added Zod package for proper validation
-- **Tool Definitions**: Converted tab_create, tab_send_message, system_get_logs to Zod
+### ✅ Fixed Issues (Extension Reload Required)
+- **Parameter Passing**: All 20 tools converted from inputSchema to zodSchema
+- **Service Worker Imports**: Fixed dynamic import restriction in system_get_logs  
+- **Content Script Tracking**: Fixed stale hasContentScript state after navigation
+- **Tab Forwarding**: Enhanced connection error handling with auto-injection
+- **Debugger Lifecycle**: Comprehensive attachment/detachment management
+- **Batch Operations**: Analyzed response timeout issues (status detection gaps)
 
-### Next Steps After Restart
-1. **Test Parameter Passing**: Try `tab_send_message --tabId <id> --message "test"`
-2. **Verify All Tools**: Test system_get_logs with parameters
-3. **Clean Debug Code**: Remove extensive debug logging after verification
-4. **Complete Conversion**: Convert remaining tools to Zod schemas
+### ⚠️ Critical Issue: Dual Operation ID Systems
+**ARCHITECTURE BUG**: MCP server (`op_*`) and extension (`ext_op_*`) generate separate operation IDs
 
-### Files Modified This Session
-- `mcp-server/src/server.js` - Fixed tool registration to use Zod schemas
-- `mcp-server/src/tools/tab-tools.js` - Converted to Zod schemas
-- `mcp-server/src/tools/system-tools.js` - Converted to Zod schemas
-- `mcp-server/package.json` - Added Zod dependency
+**Impact**: `system_wait_operation` fails because server doesn't track extension-generated IDs
+
+**Fix Required** (Post-Restart):
+1. Modify `tab_send_message` handler to create MCP server operation first
+2. Pass server operation ID to extension instead of extension self-generating
+3. Update extension to report operation milestones back to server
+4. Test `system_wait_operation` with unified operation tracking
+
+### Next Steps After Restart  
+**CLI DEBUGGING SETUP COMPLETE**: Use CLI for rapid iteration without Claude Code restarts
+
+#### CLI-First Development Workflow
+```bash
+# CLI daemon configured with both servers:
+./bin/mcp servers     # claude-chrome-mcp: 28 tools, filesystem: 11 tools
+./bin/mcp system_health    # Test MCP server changes instantly
+./bin/mcp edit_file /path  # Edit code without restarts
+```
+
+#### Operation ID Unification (HIGH PRIORITY)
+**Current Bug**: MCP server generates `op_*` IDs, extension generates `ext_op_*` IDs
+**Fix Plan**:
+1. Edit `mcp-server/src/tools/tab-tools.js` via CLI to create operation first  
+2. Pass server operation ID to extension instead of self-generating
+3. Update extension to report milestones back to server
+4. Test `system_wait_operation` with unified tracking
+
+#### Secondary Tasks
+1. **Extension Reload**: Manual reload for tested changes
+2. **Performance**: Address batch operation timeout detection gaps  
+3. **Testing**: Verify all error handling improvements
 
 ## Session History
 **See git commit history for detailed session summaries and accomplishments**

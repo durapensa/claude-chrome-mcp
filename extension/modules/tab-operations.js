@@ -74,6 +74,11 @@ export const tabOperationMethods = {
   },
 
   async closeClaudeTab(params) {
+    console.log('CCM Extension: closeClaudeTab called with params:', params);
+    console.log('CCM Extension: params type:', typeof params);
+    console.log('CCM Extension: params keys:', Object.keys(params || {}));
+    console.log('CCM Extension: tabId value:', params?.tabId);
+    
     const { tabId } = params;
     
     if (!tabId) {
@@ -88,6 +93,11 @@ export const tabOperationMethods = {
       this.operationLock.releaseLock(tabId);
       if (this.contentScriptManager) {
         this.contentScriptManager.removeTab(tabId);
+      }
+      
+      // Clean up debugger session if exists
+      if (this.debuggerSessions && this.debuggerSessions.has(tabId)) {
+        await this.detachDebugger(tabId);
       }
       
       return { success: true };
@@ -234,13 +244,33 @@ export const tabOperationMethods = {
       // Generate operation ID
       const operationId = generateOperationId();
       
-      // Register operation in content script
-      await chrome.tabs.sendMessage(tabId, {
-        type: 'register_operation',
-        operationId: operationId,
-        operationType: 'send_message',
-        params: { message, tabId }
-      });
+      // Register operation in content script with error handling
+      try {
+        await chrome.tabs.sendMessage(tabId, {
+          type: 'register_operation',
+          operationId: operationId,
+          operationType: 'send_message',
+          params: { message, tabId }
+        });
+      } catch (error) {
+        this.operationLock.releaseLock(tabId);
+        
+        if (error.message.includes('Receiving end does not exist')) {
+          return { 
+            success: false, 
+            error: 'Content script not available in target tab. Tab may not have content script injected or may be on a non-Claude.ai page.',
+            tabId: tabId,
+            errorType: 'content_script_missing'
+          };
+        } else {
+          return { 
+            success: false, 
+            error: `Failed to register operation: ${error.message}`,
+            tabId: tabId,
+            errorType: 'communication_error'
+          };
+        }
+      }
       
       // Execute message sending
       const results = await chrome.scripting.executeScript({

@@ -15,21 +15,9 @@ const systemTools = [
   {
     name: 'system_wait_operation',
     description: 'Wait for async operation completion',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        operationId: {
-          type: 'string',
-          description: 'Operation ID to wait for'
-        },
-        timeoutMs: {
-          type: 'number',
-          description: 'Timeout in milliseconds',
-          default: 30000
-        }
-      },
-      required: ['operationId'],
-      additionalProperties: false
+    zodSchema: {
+      operationId: z.string().describe('Operation ID to wait for'),
+      timeoutMs: z.number().default(30000).describe('Timeout in milliseconds')
     }
   },
   {

@@ -13,7 +13,7 @@ import { MessageQueue } from './message-queue.js';
 import { TabOperationLock } from './tab-operation-lock.js';
 import { MCPClient } from './mcp-client.js';
 import { tabOperationMethods } from './tab-operations.js';
-import { createLogger } from '../utils/logger.js';
+import { createLogger, extensionLogger } from '../utils/logger.js';
 import { conversationOperationMethods } from './conversation-operations.js';
 import { batchOperationMethods } from './batch-operations.js';
 import { debugOperationMethods } from './debug-operations.js';
@@ -45,6 +45,14 @@ export class ExtensionRelayClient {
     
     // Setup listeners
     this.setupEventListeners();
+    
+    // Start periodic debugger cleanup (every 5 minutes)
+    this.debuggerCleanupInterval = setInterval(() => {
+      this.cleanupDebuggerSessions().catch(error => {
+        this.logger.error('Periodic debugger cleanup failed', { error: error.message });
+      });
+    }, 5 * 60 * 1000);
+    
     this.logger.info('WebSocket ExtensionRelayClient initialized');
   }
 
@@ -135,6 +143,12 @@ export class ExtensionRelayClient {
         case 'debug_attach':
           result = await this.attachDebugger((command.params || {}).tabId);
           break;
+        case 'debug_detach':
+          result = await this.detachDebugger((command.params || {}).tabId);
+          break;
+        case 'debug_status':
+          result = await this.getDebuggerStatus(command.params || {});
+          break;
         case 'execute_script':
           result = await this.executeScript(command.params || {});
           break;
@@ -172,6 +186,12 @@ export class ExtensionRelayClient {
           break;
         case 'chrome_debug_attach':
           result = await this.attachDebugger((command.params || {}).tabId);
+          break;
+        case 'chrome_debug_detach':
+          result = await this.detachDebugger((command.params || {}).tabId);
+          break;
+        case 'chrome_debug_status':
+          result = await this.getDebuggerStatus(command.params || {});
           break;
         case 'chrome_execute_script':
           result = await this.executeScript(command.params || {});
@@ -272,6 +292,12 @@ export class ExtensionRelayClient {
       reject(new Error('Connection disconnected'));
     }
     this.pendingRequests.clear();
+    
+    // Clear debugger cleanup interval
+    if (this.debuggerCleanupInterval) {
+      clearInterval(this.debuggerCleanupInterval);
+      this.debuggerCleanupInterval = null;
+    }
     
     console.log('CCM Extension: WebSocket relay disconnected');
   }
@@ -478,15 +504,61 @@ export class ExtensionRelayClient {
       return { success: false, error: 'Missing required parameters: sourceTabId, targetTabId' };
     }
 
+    // Handle self-forwarding case
+    if (sourceTabId === targetTabId) {
+      return { 
+        success: false, 
+        error: 'Cannot forward response to the same tab (sourceTabId === targetTabId)',
+        sourceTabId,
+        targetTabId
+      };
+    }
+
+    // Check if target tab has content script injected
+    const hasContentScript = this.contentScriptManager ? 
+      this.contentScriptManager.injectedTabs.has(targetTabId) : false;
+
+    if (!hasContentScript && this.contentScriptManager) {
+      console.log(`CCM Extension: Content script not detected in target tab ${targetTabId}, attempting injection`);
+      
+      try {
+        const injectionResult = await this.contentScriptManager.injectContentScript(targetTabId);
+        if (!injectionResult.success) {
+          return { 
+            success: false, 
+            error: `Failed to inject content script into target tab: ${injectionResult.error}`,
+            targetTabId,
+            injectionResult
+          };
+        }
+        console.log(`CCM Extension: Content script successfully injected into tab ${targetTabId}`);
+      } catch (error) {
+        return { 
+          success: false, 
+          error: `Content script injection failed: ${error.message}`,
+          targetTabId
+        };
+      }
+    }
+
     // Get response from source tab
     const sourceResponse = await this.getClaudeResponse({ tabId: sourceTabId });
     
     if (!sourceResponse.success) {
-      return { success: false, error: 'Failed to get response from source tab' };
+      return { success: false, error: 'Failed to get response from source tab', sourceTabId };
     }
 
     // Extract text from response object
     const responseText = sourceResponse.response?.text || sourceResponse.response || '';
+    
+    if (!responseText || responseText.trim() === '') {
+      return { 
+        success: false, 
+        error: 'No response text available from source tab',
+        sourceTabId,
+        sourceResponse
+      };
+    }
     
     // Transform response if template provided
     let messageToSend = responseText;
@@ -494,28 +566,216 @@ export class ExtensionRelayClient {
       messageToSend = transformTemplate.replace('${response}', responseText);
     }
 
-    // Send to target tab
-    const sendResult = await this.sendMessageAsync({ tabId: targetTabId, message: messageToSend });
-    
-    return {
-      success: sendResult.success,
-      sourceResponse: responseText,
-      transformedMessage: messageToSend,
-      sendResult: sendResult
-    };
+    // Send to target tab with enhanced error handling
+    try {
+      const sendResult = await this.sendMessageAsync({ tabId: targetTabId, message: messageToSend });
+      
+      return {
+        success: sendResult.success,
+        sourceResponse: responseText,
+        transformedMessage: messageToSend,
+        sendResult: sendResult,
+        sourceTabId,
+        targetTabId
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to send message to target tab: ${error.message}`,
+        sourceResponse: responseText,
+        transformedMessage: messageToSend,
+        sourceTabId,
+        targetTabId
+      };
+    }
   }
 
   async attachDebugger(tabId) {
-    return new Promise((resolve, reject) => {
-      chrome.debugger.attach({ tabId }, '1.3', () => {
+    // Check if already attached before attempting to attach
+    if (this.debuggerSessions.has(tabId)) {
+      this.logger.debug(`Debugger already tracked for tab ${tabId}`);
+      return { success: true, alreadyAttached: true };
+    }
+
+    try {
+      // Test if debugger is already working by sending a simple command
+      await new Promise((resolve, reject) => {
+        chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
+          expression: 'true',
+          returnByValue: true
+        }, (result) => {
+          if (chrome.runtime.lastError) {
+            // Not attached or not working, need to attach
+            reject(new Error('Not attached'));
+          } else {
+            // Already working
+            resolve(result);
+          }
+        });
+      });
+      
+      // Debugger is already working, just track it
+      this.debuggerSessions.set(tabId, { attached: Date.now(), source: 'existing' });
+      this.logger.debug(`Debugger already attached to tab ${tabId}, tracking existing session`);
+      return { success: true, alreadyAttached: true };
+      
+    } catch (testError) {
+      // Debugger not working, try to attach
+      return new Promise((resolve, reject) => {
+        chrome.debugger.attach({ tabId }, '1.3', () => {
+          if (chrome.runtime.lastError) {
+            // Check if error is about already being attached
+            if (chrome.runtime.lastError.message?.includes('already attached')) {
+              // Another debugger is attached, track it but note we didn't create it
+              this.debuggerSessions.set(tabId, { attached: Date.now(), source: 'external' });
+              this.logger.warn(`External debugger detected on tab ${tabId}, tracking but not managing`);
+              resolve({ success: true, alreadyAttached: true, external: true });
+            } else {
+              reject(new Error(chrome.runtime.lastError.message));
+            }
+          } else {
+            this.debuggerSessions.set(tabId, { attached: Date.now(), source: 'self' });
+            this.logger.debug(`Debugger attached to tab ${tabId}`);
+            resolve({ success: true, alreadyAttached: false });
+          }
+        });
+      });
+    }
+  }
+
+  async detachDebugger(tabId) {
+    if (!this.debuggerSessions.has(tabId)) {
+      this.logger.debug(`No debugger session tracked for tab ${tabId}`);
+      return { success: true, wasDetached: false };
+    }
+
+    const session = this.debuggerSessions.get(tabId);
+    
+    // Only detach if we created the session ourselves
+    if (session.source === 'external') {
+      this.logger.debug(`Not detaching external debugger from tab ${tabId}`);
+      this.debuggerSessions.delete(tabId);
+      return { success: true, wasDetached: false, reason: 'external' };
+    }
+
+    return new Promise((resolve) => {
+      chrome.debugger.detach({ tabId }, () => {
         if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
+          this.logger.warn(`Failed to detach debugger from tab ${tabId}: ${chrome.runtime.lastError.message}`);
+          // Still remove from tracking even if detach failed
+          this.debuggerSessions.delete(tabId);
+          resolve({ success: true, wasDetached: false, error: chrome.runtime.lastError.message });
         } else {
-          this.debuggerSessions.set(tabId, true);
-          resolve();
+          this.logger.debug(`Debugger detached from tab ${tabId}`);
+          this.debuggerSessions.delete(tabId);
+          resolve({ success: true, wasDetached: true });
         }
       });
     });
+  }
+
+  // Clean up debugger sessions for tabs that no longer exist
+  async cleanupDebuggerSessions() {
+    if (!this.debuggerSessions || this.debuggerSessions.size === 0) {
+      return { cleaned: 0 };
+    }
+
+    try {
+      const allTabs = await chrome.tabs.query({});
+      const existingTabIds = new Set(allTabs.map(tab => tab.id));
+      const sessionsToClean = [];
+
+      for (const [tabId, session] of this.debuggerSessions) {
+        if (!existingTabIds.has(tabId)) {
+          sessionsToClean.push(tabId);
+        }
+      }
+
+      this.logger.debug(`Cleaning up ${sessionsToClean.length} debugger sessions for closed tabs`);
+
+      for (const tabId of sessionsToClean) {
+        this.debuggerSessions.delete(tabId);
+      }
+
+      return { cleaned: sessionsToClean.length };
+
+    } catch (error) {
+      this.logger.error('Failed to cleanup debugger sessions', { error: error.message });
+      return { cleaned: 0, error: error.message };
+    }
+  }
+
+  async getDebuggerStatus(params = {}) {
+    const { tabId } = params;
+
+    try {
+      if (tabId) {
+        // Return status for specific tab
+        const session = this.debuggerSessions.get(tabId);
+        if (!session) {
+          return {
+            success: true,
+            tabId: tabId,
+            attached: false,
+            session: null
+          };
+        }
+
+        // Test if debugger is still functional
+        let functional = false;
+        try {
+          await new Promise((resolve, reject) => {
+            chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
+              expression: 'true',
+              returnByValue: true
+            }, (result) => {
+              if (chrome.runtime.lastError) {
+                reject(new Error(chrome.runtime.lastError.message));
+              } else {
+                resolve(result);
+              }
+            });
+          });
+          functional = true;
+        } catch (error) {
+          this.logger.warn(`Debugger on tab ${tabId} not functional: ${error.message}`);
+        }
+
+        return {
+          success: true,
+          tabId: tabId,
+          attached: true,
+          functional: functional,
+          session: {
+            attached: new Date(session.attached).toISOString(),
+            source: session.source,
+            age: Date.now() - session.attached
+          }
+        };
+      } else {
+        // Return status for all sessions
+        const sessions = [];
+        for (const [tabId, session] of this.debuggerSessions) {
+          sessions.push({
+            tabId: tabId,
+            attached: new Date(session.attached).toISOString(),
+            source: session.source,
+            age: Date.now() - session.attached
+          });
+        }
+
+        return {
+          success: true,
+          totalSessions: sessions.length,
+          sessions: sessions
+        };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message
+      };
+    }
   }
 
   async reloadExtension(params = {}) {
@@ -556,50 +816,18 @@ export class ExtensionRelayClient {
           throw new Error(`Tab ${tabId} not found`);
         }
         
-        // First test if debugger is already working
-        try {
-          await new Promise((resolve, reject) => {
-            chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
-              expression: 'true',
-              returnByValue: true
-            }, (result) => {
-              if (chrome.runtime.lastError) {
-                reject(new Error(chrome.runtime.lastError.message));
-                return;
-              }
-              resolve(result);
-            });
-          });
-          console.log(`Debugger already working on tab ${tabId}`);
-          this.debuggerSessions.set(tabId, { attached: Date.now() });
-          return; // Success - debugger is already functional
-        } catch (testError) {
-          // Debugger not working, try to attach
+        // Use the improved attachDebugger method
+        const result = await this.attachDebugger(tabId);
+        if (result.success) {
+          this.logger.debug(`Debugger ready for tab ${tabId}`);
+          return;
         }
         
-        // Try to attach debugger
-        await new Promise((resolve, reject) => {
-          chrome.debugger.attach({ tabId }, '1.0', () => {
-            if (chrome.runtime.lastError) {
-              // Already attached is not an error if it's working
-              if (chrome.runtime.lastError.message?.includes('already attached')) {
-                resolve();
-                return;
-              }
-              reject(new Error(chrome.runtime.lastError.message));
-              return;
-            }
-            resolve();
-          });
-        });
-        
-        console.log(`Debugger attached to tab ${tabId}`);
-        this.debuggerSessions.set(tabId, { attached: Date.now() });
-        return;
+        throw new Error('Failed to attach debugger');
         
       } catch (error) {
         retries++;
-        console.log(`Failed to attach debugger to tab ${tabId} (attempt ${retries}/${maxRetries}):`, error.message);
+        this.logger.warn(`Failed to attach debugger to tab ${tabId} (attempt ${retries}/${maxRetries}):`, error.message);
         
         if (retries >= maxRetries) {
           throw new Error(`Failed to attach debugger after ${maxRetries} attempts: ${error.message}`);
@@ -805,7 +1033,7 @@ export class ExtensionRelayClient {
 
   handleRelayMessage(message) {
     // Use proper logger instead of console.log
-    this.logMessage('relay-message', `Message from relay: ${message.type}`, message);
+    this.logger.debug(`Message from relay: ${message.type}`, message);
     
     // Handle different relay message types
     if (message.type === 'relay_message' && message.data) {
@@ -813,7 +1041,7 @@ export class ExtensionRelayClient {
       
       // Check if this is an MCP tool request from an MCP server
       if (data.from && data.id && data.type) {
-        this.logMessage('mcp-tool-request', `MCP tool request: ${data.type}`, {
+        this.logger.debug(`MCP tool request: ${data.type}`, {
           toolType: data.type,
           hasParams: !!data.params,
           paramType: typeof data.params,
@@ -938,9 +1166,7 @@ export class ExtensionRelayClient {
   // Get extension logs with filtering
   async getExtensionLogs(params = {}) {
     try {
-      // Import the existing logger system
-      const { extensionLogger } = await import('../utils/logger.js');
-      
+      // Use the statically imported extensionLogger (no dynamic import needed)
       const { level, component, since, limit = 100, format = 'text' } = params;
       
       // Get logs from the existing logger buffer
