@@ -18,11 +18,12 @@ When you type 'continue' in a fresh Claude Code instance:
 ## Project Priorities & Next Steps
 
 ### High Priority Improvements
-1. **Performance Optimization**: Message batching and queue optimization in extension
-2. **Error Recovery**: Enhance reconnection logic and error handling  
-3. **TypeScript Migration**: Complete migration of remaining JavaScript files
-4. **Test Coverage**: Add integration tests for critical workflows
-5. **Documentation**: Keep docs minimal and up-to-date per Critical Directives
+1. **Remove Backward Compatibility**: Clean up legacy HTTP polling and old message formats (v2.6.0 is fully WebSocket)
+2. **Performance Optimization**: Message batching and queue optimization in extension
+3. **Error Recovery**: Enhance reconnection logic and error handling  
+4. **TypeScript Migration**: Complete migration of remaining JavaScript files
+5. **Test Coverage**: Add integration tests for critical workflows
+6. **Documentation**: Keep docs minimal and up-to-date per Critical Directives
 
 ### Known Issues to Address
 - Tab operation timeouts under heavy load

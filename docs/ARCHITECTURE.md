@@ -283,18 +283,13 @@ await chrome.storage.local.set({
 - **Routing**: Clean separation between multiple clients
 - **Simplicity**: No complex service discovery needed
 
-## Migration Path
+## Next Architecture Tasks
 
-### From Current Architecture
-1. **Replace HTTP polling** with offscreen WebSocket
-2. **Strip hub logic** to create simple relay
-3. **Move coordination** fully to extension
-4. **Update message formats** for event-driven flow
-
-### Backward Compatibility
-- Relay accepts old message formats during transition
-- Extension supports both polling and WebSocket temporarily
-- Gradual feature migration without breaking changes
+### Remove Backward Compatibility
+- System is now fully WebSocket-based (v2.6.0)
+- Old message formats and HTTP polling code can be removed
+- Simplify relay by removing legacy format support
+- Clean up any temporary compatibility layers
 
 ## Security Considerations
 

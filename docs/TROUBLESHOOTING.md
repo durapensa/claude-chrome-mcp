@@ -325,12 +325,8 @@ When filtering extension logs by component:
    - Terminal 1: `tail -f ~/.claude-chrome-mcp/logs/claude-chrome-mcp-server-PID-*.log`
    - Terminal 2: `mcp system_get_extension_logs --limit 20` (run periodically)
 
-### Critical Testing Findings
-
-> **Note**: This section documents verified testing behaviors discovered during development. Update immediately when new workflow patterns are discovered.
-
-**Extension Reload Content Script Behavior** ⚠️ *(Verified 2025-06-05)*
-- Extension reload (`mcp chrome_reload_extension`) clears ALL content scripts from existing tabs
+### Extension Reload Behavior
+- Extension reload clears ALL content scripts from existing tabs
 - Tabs created before reload will show "Content script not available" errors
 - **Required workflow**: Close old tabs → Create fresh tabs after any extension reload
 - This is expected behavior, not a bug

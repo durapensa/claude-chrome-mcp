@@ -40,11 +40,6 @@ Type `continue` to resume where we left off. Claude will:
 - Check git log for recent commits
 - Resume from the documented state
 
-## What Was Fixed
-- All 38 MCP tools restored (was missing 18+)
-- Modular architecture implemented
-- Extension methods properly organized
-- Parameter mapping preserved
 
 ## If Issues Occur
 1. Check Chrome DevTools console for extension errors
