@@ -40,11 +40,11 @@ const systemTools = [
  * System tool handlers
  */
 const systemHandlers = {
-  async 'system_health'(server, args) {
+  'system_health': async (server, args) => {
     return await server.getConnectionHealth();
   },
 
-  async 'system_wait_operation'(server, args) {
+  'system_wait_operation': async (server, args) => {
     return await server.waitForOperation(args);
   }
 };

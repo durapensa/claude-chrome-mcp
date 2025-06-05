@@ -122,19 +122,19 @@ const apiTools = [
  * API tool handlers
  */
 const apiHandlers = {
-  async 'api_list_conversations'(server, args) {
+  'api_list_conversations': async (server, args) => {
     return await server.forwardToExtension('get_claude_conversations', args);
   },
 
-  async 'api_search_conversations'(server, args) {
+  'api_search_conversations': async (server, args) => {
     return await server.forwardToExtension('search_claude_conversations', args);
   },
 
-  async 'api_get_conversation_metadata'(server, args) {
+  'api_get_conversation_metadata': async (server, args) => {
     return await server.forwardToExtension('get_conversation_metadata', args);
   },
 
-  async 'api_get_conversation_url'(server, args) {
+  'api_get_conversation_url': async (server, args) => {
     // Pure URL generation without tab creation
     const { conversationId } = args;
     
@@ -152,7 +152,7 @@ const apiHandlers = {
     };
   },
 
-  async 'api_delete_conversations'(server, args) {
+  'api_delete_conversations': async (server, args) => {
     const { conversationIds } = args;
     
     // Handle single vs bulk deletion

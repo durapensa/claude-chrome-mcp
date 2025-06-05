@@ -292,19 +292,19 @@ const tabTools = [
  * Tab tool handlers
  */
 const tabHandlers = {
-  async 'tab_create'(server, args) {
+  'tab_create': async (server, args) => {
     return await server.forwardToExtension('spawn_claude_dot_ai_tab', args);
   },
 
-  async 'tab_list'(server, args) {
+  'tab_list': async (server, args) => {
     return await server.forwardToExtension('get_claude_dot_ai_tabs', args);
   },
 
-  async 'tab_close'(server, args) {
+  'tab_close': async (server, args) => {
     return await server.forwardToExtension('close_claude_dot_ai_tab', args);
   },
 
-  async 'tab_send_message'(server, args) {
+  'tab_send_message': async (server, args) => {
     // Route to appropriate underlying tool based on waitForCompletion
     if (args.waitForCompletion) {
       // Use sync version with retry logic
@@ -315,31 +315,31 @@ const tabHandlers = {
     }
   },
 
-  async 'tab_get_response'(server, args) {
+  'tab_get_response': async (server, args) => {
     return await server.forwardToExtension('get_claude_dot_ai_response', args);
   },
 
-  async 'tab_get_response_status'(server, args) {
+  'tab_get_response_status': async (server, args) => {
     return await server.forwardToExtension('get_claude_dot_ai_response_status', args);
   },
 
-  async 'tab_forward_response'(server, args) {
+  'tab_forward_response': async (server, args) => {
     return await server.forwardToExtension('forward_response_to_claude_dot_ai_tab', args);
   },
 
-  async 'tab_extract_elements'(server, args) {
+  'tab_extract_elements': async (server, args) => {
     return await server.forwardToExtension('extract_conversation_elements', args);
   },
 
-  async 'tab_export_conversation'(server, args) {
+  'tab_export_conversation': async (server, args) => {
     return await server.forwardToExtension('export_conversation_transcript', args);
   },
 
-  async 'tab_debug_page'(server, args) {
+  'tab_debug_page': async (server, args) => {
     return await server.forwardToExtension('debug_claude_dot_ai_page', args);
   },
 
-  async 'tab_batch_operations'(server, args) {
+  'tab_batch_operations': async (server, args) => {
     // Route to appropriate batch operations based on operation type
     switch (args.operation) {
       case 'send_messages':
