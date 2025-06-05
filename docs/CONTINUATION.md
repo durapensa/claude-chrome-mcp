@@ -61,3 +61,24 @@ The CLI daemon auto-spawns when running commands. Use `mcp help` for available c
 - **Log Levels**: error, warn, info, debug, verbose (set via LOG_LEVEL env)
 - **Components**: Each module has named logger (e.g., 'Relay', 'ChromeMCPServer')
 - **Viewing Logs**: `tail -f ~/.claude-chrome-mcp/logs/claude-chrome-mcp-server-PID-*.log`
+
+### Extension Debug Logging
+On-demand debug log forwarding from Chrome extension to MCP server:
+
+```bash
+# Enable debug mode (all logs)
+mcp system_enable_extension_debug_mode
+
+# Enable error-only mode
+mcp system_enable_extension_debug_mode --errorOnly
+
+# Set log level
+mcp system_set_extension_log_level --level DEBUG
+
+# Disable debug mode
+mcp system_disable_extension_debug_mode
+```
+
+**Known Issues**:
+- Log structure shows `[Extension:undefined] undefined` - needs fix
+- CLI array parameter handling for components filter needs improvement

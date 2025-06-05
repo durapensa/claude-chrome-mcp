@@ -22,19 +22,21 @@ class NotificationManager {
     this.logger.info('Sending progress', { operationId, milestone });
     
     try {
-      if (this.server && typeof this.server.sendNotification === 'function') {
-        this.server.sendNotification('operation/progress', notification.params);
+      // McpServer has a 'server' property which is the underlying Server instance
+      // Server inherits from Protocol which has the notification() method
+      if (this.server && this.server.server && typeof this.server.server.notification === 'function') {
+        await this.server.server.notification({
+          method: notification.method,
+          params: notification.params
+        });
         this.logger.info('Successfully sent notification', { operationId });
       } else {
-        const errorMsg = 'Server not properly initialized or sendNotification method missing';
-        this.logger.error(errorMsg);
-        if (this.errorTracker) {
-          this.errorTracker.logError(new Error(errorMsg), { 
-            operationId, 
-            milestone,
-            component: 'NotificationManager' 
-          });
-        }
+        // Notifications not available or server not properly initialized
+        // This is non-critical for debug logging functionality
+        this.logger.debug('MCP notification method not available, skipping notification', { 
+          operationId, 
+          milestone 
+        });
         return false;
       }
     } catch (error) {
