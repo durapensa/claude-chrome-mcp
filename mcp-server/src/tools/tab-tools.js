@@ -1,6 +1,8 @@
 // Tab Tools
 // Tab operations via tabId only - creating, messaging, and managing Claude.ai tabs
 
+const { z } = require('zod');
+
 /**
  * Tab tool definitions
  */
@@ -8,36 +10,16 @@ const tabTools = [
   {
     name: 'tab_create',
     description: 'Open a new Claude.ai tab with optional content script injection',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        url: {
-          type: 'string', 
-          description: 'URL to open',
-          default: 'https://claude.ai'
-        },
-        injectContentScript: {
-          type: 'boolean',
-          description: 'Whether to inject content script for interaction',
-          default: true
-        },
-        waitForLoad: {
-          type: 'boolean',
-          description: 'Wait for page to fully load',
-          default: true
-        }
-      },
-      additionalProperties: false
+    zodSchema: {
+      url: z.string().describe('URL to open').default('https://claude.ai'),
+      injectContentScript: z.boolean().describe('Whether to inject content script for interaction').default(true),
+      waitForLoad: z.boolean().describe('Wait for page to fully load').default(true)
     }
   },
   {
     name: 'tab_list',
     description: 'Get list of all currently open Claude.ai tabs with their IDs, status, and conversation IDs (if available).',
-    inputSchema: {
-      type: 'object',
-      properties: {},
-      additionalProperties: false
-    }
+    zodSchema: {}
   },
   {
     name: 'tab_close',
@@ -62,40 +44,13 @@ const tabTools = [
   {
     name: 'tab_send_message',
     description: 'Send message to Claude tab with configurable async/sync behavior',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        tabId: {
-          type: 'number',
-          description: 'Tab ID to send message to'
-        },
-        message: {
-          type: 'string',
-          description: 'Message to send to Claude'
-        },
-        waitForCompletion: {
-          type: 'boolean',
-          description: 'Whether to wait for response completion (false = async, true = sync)',
-          default: false
-        },
-        waitForReady: {
-          type: 'boolean',
-          description: 'Whether to wait for Claude to be ready before sending',
-          default: true
-        },
-        maxRetries: {
-          type: 'number',
-          description: 'Maximum number of retry attempts if sending fails',
-          default: 3
-        },
-        retryDelayMs: {
-          type: 'number',
-          description: 'Delay between retry attempts in milliseconds',
-          default: 1000
-        }
-      },
-      required: ['tabId', 'message'],
-      additionalProperties: false
+    zodSchema: {
+      tabId: z.number().describe('Tab ID to send message to'),
+      message: z.string().describe('Message to send to Claude'),
+      waitForCompletion: z.boolean().describe('Whether to wait for response completion (false = async, true = sync)').default(false),
+      waitForReady: z.boolean().describe('Whether to wait for Claude to be ready before sending').default(true),
+      maxRetries: z.number().describe('Maximum number of retry attempts if sending fails').default(3),
+      retryDelayMs: z.number().describe('Delay between retry attempts in milliseconds').default(1000)
     }
   },
   {

@@ -53,12 +53,25 @@ If testing is requested:
 - **Important**: Extension needs manual reload after code changes
 
 ## Current Work Focus
-**RESTART REQUIRED**: MCP server changes (system_get_logs tool) require Claude Code restart to load new tool
+**PARAMETER PASSING BUG FIXED**: Major refactor to Zod schemas complete
 
-### Pending Tasks After Restart
-- Debug parameter validation issue in MCP tool calls using new system_get_logs tool
-- Test enhanced logging system for parameter flow debugging
-- Complete workflow validation with reorganized tool architecture
+### Fixed Issues
+- **Tool Registration**: Fixed handler signature from `(extra)` to `(args, extra)`
+- **Schema System**: Replaced JSON Schema with native Zod schemas
+- **Dependencies**: Added Zod package for proper validation
+- **Tool Definitions**: Converted tab_create, tab_send_message, system_get_logs to Zod
+
+### Next Steps After Restart
+1. **Test Parameter Passing**: Try `tab_send_message --tabId <id> --message "test"`
+2. **Verify All Tools**: Test system_get_logs with parameters
+3. **Clean Debug Code**: Remove extensive debug logging after verification
+4. **Complete Conversion**: Convert remaining tools to Zod schemas
+
+### Files Modified This Session
+- `mcp-server/src/server.js` - Fixed tool registration to use Zod schemas
+- `mcp-server/src/tools/tab-tools.js` - Converted to Zod schemas
+- `mcp-server/src/tools/system-tools.js` - Converted to Zod schemas
+- `mcp-server/package.json` - Added Zod dependency
 
 ## Session History
 **See git commit history for detailed session summaries and accomplishments**
