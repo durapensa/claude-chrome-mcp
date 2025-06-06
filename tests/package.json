@@ -1,0 +1,27 @@
+{
+  "name": "claude-chrome-mcp-tests",
+  "version": "1.0.0",
+  "description": "Test suite for Claude Chrome MCP",
+  "scripts": {
+    "test": "jest",
+    "test:integration": "jest integration/",
+    "test:performance": "jest performance/",
+    "test:resilience": "jest resilience/",
+    "test:watch": "jest --watch",
+    "test:verbose": "jest --verbose"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.6"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testTimeout": 60000,
+    "verbose": true,
+    "testMatch": [
+      "**/*.test.js"
+    ]
+  }
+}

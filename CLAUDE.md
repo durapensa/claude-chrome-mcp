@@ -60,6 +60,10 @@ mcp tab_get_response --tabId <id>
 # Forwarding & API
 mcp tab_forward_response --sourceTabId <source> --targetTabId <target>
 mcp tab_get_response --targetTabId <target>
+
+# GitHub operations (use gh CLI)
+gh issue list --repo durapensa/claude-chrome-mcp
+gh issue view <number> --repo durapensa/claude-chrome-mcp
 ```
 
 ## DOCUMENTATION
