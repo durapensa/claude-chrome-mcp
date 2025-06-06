@@ -22,7 +22,8 @@ THEN: **Simplify and consolidate:**
 - Consider deleting dead/commented code immediately
 - Edit existing files rather than create new; ask user if new file creation seems a good choice to maintain existing modularity schemas
 - Don't create temporary files (git provides history)
-- Single source for information, link from elsewhere
+- **Single source for information, link from elsewhere** (GitHub Issues for active work, docs for stable analysis)
+- **DON'T duplicate tracking** between docs and GitHub Issues - use Issues for active work, docs for context
 - **DON'T document implementation details in project docs when git captures them** (TODOs, pattern notes, completed features)
 
 ## TROUBLESHOOTING
