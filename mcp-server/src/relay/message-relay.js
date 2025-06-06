@@ -266,7 +266,10 @@ class MessageRelay extends EventEmitter {
             message.data._from = fromClientId;
             this.multicast(message.targetType, message.data, fromClientId);
           } else {
-            this.multicast(message.targetType, message, fromClientId);
+            // Remove routing metadata and inject _from
+            const { type, targetType, ...payload } = message;
+            payload._from = fromClientId;
+            this.multicast(message.targetType, payload, fromClientId);
           }
         }
         break;
