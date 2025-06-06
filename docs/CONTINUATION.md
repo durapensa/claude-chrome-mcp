@@ -18,8 +18,8 @@ When you type 'continue' in a fresh Claude Code instance:
 ## Project Priorities & Next Steps
 
 ### High Priority Improvements
-1. **⚠️ CRITICAL: Test Suite Rewrite**: tests/ directory requires complete rewrite - current tests timeout and are incompatible with v2.6.0 WebSocket architecture
-2. **Remove Backward Compatibility**: Clean up legacy HTTP polling and old message formats (v2.6.0 is fully WebSocket)
+1. **⚠️ CRITICAL: Test Suite Rewrite**: tests/ directory requires complete rewrite - current tests timeout and are incompatible with v2.6.0 WebSocket architecture (see [Architecture Analysis](ARCHITECTURE-ANALYSIS.md) for detailed requirements)
+2. **~~Remove Backward Compatibility~~**: ✅ **COMPLETED** - Cleaned up legacy HTTP polling and old message formats (137 lines removed)
 3. **Performance Optimization**: Message batching and queue optimization in extension
 4. **Error Recovery**: Enhance reconnection logic and error handling  
 5. **TypeScript Migration**: Complete migration of remaining JavaScript files
@@ -40,6 +40,7 @@ When you type 'continue' in a fresh Claude Code instance:
 
 ## Key Documentation
 - **[Architecture](ARCHITECTURE.md)**: System design and components
+- **[Architecture Analysis](ARCHITECTURE-ANALYSIS.md)**: Deep-dive analysis, inconsistencies, and test rewrite requirements
 - **[Troubleshooting](TROUBLESHOOTING.md)**: Issues, debugging methodology, and solutions  
 - **[TypeScript](TYPESCRIPT.md)**: Type definitions and development guidelines
 
@@ -49,10 +50,10 @@ When you type 'continue' in a fresh Claude Code instance:
 - **Important**: Extension needs manual reload after code changes
 
 ## Latest Session Work
-- Simplified MCP server connection flow by removing callback pattern
-- Changed to sequential initialization: connect server → get client info → connect relay
-- No more deferred connections or callbacks - just straightforward order of operations
-- Cleaner, more maintainable code without unnecessary complexity
+- **Backward Compatibility Cleanup**: Removed 137 lines of legacy command routing 
+- **Unified Command Names**: All tools now use clean domain separation (`system_*`, `chrome_*`, `tab_*`, `api_*`)
+- **Architecture Analysis**: Comprehensive system examination revealing test suite incompatibility with v2.6.0 WebSocket architecture
+- **Documentation**: Created detailed analysis for critical test suite rewrite requirements
 
 ## CLI Usage
 The CLI daemon auto-spawns when running commands. Use `mcp help` for available commands.
