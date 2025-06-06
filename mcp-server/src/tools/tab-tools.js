@@ -114,15 +114,15 @@ const tabTools = [
  */
 const tabHandlers = {
   'tab_create': async (server, args) => {
-    return await server.forwardToExtension('spawn_claude_dot_ai_tab', args);
+    return await server.forwardToExtension('tab_create', args);
   },
 
   'tab_list': async (server, args) => {
-    return await server.forwardToExtension('get_claude_dot_ai_tabs', args);
+    return await server.forwardToExtension('tab_list', args);
   },
 
   'tab_close': async (server, args) => {
-    return await server.forwardToExtension('close_claude_dot_ai_tab', args);
+    return await server.forwardToExtension('tab_close', args);
   },
 
   'tab_send_message': async (server, args) => {
@@ -144,15 +144,8 @@ const tabHandlers = {
     });
     
     try {
-      // Route to appropriate underlying tool based on waitForCompletion
-      let result;
-      if (args.waitForCompletion) {
-        // Use sync version with retry logic
-        result = await server.forwardToExtension('send_message_to_claude_dot_ai_tab', argsWithOpId);
-      } else {
-        // Use async version
-        result = await server.forwardToExtension('send_message_async', argsWithOpId);
-      }
+      // Forward to unified tab_send_message command (routes internally based on waitForCompletion)
+      const result = await server.forwardToExtension('tab_send_message', argsWithOpId);
       
       // Parse MCP-wrapped response from forwardToExtension
       let actualResult;
@@ -190,41 +183,41 @@ const tabHandlers = {
   },
 
   'tab_get_response': async (server, args) => {
-    return await server.forwardToExtension('get_claude_dot_ai_response', args);
+    return await server.forwardToExtension('tab_get_response', args);
   },
 
   'tab_get_response_status': async (server, args) => {
-    return await server.forwardToExtension('get_claude_dot_ai_response_status', args);
+    return await server.forwardToExtension('tab_get_response_status', args);
   },
 
   'tab_forward_response': async (server, args) => {
-    return await server.forwardToExtension('forward_response_to_claude_dot_ai_tab', args);
+    return await server.forwardToExtension('tab_forward_response', args);
   },
 
   'tab_extract_elements': async (server, args) => {
-    return await server.forwardToExtension('extract_conversation_elements', args);
+    return await server.forwardToExtension('tab_extract_elements', args);
   },
 
   'tab_export_conversation': async (server, args) => {
-    return await server.forwardToExtension('export_conversation_transcript', args);
+    return await server.forwardToExtension('tab_export_conversation', args);
   },
 
   'tab_debug_page': async (server, args) => {
-    return await server.forwardToExtension('debug_claude_dot_ai_page', args);
+    return await server.forwardToExtension('tab_debug_page', args);
   },
 
   'tab_batch_operations': async (server, args) => {
     // Route to appropriate batch operations based on operation type
     switch (args.operation) {
       case 'send_messages':
-        return await server.forwardToExtension('batch_send_messages', {
+        return await server.forwardToExtension('tab_batch_operations', {
           messages: args.messages,
           sequential: args.sequential,
           delayMs: args.delayMs,
           maxConcurrent: args.maxConcurrent
         });
       case 'get_responses':
-        return await server.forwardToExtension('batch_get_responses', {
+        return await server.forwardToExtension('tab_batch_operations', {
           tabIds: args.tabIds,
           timeoutMs: args.timeoutMs,
           waitForAll: args.waitForAll,
@@ -232,7 +225,7 @@ const tabHandlers = {
         });
       case 'send_and_get':
         // First send messages, then get responses
-        const sendResult = await server.forwardToExtension('batch_send_messages', {
+        const sendResult = await server.forwardToExtension('tab_batch_operations', {
           messages: args.messages,
           sequential: args.sequential,
           delayMs: args.delayMs,
@@ -242,7 +235,7 @@ const tabHandlers = {
         if (sendResult.success) {
           // Extract tabIds from messages for getting responses
           const tabIds = args.messages.map(msg => msg.tabId);
-          const getResult = await server.forwardToExtension('batch_get_responses', {
+          const getResult = await server.forwardToExtension('tab_batch_operations', {
             tabIds: tabIds,
             timeoutMs: args.timeoutMs,
             waitForAll: args.waitForAll,

@@ -67,7 +67,7 @@ const systemHandlers = {
   },
 
   'system_get_extension_logs': async (server, args) => {
-    return await server.forwardToExtension('get_extension_logs', args);
+    return await server.forwardToExtension('system_get_extension_logs', args);
   },
 
   'system_enable_extension_debug_mode': async (server, args) => {

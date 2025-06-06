@@ -139,7 +139,7 @@ function handleMessage(request, sender, sendResponse) {
   // Handle MCP tool requests
   if (request.type === 'mcp_tool_request' && request.tool && request.params) {
     logger.debug('MCP tool request', { tool: request.tool });
-    relayClient.handleMCPToolRequest(request.tool, request.params)
+    relayClient.executeCommand({ type: request.tool, params: request.params })
       .then(result => sendResponse(result))
       .catch(error => sendResponse({ success: false, error: error.message }));
     return true;

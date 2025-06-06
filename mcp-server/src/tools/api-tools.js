@@ -56,15 +56,15 @@ const apiTools = [
  */
 const apiHandlers = {
   'api_list_conversations': async (server, args) => {
-    return await server.forwardToExtension('get_claude_conversations', args);
+    return await server.forwardToExtension('api_list_conversations', args);
   },
 
   'api_search_conversations': async (server, args) => {
-    return await server.forwardToExtension('search_claude_conversations', args);
+    return await server.forwardToExtension('api_search_conversations', args);
   },
 
   'api_get_conversation_metadata': async (server, args) => {
-    return await server.forwardToExtension('get_conversation_metadata', args);
+    return await server.forwardToExtension('api_get_conversation_metadata', args);
   },
 
   'api_get_conversation_url': async (server, args) => {
@@ -91,12 +91,12 @@ const apiHandlers = {
     // Handle single vs bulk deletion
     if (conversationIds.length === 1) {
       // Route to single deletion for efficiency
-      return await server.forwardToExtension('delete_claude_conversation', {
+      return await server.forwardToExtension('api_delete_conversations', {
         conversationId: conversationIds[0]
       });
     } else {
       // Route to bulk deletion
-      return await server.forwardToExtension('bulk_delete_conversations', {
+      return await server.forwardToExtension('api_delete_conversations', {
         conversationIds: conversationIds,
         batchSize: args.batchSize,
         delayMs: args.delayMs

@@ -77,39 +77,39 @@ const chromeTools = [
  */
 const chromeHandlers = {
   'chrome_reload_extension': async (server, args) => {
-    return await server.forwardToExtension('reload_extension', args);
+    return await server.forwardToExtension('chrome_reload_extension', args);
   },
 
   'chrome_debug_attach': async (server, args) => {
-    return await server.forwardToExtension('debug_attach', args);
+    return await server.forwardToExtension('chrome_debug_attach', args);
   },
 
   'chrome_debug_detach': async (server, args) => {
-    return await server.forwardToExtension('debug_detach', args);
+    return await server.forwardToExtension('chrome_debug_detach', args);
   },
 
   'chrome_debug_status': async (server, args) => {
-    return await server.forwardToExtension('debug_status', args);
+    return await server.forwardToExtension('chrome_debug_status', args);
   },
 
   'chrome_execute_script': async (server, args) => {
-    return await server.forwardToExtension('execute_script', args);
+    return await server.forwardToExtension('chrome_execute_script', args);
   },
 
   'chrome_get_dom_elements': async (server, args) => {
-    return await server.forwardToExtension('get_dom_elements', args);
+    return await server.forwardToExtension('chrome_get_dom_elements', args);
   },
 
   'chrome_start_network_monitoring': async (server, args) => {
-    return await server.forwardToExtension('start_network_inspection', args);
+    return await server.forwardToExtension('chrome_start_network_monitoring', args);
   },
 
   'chrome_stop_network_monitoring': async (server, args) => {
-    return await server.forwardToExtension('stop_network_inspection', args);
+    return await server.forwardToExtension('chrome_stop_network_monitoring', args);
   },
 
   'chrome_get_network_requests': async (server, args) => {
-    return await server.forwardToExtension('get_captured_requests', args);
+    return await server.forwardToExtension('chrome_get_network_requests', args);
   }
 };
 

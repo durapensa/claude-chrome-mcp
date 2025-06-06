@@ -18,11 +18,11 @@ When you type 'continue' in a fresh Claude Code instance:
 ## Project Priorities & Next Steps
 
 ### High Priority Improvements
-1. **Remove Backward Compatibility**: Clean up legacy HTTP polling and old message formats (v2.6.0 is fully WebSocket)
-2. **Performance Optimization**: Message batching and queue optimization in extension
-3. **Error Recovery**: Enhance reconnection logic and error handling  
-4. **TypeScript Migration**: Complete migration of remaining JavaScript files
-5. **Test Coverage**: Add integration tests for critical workflows
+1. **⚠️ CRITICAL: Test Suite Rewrite**: tests/ directory requires complete rewrite - current tests timeout and are incompatible with v2.6.0 WebSocket architecture
+2. **Remove Backward Compatibility**: Clean up legacy HTTP polling and old message formats (v2.6.0 is fully WebSocket)
+3. **Performance Optimization**: Message batching and queue optimization in extension
+4. **Error Recovery**: Enhance reconnection logic and error handling  
+5. **TypeScript Migration**: Complete migration of remaining JavaScript files
 6. **Documentation**: Keep docs minimal and up-to-date per Critical Directives
 
 ### Known Issues to Address
@@ -31,10 +31,12 @@ When you type 'continue' in a fresh Claude Code instance:
 - Extension debug log buffering improvements
 
 ### When Todo List is Empty
-1. Run tests to ensure system stability: `cd tests && node regression-test-quick.js`
-2. Check for TODO/FIXME comments in codebase
-3. Review recent commits for follow-up work
-4. Consider improvements from Project Priorities above
+1. **Run manual tests** to ensure system stability (avoid broken /tests suite - see High Priority #1):
+   - `mcp system_health` - Check system status
+   - `mcp tab_create` - Test tab creation
+   - `mcp tab_send_message` - Test messaging functionality
+2. Review recent commits for follow-up work
+3. Consider improvements from Project Priorities above
 
 ## Key Documentation
 - **[Architecture](ARCHITECTURE.md)**: System design and components
