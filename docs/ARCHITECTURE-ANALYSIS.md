@@ -2,6 +2,41 @@
 
 After examining the `mcp-server/` and `extension/` codebases, this document identifies key architectural patterns, inconsistencies, and areas requiring attention for the critical test suite rewrite.
 
+## 🚨 CRITICAL ACTION ITEMS (Priority Order)
+
+**Tracking**: These items are now tracked as GitHub Issues for better project management.
+
+### 1. **Test Suite Architecture Rewrite** (BLOCKING) - [Issue #1](https://github.com/durapensa/claude-chrome-mcp/issues/1)
+- **Problem**: Tests assume HTTP polling patterns (system now uses WebSocket), testing wrong APIs (v1 vs v2)
+- **Impact**: Unreliable CI/CD, frequent timeouts, development velocity blocked
+- **Action**: Complete from-scratch rewrite using real MCP client patterns
+- **Design**: [Test Suite V3 Design](TEST-SUITE-V3-DESIGN.md)
+- **Estimated Effort**: 2.5 days
+
+### 2. **State Drift Prevention** (HIGH) - [Issue #2](https://github.com/durapensa/claude-chrome-mcp/issues/2)
+- **Problem**: Extension and server track different state aspects, no unified source of truth
+- **Impact**: Potential synchronization bugs, inconsistent resource tracking
+- **Action**: Implement unified resource state management system
+- **Estimated Effort**: 1-2 days
+
+### 3. **Resource Management Race Conditions** (HIGH) - [Issue #3](https://github.com/durapensa/claude-chrome-mcp/issues/3)
+- **Problem**: Multiple cleanup paths, scattered tracking, undefined cleanup order
+- **Impact**: Memory leaks, zombie processes, unreliable resource cleanup
+- **Action**: Define cleanup order dependencies, centralize resource tracking
+- **Estimated Effort**: 1 day
+
+### 4. **Configuration Fragmentation** (MEDIUM) - [Issue #4](https://github.com/durapensa/claude-chrome-mcp/issues/4)
+- **Problem**: Port numbers and constants scattered across multiple files
+- **Impact**: Maintenance overhead, deployment complexity
+- **Action**: Centralize all configuration in single source
+- **Estimated Effort**: 0.5 days
+
+### 5. **Error Recovery Patterns** (MEDIUM) - [Issue #5](https://github.com/durapensa/claude-chrome-mcp/issues/5)
+- **Problem**: No circuit breakers, limited retry logic, single relay bottleneck
+- **Impact**: Poor fault tolerance, cascading failures
+- **Action**: Implement circuit breakers and intelligent retry patterns
+- **Estimated Effort**: 1 day
+
 ## System Architecture Overview
 
 **Core Design Pattern**: WebSocket Relay Bridge
