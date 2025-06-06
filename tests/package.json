@@ -4,7 +4,10 @@
   "description": "Test suite for Claude Chrome MCP",
   "scripts": {
     "test": "jest",
+    "test:unit": "jest unit/",
     "test:integration": "jest integration/",
+    "test:contract": "jest contract/",
+    "test:fast": "jest unit/ contract/",
     "test:performance": "jest performance/",
     "test:resilience": "jest resilience/",
     "test:watch": "jest --watch",

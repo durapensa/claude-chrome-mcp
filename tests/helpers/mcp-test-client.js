@@ -16,7 +16,7 @@ class MCPTestClient {
   
   async connect() {
     // Generate unique test suite ID
-    const testId = `test-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const testId = `test-${Date.now()}`;
     
     // Connect to actual MCP server via stdio
     this.transport = new StdioClientTransport({

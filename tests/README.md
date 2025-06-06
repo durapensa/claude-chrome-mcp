@@ -1,34 +1,115 @@
-# Claude Chrome MCP Test Suite v3
+# Test Suite Architecture
 
-Modern, WebSocket-native test suite for Claude Chrome MCP.
+## Overview
 
-## Prerequisites
+This test suite uses three distinct categories to provide comprehensive coverage while maintaining reliability and speed:
 
-### Required Setup
-1. **Chrome Browser** must be running
-2. **Chrome Extension** must be:
-   - Installed at `chrome://extensions/`
-   - Enabled (toggle switch ON)
-   - Connected to relay (check popup status)
-3. **MCP Server** must be accessible:
-   - CLI daemon running: `mcp daemon status`
-   - Or standalone server available
-4. **Clean State**:
-   - Close all existing Claude.ai tabs
-   - Ensure no pending operations
+## 1. Unit Tests (`tests/unit/`)
 
-### Verify Prerequisites
+**Purpose:** Test MCP server functionality in isolation
+**Dependencies:** MCP server only (no Chrome extension required)  
+**Speed:** Fast (~50ms per test)
+**Reliability:** Always runnable
+
+**What we test:**
+- MCP server startup and tool registration
+- WebSocket relay connection and health
+- Tool listing and basic server responses
+- Error handling and timeout behavior
+- System health reporting
+
+**Example:**
+```javascript
+test('MCP server registers all expected tools', async () => {
+  const tools = await client.listTools();
+  expect(tools.tools).toHaveLength(32);
+  expect(tools.tools.find(t => t.name.includes('tab_create'))).toBeTruthy();
+});
+```
+
+## 2. Integration Tests (`tests/integration/`)
+
+**Purpose:** Test complete user workflows end-to-end
+**Dependencies:** MCP server + Chrome extension running
+**Speed:** Slow (~5-15s per test)  
+**Reliability:** Requires Chrome browser with extension
+
+**What we test:**
+- Full tab lifecycle (create → send message → get response → close)
+- Multi-tab coordination and isolation
+- API operations (list/delete conversations)
+- Real Claude.ai interaction patterns
+- Extension reload and recovery
+
+**Example:**
+```javascript
+test('Complete tab interaction workflow', async () => {
+  const { tabId } = await client.callTool('tab_create');
+  await client.callTool('tab_send_message', { tabId, message: "Test" });
+  const response = await client.callTool('tab_get_response', { tabId });
+  expect(response.completed).toBe(true);
+});
+```
+
+## 3. Contract Tests (`tests/contract/`)
+
+**Purpose:** Test interface boundaries and error conditions
+**Dependencies:** MCP server only
+**Speed:** Medium (~200ms per test)
+**Reliability:** Always runnable
+
+**What we test:**
+- Tool parameter validation
+- Error response formats
+- Timeout handling when extension unavailable
+- Edge cases and boundary conditions
+- API contract compliance
+
+**Example:**
+```javascript
+test('tab_create handles missing extension gracefully', async () => {
+  const result = await client.callTool('tab_create');
+  expect(result.error).toMatch(/timeout|extension/i);
+  expect(result.tabId).toBeUndefined();
+});
+```
+
+## Test Structure
+
+```
+tests/
+├── unit/                    # Fast, reliable server tests
+│   ├── server-startup.test.js
+│   ├── tool-registration.test.js
+│   ├── relay-connection.test.js
+│   └── system-health.test.js
+├── integration/             # End-to-end workflow tests  
+│   ├── tab-lifecycle.test.js
+│   ├── message-workflows.test.js
+│   ├── multi-tab.test.js
+│   └── api-operations.test.js
+├── contract/                # Interface and error tests
+│   ├── tool-contracts.test.js
+│   ├── error-handling.test.js
+│   └── timeout-behavior.test.js
+└── helpers/                 # Shared test utilities
+    ├── mcp-test-client.js
+    └── test-scenarios.js
+```
+
+## Running Tests
+
 ```bash
-# Check system health
-mcp system_health
+# Fast tests (unit + contract) - always work
+npm run test:fast
 
-# Expected output should show:
-# - relayConnected: true
-# - extension: { connectedClients: [...] }
-# - At least one 'chrome-extension' client
+# Full test suite - requires Chrome extension
+npm test
 
-# If extension not connected:
-mcp chrome_reload_extension
+# Specific categories
+npm run test:unit
+npm run test:integration  
+npm run test:contract
 ```
 
 ## Installation
@@ -38,57 +119,20 @@ cd tests
 npm install
 ```
 
-## Running Tests
+## Benefits
 
-### Quick Start
-```bash
-# Run all tests
-npm test
+✅ **Reliable CI/CD:** Unit tests never fail due to browser issues  
+✅ **Fast Development:** Can test server changes without Chrome setup  
+✅ **Complete Coverage:** Unit tests catch server bugs, integration tests catch workflow bugs  
+✅ **Clear Separation:** Easy to understand what each test category validates  
+✅ **Practical:** Matches real development and deployment scenarios
 
-# Or use the test runner
-node run-tests.js
-```
+## Writing Tests
 
-### Test Categories
-```bash
-# Integration tests only
-npm run test:integration
-
-# Performance tests only  
-npm run test:performance
-
-# Resilience tests only
-npm run test:resilience
-
-# Watch mode for development
-npm run test:watch
-```
-
-## Test Structure
-
-```
-tests/
-├── integration/          # End-to-end workflow tests
-├── performance/         # WebSocket relay performance
-├── resilience/          # Fault tolerance (coming soon)
-└── helpers/            # Test utilities and helpers
-```
-
-## Key Design Principles
-
-- **Black-box testing**: Tests use actual MCP tools, not internal APIs
-- **WebSocket-native**: Built for v2.6.0+ architecture
-- **Real Chrome integration**: Tests against actual extension
-- **Operation-aware**: Understands async operation lifecycle
-
-## Writing New Tests
-
-Use the provided helpers for consistent test patterns:
+Use the MCPTestClient helper for all test categories:
 
 ```javascript
 const { MCPTestClient } = require('../helpers/mcp-test-client');
-const { expectValidResponse } = require('../helpers/assertions');
-const { waitForResponse } = require('../helpers/test-scenarios');
 
 describe('Your Test Suite', () => {
   let client;
@@ -104,68 +148,18 @@ describe('Your Test Suite', () => {
   });
 
   test('Your test case', async () => {
-    const { tabId } = await client.callTool('tab_create', {
-      waitForLoad: true,
-      injectContentScript: true
-    });
-    
-    // Your test logic here
+    const result = await client.callTool('your_tool', { param: 'value' });
+    expect(result).toBeTruthy();
   });
 });
 ```
 
-## Troubleshooting
+## Prerequisites for Integration Tests
 
-### Common Test Failures
+Integration tests require Chrome extension to be running. Unit and contract tests work without it.
 
-#### "SETUP FAILED: Chrome extension not connected to relay"
-The extension is loaded but not communicating with the relay.
+To verify integration test prerequisites:
 ```bash
-# Solution 1: Reload extension via MCP
-mcp chrome_reload_extension
-
-# Solution 2: Manual reload
-# 1. Go to chrome://extensions/
-# 2. Find "Claude Chrome MCP"
-# 3. Click the refresh icon
-# 4. Wait 5 seconds for reconnection
-```
-
-#### "TIMEOUT: Tool 'tab_create' did not respond"
-The extension cannot create Chrome tabs.
-```bash
-# Check if Chrome is running and extension has permissions
-# Verify popup shows "Connected" status
-# Try creating a tab manually:
-mcp tab_create --injectContentScript
-```
-
-#### "No Chrome extension clients connected"
-The extension background script isn't running.
-```bash
-# Check extension logs
-mcp system_get_extension_logs --limit 50
-
-# Enable debug mode for more info
-mcp system_enable_extension_debug_mode
-```
-
-### Pre-Test Checklist
-1. ✅ Chrome browser is open
-2. ✅ Extension shows "Connected" in popup
-3. ✅ `mcp system_health` shows healthy state
-4. ✅ No Claude.ai tabs are open
-5. ✅ No active operations in progress
-
-### Debug Mode
-For detailed diagnostics during test failures:
-```bash
-# Enable extension debug logging
-mcp system_enable_extension_debug_mode
-
-# Run tests with verbose output
-npm run test:verbose
-
-# Check logs after failure
-mcp system_get_extension_logs --limit 100
+mcp system_health
+# Should show: relayConnected: true, extension with connectedClients
 ```
