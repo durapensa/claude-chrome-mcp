@@ -12,7 +12,7 @@
     "test:verbose": "jest --verbose"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.6"
+    "@modelcontextprotocol/sdk": "^1.12.1"
   },
   "devDependencies": {
     "jest": "^29.7.0"
