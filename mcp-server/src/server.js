@@ -71,23 +71,27 @@ class ChromeMCPServer {
     
     // Initialize relay client  
     this.relayClient = null;
+    this.clientInfo = null;
     
     const originalOnInitialize = this.server.server._oninitialize.bind(this.server.server);
     this.server.server._oninitialize = async (request) => {
       // Call original handler first
       const result = await originalOnInitialize(request);
       
-      // Extract client name and start relay synchronously
+      // Extract client name from initialization
       const clientInfo = request.params.clientInfo;
       const clientName = process.env.CCM_CLIENT_NAME || clientInfo.name || 'Claude Chrome MCP';
       const clientVersion = clientInfo.version || '2.6.0';
       
-      this.startRelay({
+      this.clientInfo = {
         type: 'mcp-client',
         name: clientName,
         version: clientVersion,
         capabilities: ['chrome_tabs', 'debugger', 'claude_automation']
-      });
+      };
+      
+      // Start relay connection after initialization is complete
+      this.startRelay(this.clientInfo);
       
       return result;
     };
