@@ -102,15 +102,6 @@ class MCPRelayClient extends EventEmitter {
     }
   }
 
-  updateClientInfo(clientInfo) {
-    this.clientInfo = clientInfo;
-    this.logger.info('Updated client info', { clientInfo });
-    
-    // Update relay manager with new client info if initialized
-    if (this.relayManager && this.relayManager.client) {
-      this.relayManager.updateClientInfo(clientInfo);
-    }
-  }
 
   async connect() {
     if (this.connectionState === 'connecting') {

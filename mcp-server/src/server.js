@@ -73,61 +73,53 @@ class ChromeMCPServer {
     // Force relay mode by setting environment variable
     process.env.USE_WEBSOCKET_RELAY = 'true';
     
-    // Initialize with client info from environment or defaults
-    const clientType = process.env.CCM_CLIENT_TYPE || 'mcp-client';
-    const clientName = process.env.CCM_CLIENT_NAME || 'Awaiting MCP Client';
+    // Don't create relay client yet - wait for MCP initialization
+    this.relayClient = null;
     
-    // Log will be done after logger initialization
-    
-    this.relayClient = new MCPRelayClient({
-      type: clientType,
-      name: clientName,
-      version: '2.6.0',
-      capabilities: ['chrome_tabs', 'debugger', 'claude_automation']
-    }, this.operationManager, this.notificationManager);
-    
-    // Set up callback to update relay client info after MCP initialization
-    this.server._handleRequest = new Proxy(this.server._handleRequest, {
-      apply: async (target, thisArg, args) => {
-        const [request] = args;
+    // Set up callback to connect relay after initialization
+    this.server.oninitialized = async () => {
+      try {
+        // Check for environment variable override first
+        const envClientName = process.env.CCM_CLIENT_NAME;
+        let clientName = envClientName || 'Claude Chrome MCP';
+        let clientVersion = '2.6.0';
         
-        // Intercept the initialize response to update client info
-        if (request.method === 'initialize') {
-          const result = await target.apply(thisArg, args);
+        if (!envClientName) {
+          // Get the actual MCP client info from the SDK
+          const clientInfo = this.server.getClientVersion();
+          this.debug.info('After initialization, getClientVersion() returned:', { clientInfo });
           
-          // After successful initialization, update relay with client info
-          try {
-            // Check for environment variable override first
-            const envClientName = process.env.CCM_CLIENT_NAME;
-            
-            if (!envClientName) {
-              // Get the actual MCP client info from the SDK
-              const clientInfo = this.server.getClientVersion();
-              this.debug.info('After initialize, getClientVersion() returned:', { clientInfo });
-              
-              if (clientInfo && clientInfo.name) {
-                // Pass raw client name - let extension handle display mapping
-                this.relayClient.updateClientInfo({
-                  type: 'mcp-client',
-                  name: clientInfo.name,
-                  version: clientInfo.version || '2.6.0',
-                  capabilities: ['chrome_tabs', 'debugger', 'claude_automation']
-                });
-                this.debug.info(`Updated relay client with raw name: ${clientInfo.name}`);
-              } else {
-                this.debug.warn('getClientVersion() did not return expected client info');
-              }
-            }
-          } catch (error) {
-            this.debug.error('Failed to update client info after initialization:', error);
+          if (clientInfo && clientInfo.name) {
+            clientName = clientInfo.name;
+            clientVersion = clientInfo.version || '2.6.0';
+          } else {
+            this.debug.warn('getClientVersion() did not return expected client info');
           }
-          
-          return result;
         }
         
-        return target.apply(thisArg, args);
+        // Now create and connect relay client with correct info
+        this.debug.info('Creating relay client with:', { clientName, clientVersion });
+        this.relayClient = new MCPRelayClient({
+          type: 'mcp-client',
+          name: clientName,
+          version: clientVersion,
+          capabilities: ['chrome_tabs', 'debugger', 'claude_automation']
+        }, this.operationManager, this.notificationManager);
+        
+        await this.relayClient.connect();
+        this.debug.info('Relay client connected successfully');
+        
+      } catch (error) {
+        this.debug.error('Failed to connect relay after initialization:', error);
+        // Create a minimal relay client to prevent errors
+        this.relayClient = new MCPRelayClient({
+          type: 'mcp-client',
+          name: 'Error Connecting',
+          version: '2.6.0',
+          capabilities: ['chrome_tabs', 'debugger', 'claude_automation']
+        }, this.operationManager, this.notificationManager);
       }
-    });
+    };
 
     this.setupTools();
   }
@@ -188,26 +180,30 @@ class ChromeMCPServer {
   async getConnectionHealth() {
     // Get server-side health
     const serverHealth = {
-      relayClient: this.relayClient.getConnectionStats(),
+      relayClient: this.relayClient ? this.relayClient.getConnectionStats() : { status: 'not_initialized' },
       server: {
         uptime: Date.now() - this.startTime,
         operationsCount: this.operationManager.operations.size,
         errorsCount: this.errorTracker.errors ? this.errorTracker.errors.length : 0
       },
       relayMode: true,
-      relayConnected: this.relayClient.connected
+      relayConnected: this.relayClient ? this.relayClient.connected : false
     };
 
     // Try to get extension-side health
     let extensionHealth = null;
-    try {
-      const extensionResult = await this.relayClient.sendRequest('get_connection_health', {});
-      if (extensionResult && extensionResult.health) {
-        extensionHealth = extensionResult.health;
+    if (this.relayClient) {
+      try {
+        const extensionResult = await this.relayClient.sendRequest('get_connection_health', {});
+        if (extensionResult && extensionResult.health) {
+          extensionHealth = extensionResult.health;
+        }
+      } catch (error) {
+        this.debug.warn('Failed to get extension health', { error: error.message });
+        extensionHealth = { error: 'Extension health unavailable', message: error.message };
       }
-    } catch (error) {
-      this.debug.warn('Failed to get extension health', { error: error.message });
-      extensionHealth = { error: 'Extension health unavailable', message: error.message };
+    } else {
+      extensionHealth = { error: 'Relay client not initialized' };
     }
 
     // Combine both health reports
@@ -225,6 +221,10 @@ class ChromeMCPServer {
   }
 
   async forwardToExtension(toolName, params) {
+    if (!this.relayClient) {
+      throw new Error('Relay client not initialized. MCP client must connect first.');
+    }
+    
     const result = await this.relayClient.sendRequest(toolName, params);
     
     if (result.error) {
@@ -264,8 +264,7 @@ class ChromeMCPServer {
       // Load saved operations
       await this.operationManager.loadState();
       
-      // Connect relay client
-      await this.relayClient.connect();
+      // Don't connect relay client here - wait for MCP initialization
       
       // Connect to stdio transport
       const transport = new StdioServerTransport();

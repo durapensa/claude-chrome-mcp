@@ -75,12 +75,14 @@ mcp api_get_conversation_url --conversationId <uuid>
 ### 6. 🔴 **TEST OR DIE - NO UNTESTED CODE**
 **RULE**: Every change MUST be verified BEFORE committing  
 **YOU MUST**:
+- **RESTART CLI DAEMON** with `mcp daemon stop` before testing mcp-server/ changes
 - Test with cli/ tools IMMEDIATELY after ANY changes to mcp-server/
 - NEVER commit mcp-server/ changes without testing first
 - Reload extension after ANY extension/ changes
 - Verify with cli/ MCP tools before proceeding or committing
 **CONSEQUENCE**: Untested code = broken features, debugging hell, wasted time
 **CRITICAL**: Breaking the MCP server breaks EVERYTHING - test first!
+**CRITICAL**: CLI daemon uses cached MCP server - MUST restart to test changes!
 
 **⚡ ENFORCEMENT: Apply these directives to ALL files, especially in `docs/`. Delete violations on sight. No exceptions. ⚡**
 

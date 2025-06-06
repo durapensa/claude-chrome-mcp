@@ -111,20 +111,6 @@ class EmbeddedRelayManager extends EventEmitter {
     return this.client.sendToExtension(targetId, type, params);
   }
 
-  updateClientInfo(clientInfo) {
-    this.clientInfo = clientInfo;
-    
-    // Update the client connection if we're connected as a client
-    if (this.client && this.client.isConnected) {
-      // Re-identify with new client info
-      this.client.send({
-        type: 'identify',
-        clientType: clientInfo.type || 'mcp-server',
-        name: clientInfo.name || 'Claude Chrome MCP',
-        capabilities: clientInfo.capabilities
-      });
-    }
-  }
 
   async stop() {
     console.error('[EmbeddedRelay] Stopping embedded relay manager...');
