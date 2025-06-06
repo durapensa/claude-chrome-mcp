@@ -123,11 +123,11 @@ class MCPCli {
     console.log('  mcp [OPTIONS] [@SERVER:]TOOL [ARGS]\n');
     
     console.log(chalk.bold('Built-in Commands:'));
-    console.log('  help                     Show this help');
-    console.log('  version                  Show version');
-    console.log('  daemon start|stop|status Manage daemon');
-    console.log('  servers                  List server status');
-    console.log('  tools                    List available tools\n');
+    console.log('  help                             Show this help');
+    console.log('  version                          Show version');
+    console.log('  daemon start|stop|restart|status Manage daemon');
+    console.log('  servers                          List server status');
+    console.log('  tools                            List available tools\n');
     
     console.log(chalk.bold('Global Options:'));
     console.log('  -h, --help              Show help');
@@ -186,6 +186,10 @@ class MCPCli {
       
       case 'stop':
         await this.stopDaemon();
+        break;
+      
+      case 'restart':
+        await this.restartDaemon();
         break;
       
       case 'status':
@@ -299,6 +303,15 @@ class MCPCli {
         console.error(chalk.red('Failed to kill daemon processes:'), (killError as Error).message);
       }
     }
+  }
+
+  /**
+   * Restart the daemon (stop then start)
+   */
+  private async restartDaemon(): Promise<void> {
+    console.log('Restarting daemon...');
+    await this.stopDaemon();
+    await this.startDaemon();
   }
 
   /**

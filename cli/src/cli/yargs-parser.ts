@@ -69,7 +69,7 @@ export class YargsParser {
         return yargs
           .positional('action', {
             describe: 'Daemon action',
-            choices: ['start', 'stop', 'status']
+            choices: ['start', 'stop', 'restart', 'status']
           });
       })
       .command('servers', 'List server status')
