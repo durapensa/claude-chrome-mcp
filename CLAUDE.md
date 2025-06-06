@@ -73,12 +73,14 @@ mcp api_get_conversation_url --conversationId <uuid>
 **CONSEQUENCE**: Bloat = confusion, wasted time, poor decisions
 
 ### 6. 🔴 **TEST OR DIE - NO UNTESTED CODE**
-**RULE**: Every change MUST be verified  
+**RULE**: Every change MUST be verified BEFORE committing  
 **YOU MUST**:
-- Test with cli/ tools IMMEDIATELY after changes to mcp-server/
+- Test with cli/ tools IMMEDIATELY after ANY changes to mcp-server/
+- NEVER commit mcp-server/ changes without testing first
 - Reload extension after ANY extension/ changes
-- Verify with cli/ MCP tools before proceeding
-**CONSEQUENCE**: Untested code = broken features, debugging hell
+- Verify with cli/ MCP tools before proceeding or committing
+**CONSEQUENCE**: Untested code = broken features, debugging hell, wasted time
+**CRITICAL**: Breaking the MCP server breaks EVERYTHING - test first!
 
 **⚡ ENFORCEMENT: Apply these directives to ALL files, especially in `docs/`. Delete violations on sight. No exceptions. ⚡**
 
