@@ -73,52 +73,25 @@ class ChromeMCPServer {
     // Force relay mode by setting environment variable
     process.env.USE_WEBSOCKET_RELAY = 'true';
     
-    // Don't create relay client yet - wait for MCP initialization
+    // Connect relay during initialization
     this.relayClient = null;
     
-    // Set up callback to connect relay after initialization
-    this.server.oninitialized = async () => {
-      try {
-        // Check for environment variable override first
-        const envClientName = process.env.CCM_CLIENT_NAME;
-        let clientName = envClientName || 'Claude Chrome MCP';
-        let clientVersion = '2.6.0';
-        
-        if (!envClientName) {
-          // Get the actual MCP client info from the SDK
-          const clientInfo = this.server.getClientVersion();
-          this.debug.info('After initialization, getClientVersion() returned:', { clientInfo });
-          
-          if (clientInfo && clientInfo.name) {
-            clientName = clientInfo.name;
-            clientVersion = clientInfo.version || '2.6.0';
-          } else {
-            this.debug.warn('getClientVersion() did not return expected client info');
-          }
-        }
-        
-        // Now create and connect relay client with correct info
-        this.debug.info('Creating relay client with:', { clientName, clientVersion });
-        this.relayClient = new MCPRelayClient({
-          type: 'mcp-client',
-          name: clientName,
-          version: clientVersion,
-          capabilities: ['chrome_tabs', 'debugger', 'claude_automation']
-        }, this.operationManager, this.notificationManager);
-        
-        await this.relayClient.connect();
-        this.debug.info('Relay client connected successfully');
-        
-      } catch (error) {
-        this.debug.error('Failed to connect relay after initialization:', error);
-        // Create a minimal relay client to prevent errors
-        this.relayClient = new MCPRelayClient({
-          type: 'mcp-client',
-          name: 'Error Connecting',
-          version: '2.6.0',
-          capabilities: ['chrome_tabs', 'debugger', 'claude_automation']
-        }, this.operationManager, this.notificationManager);
-      }
+    const originalOnInitialize = this.server.server._oninitialize.bind(this.server.server);
+    this.server.server._oninitialize = async (request) => {
+      const clientInfo = request.params.clientInfo;
+      const clientName = process.env.CCM_CLIENT_NAME || clientInfo.name || 'Claude Chrome MCP';
+      const clientVersion = clientInfo.version || '2.6.0';
+      
+      this.relayClient = new MCPRelayClient({
+        type: 'mcp-client',
+        name: clientName,
+        version: clientVersion,
+        capabilities: ['chrome_tabs', 'debugger', 'claude_automation']
+      }, this.operationManager, this.notificationManager);
+      
+      await this.relayClient.connect();
+      
+      return await originalOnInitialize(request);
     };
 
     this.setupTools();
@@ -264,8 +237,6 @@ class ChromeMCPServer {
       // Load saved operations
       await this.operationManager.loadState();
       
-      // Don't connect relay client here - wait for MCP initialization
-      
       // Connect to stdio transport
       const transport = new StdioServerTransport();
       
@@ -283,7 +254,7 @@ class ChromeMCPServer {
       
       await this.server.connect(transport);
       
-      this.debug.info('ChromeMCPServer started successfully');
+      this.debug.info('ChromeMCPServer started successfully, waiting for client initialization...');
     } catch (error) {
       this.debug.error('Failed to start ChromeMCPServer', error);
       throw error;
