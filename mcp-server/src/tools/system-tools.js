@@ -51,6 +51,11 @@ const systemTools = [
     zodSchema: {
       level: z.enum(['ERROR', 'WARN', 'INFO', 'DEBUG', 'VERBOSE']).describe('Minimum extension log level to capture (ERROR=critical only, VERBOSE=everything)')
     }
+  },
+  {
+    name: 'system_relay_takeover',
+    description: 'Request the current relay to shut down gracefully, allowing a new relay to take over. Use with caution.',
+    zodSchema: {}
   }
 ];
 
@@ -80,6 +85,62 @@ const systemHandlers = {
 
   'system_set_extension_log_level': async (server, args) => {
     return await server.forwardToExtension('set_log_level', args);
+  },
+
+  'system_relay_takeover': async (server, args) => {
+    try {
+      // Check current relay health first
+      const healthResponse = await fetch('http://localhost:54322/health');
+      if (!healthResponse.ok) {
+        return {
+          content: [{
+            type: 'text',
+            text: 'No relay server found running on port 54321'
+          }]
+        };
+      }
+      
+      const health = await healthResponse.json();
+      
+      // Request takeover
+      const takeoverResponse = await fetch('http://localhost:54322/takeover', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (!takeoverResponse.ok) {
+        const error = await takeoverResponse.json();
+        return {
+          content: [{
+            type: 'text',
+            text: `Takeover failed: ${error.error || 'Unknown error'}`
+          }]
+        };
+      }
+      
+      const result = await takeoverResponse.json();
+      
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({
+            ...result,
+            previousRelay: {
+              version: health.version,
+              uptime: health.uptime,
+              clients: health.metrics.currentClients
+            }
+          }, null, 2)
+        }]
+      };
+    } catch (error) {
+      return {
+        content: [{
+          type: 'text',
+          text: `Failed to request relay takeover: ${error.message}`
+        }]
+      };
+    }
   }
 };
 

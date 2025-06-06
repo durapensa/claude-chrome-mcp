@@ -11,9 +11,10 @@ const { createLogger } = require('../utils/logger');
 const RELAY_PORT = 54321;
 
 class MessageRelay extends EventEmitter {
-  constructor(port = RELAY_PORT) {
+  constructor(port = RELAY_PORT, version = 'unknown') {
     super();
     this.port = port;
+    this.version = version;
     this.clients = new Map(); // clientId -> WebSocket
     this.wss = null;
     this.clientCounter = 0;
@@ -29,7 +30,7 @@ class MessageRelay extends EventEmitter {
       errors: 0
     };
     
-    this.logger.info('Message relay initialized', { port: this.port });
+    this.logger.info('Message relay initialized', { port: this.port, version: this.version });
   }
   
   start() {
@@ -73,6 +74,7 @@ class MessageRelay extends EventEmitter {
       if (req.url === '/health') {
         const health = {
           status: 'healthy',
+          version: this.version,
           uptime: Date.now() - this.metrics.startTime,
           metrics: {
             ...this.metrics,
@@ -93,6 +95,29 @@ class MessageRelay extends EventEmitter {
         
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(health, null, 2));
+      } else if (req.url === '/takeover' && req.method === 'POST') {
+        // Manual takeover endpoint - triggers graceful shutdown
+        if (this.isShuttingDown) {
+          res.writeHead(409, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Already shutting down' }));
+          return;
+        }
+        
+        this.logger.info('Takeover requested via health endpoint');
+        
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
+          status: 'accepted',
+          message: 'Relay will shut down gracefully',
+          currentClients: this.clients.size
+        }));
+        
+        // Schedule graceful shutdown after response
+        setTimeout(() => {
+          this.stop('takeover').catch(err => {
+            this.logger.error('Error during takeover shutdown', err);
+          });
+        }, 100);
       } else {
         res.writeHead(404);
         res.end('Not found');
@@ -284,17 +309,22 @@ class MessageRelay extends EventEmitter {
     });
   }
   
-  async stop() {
+  async stop(reason = 'normal') {
     if (this.isShuttingDown) return;
     
     this.isShuttingDown = true;
-    this.logger.info('Shutting down...');
+    this.logger.info('Shutting down...', { reason });
     
-    // Notify all clients
+    // Notify all clients with shutdown reason and grace period
     this.broadcast({
       type: 'relay_shutdown',
+      reason: reason,
+      gracePeriodMs: 2000,
       timestamp: Date.now()
     });
+    
+    // Give clients time to prepare for shutdown
+    await new Promise(resolve => setTimeout(resolve, 2000));
     
     // Close all client connections
     this.clients.forEach((client, clientId) => {

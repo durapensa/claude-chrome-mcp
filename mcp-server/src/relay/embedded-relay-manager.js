@@ -54,7 +54,16 @@ class EmbeddedRelayManager extends EventEmitter {
   }
 
   async startAsRelayHost() {
-    this.relay = new MessageRelay(this.port);
+    // Try to get version from package.json
+    let version = 'unknown';
+    try {
+      const packageJson = require('../../package.json');
+      version = packageJson.version || 'unknown';
+    } catch (error) {
+      this.logger.debug('Could not read version from package.json');
+    }
+    
+    this.relay = new MessageRelay(this.port, version);
     
     // Forward relay events
     this.relay.on('clientConnected', (client) => {
