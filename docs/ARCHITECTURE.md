@@ -335,6 +335,6 @@ await chrome.storage.local.set({
 
 ## Related Documentation
 
-- [Problem Resolution](../claude/problem-resolution.md) - Complete troubleshooting and timeout resolution
-- [Session Management](../claude/session-management.md) - Session continuation and workflow procedures
+- [Architecture Analysis](ARCHITECTURE-ANALYSIS.md) - Critical issues and improvement roadmap
+- [Test Suite V3 Design](TEST-SUITE-V3-DESIGN.md) - New test architecture design
 - [TypeScript Types](TYPESCRIPT.md) - API type definitions

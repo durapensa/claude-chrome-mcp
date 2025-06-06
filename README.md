@@ -67,7 +67,7 @@ In Claude Desktop, you can now use natural language commands like:
 
 | Guide | Description |
 |-------|-------------|
-| [**Getting Started**](claude/session-management.md) | Session continuation and workflow management |
+| [**Architecture Analysis**](docs/ARCHITECTURE-ANALYSIS.md) | Critical issues and improvement roadmap |
 | [**Architecture**](docs/ARCHITECTURE.md) | System design and components |
 | [**Problem Resolution**](claude/problem-resolution.md) | Complete troubleshooting and timeout resolution |
 | [**Development Workflows**](claude/development-workflows.md) | Code changes, testing, and development procedures |
