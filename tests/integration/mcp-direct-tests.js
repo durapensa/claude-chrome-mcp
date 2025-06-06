@@ -106,7 +106,7 @@ class MockMCPClient {
     console.log(`  ${colors.gray}→ ${tool}${colors.reset}`);
     
     switch (tool) {
-      case 'get_connection_health':
+      case 'system_health':
         return {
           success: true,
           health: {
@@ -148,7 +148,7 @@ async function runIntegrationTests() {
   
   // Test 1: Connection health check
   await runner.run('Connection health check', async () => {
-    const result = await client.callTool('get_connection_health', {});
+    const result = await client.callTool('system_health', {});
     
     if (!result.success) {
       throw new Error('Health check failed');
@@ -197,7 +197,7 @@ async function runIntegrationTests() {
       'spawn_claude_tab',
       'send_message_to_claude_tab',
       'get_claude_response',
-      'get_connection_health'
+      'system_health'
     ];
     
     // In real implementation, would check tool list

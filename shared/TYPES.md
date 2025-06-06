@@ -182,7 +182,7 @@ export enum MCPToolName {
   ExtractConversationElements = 'extract_conversation_elements',
   GetClaudeResponseStatus = 'get_claude_response_status',
   BatchGetResponses = 'batch_get_responses',
-  GetConnectionHealth = 'get_connection_health'
+  GetConnectionHealth = 'system_health'
 }
 ```
 
@@ -218,7 +218,7 @@ export enum MCPToolName {
 
 #### System
 - `reload_extension` - Reload the Chrome extension
-- `get_connection_health` - Check system health
+- `system_health` - Check system health
 
 ## Type Union Examples
 

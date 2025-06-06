@@ -100,7 +100,7 @@ const quickTests = {
   // 2. Health check
   async testHealth(client) {
     try {
-      const result = await client.callTool('get_connection_health', {});
+      const result = await client.callTool('system_health', {});
       const health = result.content[0].text;
       const isHealthy = health.includes('"status": "healthy"');
       

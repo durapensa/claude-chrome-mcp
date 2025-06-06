@@ -72,7 +72,7 @@ async function runTest(name, testFn, lifecycle) {
 const tests = {
   // 1. Connection Health
   async testConnectionHealth() {
-    const result = await sharedClient.callTool('get_connection_health', {});
+    const result = await sharedClient.callTool('system_health', {});
     const health = JSON.parse(result.content[0].text);
     
     const isHealthy = health.status === 'healthy';

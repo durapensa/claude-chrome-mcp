@@ -96,7 +96,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
   
   // Always handle health checks immediately, even during initialization
-  if (request.type === 'mcp_tool_request' && request.tool === 'get_connection_health') {
+  if (request.type === 'mcp_tool_request' && request.tool === 'system_health') {
     const currentState = relayClient ? relayClient.getCurrentState() : {
       relayConnected: false,
       isReconnecting: false,

@@ -122,65 +122,76 @@ export class YargsParser {
   }
 
   /**
-   * Parse tool-specific arguments with multiple format support
+   * Parse tool-specific arguments with enhanced comma-separated array support
+   * Leverages yargs native parsing with custom coercion for arrays
    */
   private static parseToolArgs(toolArgs: string[], parsedArgs: any): Record<string, any> {
     const result: Record<string, any> = {};
 
-    // Handle different argument formats:
-    // 1. JSON string: mcp tool '{"key": "value"}'
-    // 2. Key-value pairs: mcp tool --key value
-    // 3. Boolean flags: mcp tool --flag or --no-flag
-    // 4. Positional args: mcp tool value1 value2
-
-    for (let i = 0; i < toolArgs.length; i++) {
-      const arg = toolArgs[i];
-      
-      // Try parsing as JSON first
+    // Handle JSON string format as fallback: mcp tool '{"key": "value"}'
+    for (const arg of toolArgs) {
       if (arg.startsWith('{') && arg.endsWith('}')) {
         try {
           Object.assign(result, JSON.parse(arg));
-          continue;
+          break; // Only process first JSON string found
         } catch (error) {
-          // Not valid JSON, treat as positional
+          // Not valid JSON, ignore and continue with normal parsing
         }
       }
-
-      // Handle key-value format --key value
-      if (arg.startsWith('--')) {
-        const key = arg.slice(2);
-        
-        // Handle --no-<flag> convention for false booleans
-        if (key.startsWith('no-')) {
-          const actualKey = key.slice(3);
-          result[actualKey] = false;
-          continue;
-        }
-        
-        const value = toolArgs[i + 1];
-        if (value && !value.startsWith('--')) {
-          // Convert value to appropriate type
-          result[key] = this.convertValue(value);
-          i++; // Skip next arg since we consumed it
-          continue;
-        }
-        result[key] = true; // Boolean flag
-        continue;
-      }
-
-      // Positional arguments (tool schema will determine mapping)
-      if (!result.args) result.args = [];
-      result.args.push(arg);
     }
 
-    // Also include any parsed flags from yargs
+    // Copy all yargs-parsed arguments (yargs already handles --key value, --flag, --no-flag)
     for (const [key, value] of Object.entries(parsedArgs)) {
       if (!['_', '$0', 'verbose', 'json', 'timeout', 'server', 'config', 'help', 'version'].includes(key)) {
-        result[key] = value;
+        result[key] = this.processArgumentValue(key, value);
       }
+    }
+
+    // Handle positional arguments
+    const positionalArgs = toolArgs.filter(arg => !arg.startsWith('--') && !arg.startsWith('{'));
+    if (positionalArgs.length > 0) {
+      result.args = positionalArgs;
     }
 
     return result;
+  }
+
+  /**
+   * Process argument values with comma-separated array support and type coercion
+   */
+  private static processArgumentValue(key: string, value: any): any {
+    // If it's already an array from yargs, keep it
+    if (Array.isArray(value)) {
+      return value;
+    }
+
+    // Handle comma-separated arrays for likely array parameters
+    if (typeof value === 'string' && this.isLikelyArrayParameter(key) && value.includes(',')) {
+      return value.split(',').map(s => s.trim()).filter(s => s.length > 0);
+    }
+
+    // Apply type conversion
+    return this.convertValue(value);
+  }
+
+  /**
+   * Determine if a parameter name suggests it should be an array
+   */
+  private static isLikelyArrayParameter(key: string): boolean {
+    // Check for common array parameter patterns
+    const arrayPatterns = [
+      /ids?$/i,          // conversationIds, tabIds, fileIds, etc.
+      /list$/i,          // fileList, itemList, etc.
+      /items?$/i,        // items, menuItems, etc.
+      /files?$/i,        // files, sourceFiles, etc.
+      /paths?$/i,        // paths, filePaths, etc.
+      /names?$/i,        // names, fileNames, etc.
+      /types?$/i,        // types, mimeTypes, etc.
+      /tags?$/i,         // tags, categories, etc.
+      /values?$/i,       // values, configValues, etc.
+    ];
+
+    return arrayPatterns.some(pattern => pattern.test(key));
   }
 
   /**
@@ -246,7 +257,12 @@ export class YargsParser {
     
     console.log('\nExamples:');
     console.log(`  mcp ${toolName} --param1 value1 --param2 value2`);
-    console.log(`  mcp ${toolName} '{"param1": "value1", "param2": "value2"}'`);
+    console.log(`  mcp ${toolName} --arrayParam val1,val2,val3`);
+    console.log(`  mcp ${toolName} '{"param1": "value1", "arrayParam": ["val1", "val2"]}'`);
+    
+    console.log('\nArray Parameters:');
+    console.log('  Use comma-separated values: --conversationIds id1,id2,id3');
+    console.log('  Parameters ending in "Ids", "List", "Items", etc. support comma separation');
     
     console.log('\nBoolean Values:');
     console.log('  Use --flag for true, --no-flag for false');

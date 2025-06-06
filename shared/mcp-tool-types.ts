@@ -548,7 +548,7 @@ export type ToolParams =
   | { tool: 'extract_conversation_elements'; params: ExtractConversationElementsParams }
   | { tool: 'get_claude_dot_ai_response_status'; params: GetClaudeDotAiResponseStatusParams }
   | { tool: 'batch_get_responses'; params: BatchGetResponsesParams }
-  | { tool: 'get_connection_health'; params: GetConnectionHealthParams }
+  | { tool: 'system_health'; params: GetConnectionHealthParams }
   | { tool: 'get_tab_pool_stats'; params: GetTabPoolStatsParams }
   | { tool: 'release_tab_to_pool'; params: ReleaseTabToPoolParams }
   | { tool: 'configure_tab_pool'; params: ConfigureTabPoolParams }
@@ -609,7 +609,7 @@ export type ToolResponse =
   | { tool: 'extract_conversation_elements'; result: { elements: ConversationElement[] } }
   | { tool: 'get_claude_dot_ai_response_status'; result: ResponseStatus }
   | { tool: 'batch_get_responses'; result: BatchResponseResult }
-  | { tool: 'get_connection_health'; result: ConnectionHealth }
+  | { tool: 'system_health'; result: ConnectionHealth }
   | { tool: 'get_tab_pool_stats'; result: TabPoolStats }
   | { tool: 'release_tab_to_pool'; result: { success: boolean; message: string } }
   | { tool: 'configure_tab_pool'; result: { success: boolean; config: any } }

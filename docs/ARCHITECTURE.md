@@ -12,6 +12,17 @@ Claude Chrome MCP enables multiple AI agents (Claude Code, Claude Desktop, Curso
 4. **Persistent Connections** - Offscreen documents maintain WebSocket without keepalives
 5. **Event-Driven** - No polling, pure push-based messaging
 6. **Protocol-Compliant** - Uses MCP protocol's clientInfo for identification
+7. **Async Operations** - Long-running operations return immediately with tracking (via OperationManager)
+
+## Async Operation Pattern
+
+**Implemented in**: `api_delete_conversations` (mcp-server/src/tools/api-tools.js)  
+**TODO**: Review other bulk operations for similar async treatment:
+- Batch operations that might timeout (e.g., bulk tab operations)
+- Long-running API calls (e.g., conversation exports)  
+- Multi-step operations with progress tracking
+
+**Pattern**: Tool returns `{ success: true, operationId, status: "async_queued" }` immediately, then uses `OperationManager` for background processing and `system_wait_operation` for completion tracking.
 
 ## System Architecture
 

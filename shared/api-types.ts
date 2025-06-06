@@ -649,7 +649,7 @@ export enum MCPToolName {
   ExtractConversationElements = 'extract_conversation_elements',
   GetClaudeResponseStatus = 'get_claude_response_status',
   BatchGetResponses = 'batch_get_responses',
-  GetConnectionHealth = 'get_connection_health'
+  GetConnectionHealth = 'system_health'
 }
 
 // ============================================================================

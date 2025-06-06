@@ -182,7 +182,7 @@ class ChromeMCPServer {
     let extensionHealth = null;
     if (this.relayClient) {
       try {
-        const extensionResult = await this.relayClient.sendRequest('get_connection_health', {});
+        const extensionResult = await this.relayClient.sendRequest('system_health', {});
         if (extensionResult && extensionResult.health) {
           extensionHealth = extensionResult.health;
         }

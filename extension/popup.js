@@ -20,7 +20,7 @@ async function getInitialState() {
   try {
     const response = await chrome.runtime.sendMessage({
       type: 'mcp_tool_request',
-      tool: 'get_connection_health',
+      tool: 'system_health',
       params: {}
     });
     

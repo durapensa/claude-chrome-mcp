@@ -86,22 +86,52 @@ const apiHandlers = {
   },
 
   'api_delete_conversations': async (server, args) => {
-    const { conversationIds } = args;
+    const { conversationIds, batchSize = 5, delayMs = 1000 } = args;
     
-    // Handle single vs bulk deletion
-    if (conversationIds.length === 1) {
-      // Route to single deletion for efficiency
-      return await server.forwardToExtension('api_delete_conversations', {
-        conversationId: conversationIds[0]
-      });
-    } else {
-      // Route to bulk deletion
-      return await server.forwardToExtension('api_delete_conversations', {
-        conversationIds: conversationIds,
-        batchSize: args.batchSize,
-        delayMs: args.delayMs
-      });
-    }
+    // Create operation for async tracking
+    const operationId = server.operationManager.createOperation('api_delete_conversations', {
+      conversationIds,
+      batchSize,
+      delayMs,
+      total: conversationIds.length
+    });
+    
+    // Start deletion process in background
+    setImmediate(async () => {
+      try {
+        server.operationManager.updateOperation(operationId, 'started', {
+          message: `Starting deletion of ${conversationIds.length} conversation(s)`
+        });
+        
+        // Always use bulk deletion format (extension handles single items in array)
+        const result = await server.forwardToExtension('api_delete_conversations', {
+          conversationIds: conversationIds,
+          batchSize: batchSize,
+          delayMs: delayMs
+        });
+        
+        // Update operation with completion
+        server.operationManager.updateOperation(operationId, 'completed', {
+          message: 'Deletion completed',
+          result: result
+        });
+        
+      } catch (error) {
+        server.operationManager.updateOperation(operationId, 'error', {
+          message: 'Deletion failed',
+          error: error.message
+        });
+      }
+    });
+    
+    // Return immediately with operation ID
+    return {
+      success: true,
+      operationId: operationId,
+      message: `Queued deletion of ${conversationIds.length} conversation(s)`,
+      status: 'async_queued',
+      timestamp: Date.now()
+    };
   }
 };
 

@@ -9,16 +9,21 @@ THEN: `mcp system_health` → `TodoRead` → Continue pending tasks OR address C
 
 WHEN: Code changes complete  
 THEN: **Test by component → Fix failures → Commit workflow:**
-- extension/: Reload extension → Test
+- extension/: **REQUIRED** `mcp chrome_reload_extension` → Test
 - cli/: **REQUIRED** `cd cli && npm run build && npm install -g` → Test commands  
-- mcp-server/: `mcp daemon restart` → Test
+- mcp-server/: **REQUIRED** `mcp daemon restart` → Test CLI tools (`mcp` commands)
+
+**CRITICAL**: When testing mcp-server/ changes, use CLI tools (`mcp`) not MCP tools (`mcp__claude-chrome-mcp__*`)
+- CLI tools use local daemon (affected by restart)  
+- MCP tools use Claude Code's server (unaffected by local changes)
 
 WHEN: Managing code  
 THEN: **Simplify and consolidate:**
 - Consider deleting dead/commented code immediately
-- Edit existing files rather than create new; ask user if new file creation seems a good choice
+- Edit existing files rather than create new; ask user if new file creation seems a good choice to maintain existing modularity schemas
 - Don't create temporary files (git provides history)
 - Single source for information, link from elsewhere
+- **DON'T document implementation details in project docs when git captures them** (TODOs, pattern notes, completed features)
 
 ## TROUBLESHOOTING
 
@@ -26,7 +31,7 @@ WHEN: MCP tools timeout OR connection issues
 THEN: **Escalating resolution:**
 1. `mcp chrome_reload_extension`
 2. `mcp system_health` 
-3. Manual extension reload at chrome://extensions/
+3. Request that user manually reload extension reload at chrome://extensions/
 
 WHEN: Operations hang OR don't complete  
 THEN: **Check systematically:**
@@ -45,13 +50,12 @@ THEN: **Evidence gathering pattern:**
 # Core workflow
 mcp system_health
 mcp tab_create --injectContentScript
-mcp tab_send_message --message "Test" --tabId <id>
+mcp tab_send_message --message "Quick: 2 + 2" --tabId <id>
 mcp tab_get_response --tabId <id>
 
 # Forwarding & API
 mcp tab_forward_response --sourceTabId <source> --targetTabId <target>
-mcp api_list_conversations
-mcp api_get_conversation_url --conversationId <uuid>
+mcp tab_get_response --targetTabId <target>
 ```
 
 ## DOCUMENTATION

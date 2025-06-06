@@ -19,7 +19,7 @@ async function testEventDriven() {
         
         // Test health
         console.log('🏥 Testing system health...');
-        const healthResult = await sharedClient.callTool('get_connection_health', {});
+        const healthResult = await sharedClient.callTool('system_health', {});
         const health = JSON.parse(healthResult.content[0].text);
         console.log(`✅ System status: ${health.health.status}\n`);
         

@@ -234,7 +234,7 @@ export class ConfigLoader {
             description: "Claude Chrome browser automation",
             priority: 1,
             autoStart: true,
-            healthCheck: "get_connection_health"
+            healthCheck: "system_health"
           }
         },
         daemon: DEFAULT_DAEMON_CONFIG,

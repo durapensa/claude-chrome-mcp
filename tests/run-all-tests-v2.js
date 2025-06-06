@@ -88,7 +88,7 @@ async function connectSharedClient() {
     console.log(`${colors.green}✅ Connected to MCP server${colors.reset}\n`);
     
     // Test connection
-    const health = await sharedClient.callTool('get_connection_health', {});
+    const health = await sharedClient.callTool('system_health', {});
     const healthData = JSON.parse(health.content[0].text);
     
     if (healthData.status !== 'healthy') {

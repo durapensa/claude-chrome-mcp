@@ -131,7 +131,7 @@ class SharedMCPClient {
       if (this.isConnected && this.client) {
         try {
           // Try a lightweight operation to check connection
-          await this.client.callTool('get_connection_health', {});
+          await this.client.callTool('system_health', {});
           this.lastHealthCheck = Date.now();
         } catch (error) {
           console.warn('Health check failed:', error.message);

@@ -104,7 +104,7 @@ async function batchMessaging(client: any, tabIds: number[]): Promise<void> {
 
 // Example 3: Health monitoring with types
 async function monitorHealth(client: any): Promise<void> {
-  const health = await client.callTool('get_connection_health', {}) as ConnectionHealth;
+  const health = await client.callTool('system_health', {}) as ConnectionHealth;
   
   if (!health.success || !health.health) {
     console.error('❌ Health check failed');
