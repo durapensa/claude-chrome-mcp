@@ -83,6 +83,7 @@ mcp api_get_conversation_url --conversationId <uuid>
 **CONSEQUENCE**: Untested code = broken features, debugging hell, wasted time
 **CRITICAL**: Breaking the MCP server breaks EVERYTHING - test first!
 **CRITICAL**: CLI daemon uses cached MCP server - MUST restart to test changes!
+**CRITICAL ORDER**: Code → Test → Fix → Test Again → ONLY THEN Commit
 
 **⚡ ENFORCEMENT: Apply these directives to ALL files, especially in `docs/`. Delete violations on sight. No exceptions. ⚡**
 

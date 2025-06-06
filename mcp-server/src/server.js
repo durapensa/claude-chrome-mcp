@@ -69,32 +69,45 @@ class ChromeMCPServer {
     this.operationManager = new OperationManager();
     this.notificationManager = new NotificationManager(this.server, this.errorTracker);
     
-    // Initialize relay client (WebSocket relay mode only)
-    // Force relay mode by setting environment variable
-    process.env.USE_WEBSOCKET_RELAY = 'true';
+    // Initialize relay client
     
     // Connect relay during initialization
     this.relayClient = null;
     
     const originalOnInitialize = this.server.server._oninitialize.bind(this.server.server);
     this.server.server._oninitialize = async (request) => {
+      // Call original handler first
+      const result = await originalOnInitialize(request);
+      
+      // Extract client name and start relay synchronously
       const clientInfo = request.params.clientInfo;
       const clientName = process.env.CCM_CLIENT_NAME || clientInfo.name || 'Claude Chrome MCP';
       const clientVersion = clientInfo.version || '2.6.0';
       
-      this.relayClient = new MCPRelayClient({
+      this.startRelay({
         type: 'mcp-client',
         name: clientName,
         version: clientVersion,
         capabilities: ['chrome_tabs', 'debugger', 'claude_automation']
-      }, this.operationManager, this.notificationManager);
+      });
       
-      await this.relayClient.connect();
-      
-      return await originalOnInitialize(request);
+      return result;
     };
 
     this.setupTools();
+  }
+
+  startRelay(clientInfo) {
+    this.relayClient = new MCPRelayClient(
+      clientInfo,
+      this.operationManager,
+      this.notificationManager
+    );
+    
+    // Start relay connection asynchronously (don't await)
+    this.relayClient.connect().catch(error => {
+      this.debug.error('Failed to connect relay', error);
+    });
   }
 
   setupTools() {

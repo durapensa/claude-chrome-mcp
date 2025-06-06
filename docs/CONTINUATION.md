@@ -47,10 +47,10 @@ When you type 'continue' in a fresh Claude Code instance:
 - **Important**: Extension needs manual reload after code changes
 
 ## Latest Session Work
-- Refactored MCP server connection flow to connect to relay AFTER receiving client initialization
-- Removed client info update complexity - now gets client name during MCP initialization
-- Fixed TypeError when starting server by using proper `oninitialized` callback instead of proxy
-- Simplified architecture: MCP client → server (stdio) → get client name → connect to relay
+- Simplified MCP server connection flow by removing callback pattern
+- Changed to sequential initialization: connect server → get client info → connect relay
+- No more deferred connections or callbacks - just straightforward order of operations
+- Cleaner, more maintainable code without unnecessary complexity
 
 ## CLI Usage
 The CLI daemon auto-spawns when running commands. Use `mcp help` for available commands.
