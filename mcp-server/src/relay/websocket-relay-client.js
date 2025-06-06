@@ -39,7 +39,8 @@ class RelayClient extends EventEmitter {
             type: 'identify',
             clientType: this.clientInfo.type,
             name: this.clientInfo.name,
-            capabilities: this.clientInfo.capabilities
+            capabilities: this.clientInfo.capabilities,
+            isRelayHost: this.clientInfo.isRelayHost || false
           });
           
           // Send any queued messages

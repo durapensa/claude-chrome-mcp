@@ -83,7 +83,12 @@ class EmbeddedRelayManager extends EventEmitter {
   }
 
   async connectAsClient() {
-    this.client = new RelayClient(this.clientInfo, this.port);
+    // Include relay host status in client info
+    const clientInfo = {
+      ...this.clientInfo,
+      isRelayHost: this.isRelayHost
+    };
+    this.client = new RelayClient(clientInfo, this.port);
     
     // Forward client events
     this.client.on('connected', () => {

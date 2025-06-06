@@ -167,12 +167,14 @@ class ChromeMCPServer {
 
   async getConnectionHealth() {
     // Get server-side health
+    const relayStats = this.relayClient ? this.relayClient.getConnectionStats() : { status: 'not_initialized' };
     const serverHealth = {
-      relayClient: this.relayClient ? this.relayClient.getConnectionStats() : { status: 'not_initialized' },
+      relayClient: relayStats,
       server: {
         uptime: Date.now() - this.startTime,
         operationsCount: this.operationManager.operations.size,
-        errorsCount: this.errorTracker.errors ? this.errorTracker.errors.length : 0
+        errorsCount: this.errorTracker.errors ? this.errorTracker.errors.length : 0,
+        role: relayStats.isRelayHost ? 'RELAY HOST' : 'relay client'
       },
       relayMode: true,
       relayConnected: this.relayClient ? this.relayClient.connected : false
