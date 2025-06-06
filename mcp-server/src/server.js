@@ -130,16 +130,7 @@ class ChromeMCPServer {
         async (args, extra) => {
           try {
             // Modern MCP SDK passes args as first parameter
-            this.debug.info(`Tool ${tool.name} called with args:`, { args });
-            this.debug.info(`Tool ${tool.name} extra context:`, { extra });
-            this.debug.info(`Tool ${tool.name} args analysis:`, { 
-              argsType: typeof args, 
-              argsKeys: Object.keys(args || {}),
-              extraType: typeof extra,
-              extraKeys: Object.keys(extra || {}),
-              argsCount: Object.keys(args || {}).length
-            });
-            const result = await handler(this, args);
+                  const result = await handler(this, args);
             
             // Convert result to MCP format if needed
             if (result && typeof result === 'object' && !result.content) {
