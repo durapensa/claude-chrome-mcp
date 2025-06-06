@@ -115,8 +115,16 @@ class MessageRelay extends EventEmitter {
     // Update metrics
     this.metrics.clientsConnected++;
     
-    // Store client
-    this.clients.set(clientId, { ws, info: clientInfo });
+    // Setup ping interval to keep connection alive
+    const pingInterval = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.ping();
+        this.logger.debug('Ping sent', { clientId });
+      }
+    }, 30000); // Ping every 30 seconds
+    
+    // Store client with ping interval
+    this.clients.set(clientId, { ws, info: clientInfo, pingInterval });
     
     // Send welcome message
     this.sendToClient(ws, {
@@ -139,6 +147,13 @@ class MessageRelay extends EventEmitter {
     ws.on('close', () => {
       this.logger.info('Client disconnected', { clientId });
       this.metrics.clientsDisconnected++;
+      
+      // Clean up ping interval
+      const client = this.clients.get(clientId);
+      if (client && client.pingInterval) {
+        clearInterval(client.pingInterval);
+      }
+      
       this.clients.delete(clientId);
       this.broadcastClientList();
     });
@@ -270,6 +285,12 @@ class MessageRelay extends EventEmitter {
     // Close all client connections
     this.clients.forEach((client, clientId) => {
       this.logger.info('Closing connection', { clientId });
+      
+      // Clean up ping interval
+      if (client.pingInterval) {
+        clearInterval(client.pingInterval);
+      }
+      
       client.ws.close();
     });
     
