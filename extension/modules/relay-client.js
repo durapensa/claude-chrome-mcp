@@ -239,7 +239,8 @@ export class ExtensionRelayClient {
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (message.type === 'relay_connection_status') {
         this.handleRelayStatus(message);
-      } else if (message.type === 'relay_message') {
+      } else if (Object.keys(message).some(key => key.startsWith('_'))) {
+        // Any message with underscore-prefixed fields is from relay
         this.handleRelayMessage(message);
       }
     });
@@ -900,34 +901,32 @@ export class ExtensionRelayClient {
     // Use proper logger instead of console.log
     this.logger.debug(`Message from relay: ${message.type}`, message);
     
-    // Handle different relay message types
-    if (message.type === 'relay_message' && message.data) {
-      const data = message.data;
-      
-      // Check if this is an MCP tool request from an MCP server
-      if (data.from && data.id && data.type) {
-        this.logger.debug(`MCP tool request: ${data.type}`, {
-          toolType: data.type,
-          hasParams: !!data.params,
-          paramType: typeof data.params,
-          paramKeys: data.params ? Object.keys(data.params) : null,
-          fullParams: data.params,
-          requestId: data.id,
-          fromClient: data.from
+    const fromClient = message._from;
+    
+    // Check if this is an MCP tool request from an MCP server
+    if (fromClient && message.id && message.type) {
+        this.logger.debug(`MCP tool request: ${message.type}`, {
+          toolType: message.type,
+          hasParams: !!message.params,
+          paramType: typeof message.params,
+          paramKeys: message.params ? Object.keys(message.params) : null,
+          fullParams: message.params,
+          requestId: message.id,
+          fromClient: fromClient
         });
         
         // Execute the command and send response back via relay
         this.executeCommand({
-          type: data.type,
-          params: data.params || {},
-          requestId: data.id
+          type: message.type,
+          params: message.params || {},
+          requestId: message.id
         }).then(result => {
           // Send response back via relay
           this.sendToRelay({
             type: 'unicast',
-            targetId: data.from,
+            targetId: fromClient,
             data: {
-              id: data.id,
+              id: message.id,
               type: 'response',
               result: result,
               timestamp: Date.now()
@@ -937,34 +936,33 @@ export class ExtensionRelayClient {
           // Send error response back via relay
           this.sendToRelay({
             type: 'unicast',
-            targetId: data.from,
+            targetId: fromClient,
             data: {
-              id: data.id,
+              id: message.id,
               type: 'error',
               error: error.message || 'Command execution failed',
               timestamp: Date.now()
             }
           });
         });
-      } else if (data.type === 'response' && data.id) {
+      } else if (message.type === 'response' && message.id) {
         // Handle response for a pending request
-        const pending = this.pendingRequests.get(data.id);
+        const pending = this.pendingRequests.get(message.id);
         if (pending) {
-          this.pendingRequests.delete(data.id);
-          if (data.error) {
-            pending.reject(new Error(data.error));
+          this.pendingRequests.delete(message.id);
+          if (message.error) {
+            pending.reject(new Error(message.error));
           } else {
-            pending.resolve(data.result);
+            pending.resolve(message.result);
           }
         }
-      }
-    } else if (message.type === 'client_list_update') {
-      console.log('CCM ExtensionRelayClient: Client list updated:', message.clients);
+      } else if (message.type === '_client_list_update') {
+      console.log('CCM ExtensionRelayClient: Client list updated:', message._clients);
       // Update connected clients
       this.connectedClients.clear();
-      if (message.clients && Array.isArray(message.clients)) {
+      if (message._clients && Array.isArray(message._clients)) {
         // Filter out self (extension) from the list
-        const otherClients = message.clients.filter(client => client.type !== 'extension');
+        const otherClients = message._clients.filter(client => client.type !== 'extension');
         for (const client of otherClients) {
           this.connectedClients.set(client.id, client);
         }

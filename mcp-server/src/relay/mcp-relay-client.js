@@ -64,41 +64,39 @@ class MCPRelayClient extends EventEmitter {
   }
 
   handleRelayMessage(message) {
-    // Handle messages from relay
-    if (message.type === 'relay_message' && message.data) {
-      const data = message.data;
-      
+    // Handle messages from relay - new format has _from injected
+    if (message._from) {
       // Check if this is a response to one of our requests
-      if (data.id && this.pendingRequests.has(data.id)) {
-        const callback = this.pendingRequests.get(data.id);
-        this.pendingRequests.delete(data.id);
+      if (message.id && this.pendingRequests.has(message.id)) {
+        const callback = this.pendingRequests.get(message.id);
+        this.pendingRequests.delete(message.id);
         
         // Extract the result from the response
-        if (data.type === 'error') {
-          callback(new Error(data.error || 'Unknown error'));
-        } else if (data.type === 'response' && data.result !== undefined) {
-          callback(null, data.result);
+        if (message.type === 'error') {
+          callback(new Error(message.error || 'Unknown error'));
+        } else if (message.type === 'response' && message.result !== undefined) {
+          callback(null, message.result);
         } else {
-          // Fallback to sending the whole data object if no result field
-          callback(null, data);
+          // Fallback to sending the whole message object if no result field
+          callback(null, message);
         }
         return;
       }
       
       // Handle log notifications from extension
-      if (data.type === 'log_notification' && data.log) {
-        this.handleExtensionLog(data.log);
+      if (message.type === 'log_notification' && message.log) {
+        this.handleExtensionLog(message.log);
         return;
       }
       
       // Handle batched logs from extension
-      if (data.type === 'log_batch' && data.logs) {
-        data.logs.forEach(log => this.handleExtensionLog(log));
+      if (message.type === 'log_batch' && message.logs) {
+        message.logs.forEach(log => this.handleExtensionLog(log));
         return;
       }
       
       // Otherwise, emit the message for other handlers
-      this.emit('message', data);
+      this.emit('message', message);
     }
   }
 
@@ -179,7 +177,6 @@ class MCPRelayClient extends EventEmitter {
         id: requestId,
         type,
         params,
-        from: this.relayManager.client.clientId || this.clientInfo.name,
         timestamp: Date.now()
       });
       

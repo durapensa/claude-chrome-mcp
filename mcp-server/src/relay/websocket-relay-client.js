@@ -87,22 +87,17 @@ class RelayClient extends EventEmitter {
     this.logger.info('Received message', { messageType: message.type });
     
     switch (message.type) {
-      case 'relay_welcome':
-        this.logger.info('Welcome from relay', { clientId: message.clientId });
-        this.clientId = message.clientId;
-        this.emit('connected', { clientId: message.clientId });
+      case '_relay_welcome':
+        this.logger.info('Welcome from relay', { clientId: message._clientId });
+        this.clientId = message._clientId;
+        this.emit('connected', { clientId: message._clientId });
         break;
         
-      case 'client_list_update':
-        this.emit('client_list', message.clients);
+      case '_client_list_update':
+        this.emit('client_list', message._clients);
         break;
         
-      case 'relay_message':
-        // Message from another client
-        this.emit('message', message);
-        break;
-        
-      case 'relay_shutdown':
+      case '_relay_shutdown':
         this.logger.info('Relay is shutting down');
         this.emit('relay_shutdown');
         break;

@@ -161,9 +161,9 @@ class MessageRelay extends EventEmitter {
     
     // Send welcome message
     this.sendToClient(ws, {
-      type: 'relay_welcome',
-      clientId: clientId,
-      timestamp: Date.now()
+      type: '_relay_welcome',
+      _clientId: clientId,
+      _timestamp: Date.now()
     });
     
     // Handle messages
@@ -228,10 +228,19 @@ class MessageRelay extends EventEmitter {
     // Route messages based on type
     this.metrics.messagesRouted++;
     
+    // Inject sender information
+    message._from = fromClientId;
+    
     switch (message.type) {
       case 'broadcast':
         // Send to all clients except sender
-        this.broadcast(message.data, fromClientId);
+        // For legacy broadcast format, inject _from into the data
+        if (message.data) {
+          message.data._from = fromClientId;
+          this.broadcast(message.data, fromClientId);
+        } else {
+          this.broadcast(message, fromClientId);
+        }
         break;
         
       case 'unicast':
@@ -239,12 +248,13 @@ class MessageRelay extends EventEmitter {
         if (message.targetId) {
           const targetClient = this.clients.get(message.targetId);
           if (targetClient) {
-            // Wrap in relay_message format like multicast
-            this.sendToClient(targetClient.ws, {
-              type: 'relay_message',
-              from: fromClientId,
-              data: message.data
-            });
+            // Inject _from and send directly
+            if (message.data) {
+              message.data._from = fromClientId;
+              this.sendToClient(targetClient.ws, message.data);
+            } else {
+              this.sendToClient(targetClient.ws, message);
+            }
           }
         }
         break;
@@ -252,17 +262,18 @@ class MessageRelay extends EventEmitter {
       case 'multicast':
         // Send to clients of specific type
         if (message.targetType) {
-          this.multicast(message.targetType, message.data, fromClientId);
+          if (message.data) {
+            message.data._from = fromClientId;
+            this.multicast(message.targetType, message.data, fromClientId);
+          } else {
+            this.multicast(message.targetType, message, fromClientId);
+          }
         }
         break;
         
       default:
         // Default: route to all clients except sender
-        this.broadcast({
-          type: 'relay_message',
-          from: fromClientId,
-          data: message
-        }, fromClientId);
+        this.broadcast(message, fromClientId);
     }
   }
   
@@ -284,12 +295,8 @@ class MessageRelay extends EventEmitter {
   multicast(targetType, data, excludeClientId = null) {
     this.clients.forEach((client, clientId) => {
       if (clientId !== excludeClientId && client.info.type === targetType) {
-        // Wrap the data in relay_message format
-        this.sendToClient(client.ws, {
-          type: 'relay_message',
-          from: excludeClientId,
-          data: data
-        });
+        // Send data directly - _from should already be injected
+        this.sendToClient(client.ws, data);
       }
     });
   }
@@ -303,9 +310,9 @@ class MessageRelay extends EventEmitter {
     }));
     
     this.broadcast({
-      type: 'client_list_update',
-      clients: clientList,
-      timestamp: Date.now()
+      type: '_client_list_update',
+      _clients: clientList,
+      _timestamp: Date.now()
     });
   }
   
@@ -317,10 +324,10 @@ class MessageRelay extends EventEmitter {
     
     // Notify all clients with shutdown reason and grace period
     this.broadcast({
-      type: 'relay_shutdown',
-      reason: reason,
-      gracePeriodMs: 2000,
-      timestamp: Date.now()
+      type: '_relay_shutdown',
+      _reason: reason,
+      _gracePeriodMs: 2000,
+      _timestamp: Date.now()
     });
     
     // Give clients time to prepare for shutdown
