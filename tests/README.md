@@ -79,22 +79,15 @@ test('tab_create handles missing extension gracefully', async () => {
 ```
 tests/
 ├── unit/                    # Fast, reliable server tests
-│   ├── server-startup.test.js
-│   ├── tool-registration.test.js
-│   ├── relay-connection.test.js
-│   └── system-health.test.js
+│   ├── system-health.test.js
+│   └── tool-registration.test.js
 ├── integration/             # End-to-end workflow tests  
-│   ├── tab-lifecycle.test.js
-│   ├── message-workflows.test.js
-│   ├── multi-tab.test.js
-│   └── api-operations.test.js
+│   └── tab-workflows.test.js
 ├── contract/                # Interface and error tests
-│   ├── tool-contracts.test.js
-│   ├── error-handling.test.js
 │   └── timeout-behavior.test.js
 └── helpers/                 # Shared test utilities
-    ├── mcp-test-client.js
-    └── test-scenarios.js
+    ├── jest-setup.js
+    └── mcp-test-client.js
 ```
 
 ## Running Tests
