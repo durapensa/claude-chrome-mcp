@@ -12,6 +12,7 @@ class MCPTestClient {
     });
     this.createdTabs = [];
     this.transport = null;
+    this.serverPid = null;
   }
   
   async connect() {
@@ -34,14 +35,18 @@ class MCPTestClient {
     });
     
     await this.client.connect(this.transport);
-    console.log(`Test client connected with ID: ${testId}`);
+    
+    // Get the spawned process PID for log tracking
+    this.serverPid = this.transport.process?.pid;
+    console.log(`Test client connected with ID: ${testId}${this.serverPid ? ` (MCP Server PID: ${this.serverPid})` : ''}`);
   }
   
   async callTool(toolName, params = {}) {
-    const fullToolName = `mcp__claude-chrome-mcp__${toolName}`;
-    
     try {
-      const result = await this.client.callTool(fullToolName, params);
+      const result = await this.client.callTool({
+        name: toolName,
+        arguments: params
+      });
       
       // Track created resources for cleanup
       if (toolName === 'tab_create' && result.tabId) {
@@ -98,6 +103,13 @@ class MCPTestClient {
     this.createdTabs = [];
   }
   
+  getLogFilePath() {
+    if (!this.serverPid) return null;
+    const os = require('os');
+    const path = require('path');
+    return path.join(os.homedir(), '.claude-chrome-mcp', 'logs', `claude-chrome-mcp-server-PID-${this.serverPid}.log`);
+  }
+
   async disconnect() {
     if (this.transport) {
       await this.transport.close();
