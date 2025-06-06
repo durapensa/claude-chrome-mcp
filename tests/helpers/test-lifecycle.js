@@ -9,12 +9,45 @@ const setupTestEnvironment = async () => {
     // Connect to MCP server
     await client.connect();
     
-    // Verify system health
+    // Verify system health with detailed checks
     const health = await client.callTool('system_health');
     
-    if (!health.relayConnected || !health.extension) {
-      throw new Error('System not ready for testing: Extension or relay not connected');
+    // Check relay connection
+    if (!health.relayConnected) {
+      throw new Error(
+        'SETUP FAILED: MCP Server not connected to relay.\n' +
+        'Ensure the relay is running and healthy.\n' +
+        'Try: mcp daemon restart'
+      );
     }
+    
+    // Check extension connection
+    if (!health.extension) {
+      throw new Error(
+        'SETUP FAILED: Chrome extension not connected to relay.\n' +
+        'Prerequisites:\n' +
+        '1. Chrome extension must be loaded (chrome://extensions/)\n' +
+        '2. Extension must be enabled\n' + 
+        '3. Try reloading extension or run: mcp chrome_reload_extension'
+      );
+    }
+    
+    // Check for connected clients
+    const connectedClients = health.extension?.connectedClients || [];
+    const hasExtensionClient = connectedClients.some(c => 
+      c.type === 'chrome-extension' || c.name.includes('extension')
+    );
+    
+    if (connectedClients.length === 0 || !hasExtensionClient) {
+      throw new Error(
+        'SETUP FAILED: No Chrome extension clients connected to relay.\n' +
+        `Found ${connectedClients.length} clients: ${connectedClients.map(c => c.name).join(', ')}\n` +
+        'The extension background script may not be running.\n' +
+        'Try reloading the extension at chrome://extensions/'
+      );
+    }
+    
+    console.log(`✅ System health check passed. Connected clients: ${connectedClients.map(c => c.name).join(', ')}`);
     
     // Clean up any existing test tabs
     const tabs = await client.callTool('tab_list');

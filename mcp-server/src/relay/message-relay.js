@@ -81,7 +81,12 @@ class MessageRelay extends EventEmitter {
               id,
               type: client.info.type,
               name: client.info.name,
-              connectedFor: Date.now() - client.info.connectedAt
+              connectedFor: Date.now() - client.info.connectedAt,
+              lastPingAt: client.info.lastPingAt,
+              lastPongAt: client.info.lastPongAt,
+              pingLatency: client.info.lastPongAt && client.info.lastPingAt 
+                ? client.info.lastPongAt - client.info.lastPingAt 
+                : null
             }))
           }
         };
@@ -107,7 +112,9 @@ class MessageRelay extends EventEmitter {
       id: clientId,
       type: 'unknown', // Will be set by client identification
       connectedAt: Date.now(),
-      remoteAddress: req.socket.remoteAddress
+      remoteAddress: req.socket.remoteAddress,
+      lastPingAt: null,
+      lastPongAt: null
     };
     
     this.logger.info('New connection', { clientId, remoteAddress: clientInfo.remoteAddress });
@@ -119,7 +126,8 @@ class MessageRelay extends EventEmitter {
     const pingInterval = setInterval(() => {
       if (ws.readyState === WebSocket.OPEN) {
         ws.ping();
-        this.logger.debug('Ping sent', { clientId });
+        clientInfo.lastPingAt = Date.now();
+        this.logger.debug('Ping sent', { clientId, timestamp: clientInfo.lastPingAt });
       }
     }, 30000); // Ping every 30 seconds
     
@@ -141,6 +149,12 @@ class MessageRelay extends EventEmitter {
       } catch (error) {
         this.logger.error('Failed to parse message', { clientId, error });
       }
+    });
+    
+    // Handle pong responses
+    ws.on('pong', () => {
+      clientInfo.lastPongAt = Date.now();
+      this.logger.debug('Pong received', { clientId, timestamp: clientInfo.lastPongAt });
     });
     
     // Handle close

@@ -31,27 +31,46 @@ if (command === 'help' || !testCommands[command]) {
   process.exit(0);
 }
 
-// Check if extension is running
-console.log('⚡ Pre-flight checks...');
-console.log('  - Ensure Chrome extension is loaded');
-console.log('  - Ensure MCP server is accessible');
-console.log('  - Close any existing Claude.ai tabs\n');
+// Run pre-flight checks first
+console.log('⚡ Running pre-flight checks...\n');
 
-// Run the selected test command
-const [cmd, cmdArgs] = testCommands[command];
-console.log(`Running: ${cmd} ${cmdArgs.join(' ')}\n`);
-
-const child = spawn(cmd, cmdArgs, {
+const preFlightChild = spawn('node', ['helpers/pre-flight-check.js'], {
   cwd: __dirname,
-  stdio: 'inherit',
-  shell: true
+  stdio: 'inherit'
 });
 
-child.on('exit', (code) => {
-  if (code === 0) {
-    console.log('\n✅ Tests completed successfully!');
-  } else {
-    console.log(`\n❌ Tests failed with exit code ${code}`);
+preFlightChild.on('exit', (code) => {
+  if (code !== 0) {
+    console.log('\n❌ Pre-flight checks failed. Please fix the issues above before running tests.');
+    process.exit(1);
   }
-  process.exit(code);
+  
+  // Pre-flight passed, run the selected test command
+  const [cmd, cmdArgs] = testCommands[command];
+  console.log(`Running: ${cmd} ${cmdArgs.join(' ')}\n`);
+  
+  // Use timeout command to prevent hanging
+  const timeoutCmd = process.platform === 'darwin' ? 'gtimeout' : 'timeout';
+  const hasTimeout = spawn('which', [timeoutCmd], { stdio: 'ignore' }).on('close', (code) => {
+    const finalCmd = code === 0 ? timeoutCmd : cmd;
+    const finalArgs = code === 0 ? ['120', cmd, ...cmdArgs] : cmdArgs;
+    
+    const child = spawn(finalCmd, finalArgs, {
+      cwd: __dirname,
+      stdio: 'inherit',
+      shell: true
+    });
+    
+    child.on('exit', (code) => {
+      if (code === 124) {
+        console.log('\n❌ Tests timed out after 2 minutes');
+        process.exit(1);
+      } else if (code === 0) {
+        console.log('\n✅ Tests completed successfully!');
+      } else {
+        console.log(`\n❌ Tests failed with exit code ${code}`);
+      }
+      process.exit(code);
+    });
+  });
 });

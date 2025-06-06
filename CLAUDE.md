@@ -1,6 +1,7 @@
 # Claude Chrome MCP
 
 **CRITICAL**: Maintain the WHEN/THEN and related structure and logic in this file when making additions or other changes.
+- better to revise existing WHEN/THEN statements rather than write new ones, unless writing new simplifies
 **CRITICAL**: When considering writing to this file, carefully evaluate the WHEN/THEN and related structure and logic to ensure consistancy, simplicity while preserving decision trees, and no looping.
 
 ## 🚨 SESSION MANAGEMENT 🚨
@@ -10,11 +11,18 @@ THEN: `mcp system_health` → `TodoRead` → Continue pending tasks OR check [Gi
 
 ## DEVELOPMENT WORKFLOW
 
+WHEN: Writing test code  
+THEN: **REQUIRED before commit:**
+- `cd tests && npm install` → Install dependencies
+- `npm test` → Run at least one test to verify framework works
+- Fix any failures → Only then commit
+
 WHEN: Code changes complete  
 THEN: **Test by component → Fix failures → Commit workflow:**
 - extension/: **REQUIRED** `mcp chrome_reload_extension` → Test
 - cli/: **REQUIRED** `cd cli && npm run build && npm install -g` → Test commands  
 - mcp-server/: **REQUIRED** `mcp daemon restart` → Test CLI tools (`mcp` commands)
+- tests/: **REQUIRED** `cd tests && npm test` → Verify tests pass
 
 **CRITICAL**: When testing mcp-server/ changes, use CLI tools (`mcp`) not MCP tools (`mcp__claude-chrome-mcp__*`)
 - CLI tools use local daemon (affected by restart)  

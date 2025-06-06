@@ -177,6 +177,18 @@ class ChromeMCPServer {
       relayMode: true,
       relayConnected: this.relayClient ? this.relayClient.connected : false
     };
+    
+    // Try to fetch relay health from endpoint
+    let relayHealth = null;
+    try {
+      const response = await fetch('http://localhost:54322/health');
+      if (response.ok) {
+        relayHealth = await response.json();
+      }
+    } catch (error) {
+      // Relay health endpoint not available
+      this.debug.debug('Could not fetch relay health', { error: error.message });
+    }
 
     // Try to get extension-side health
     let extensionHealth = null;
@@ -197,7 +209,8 @@ class ChromeMCPServer {
     // Combine both health reports
     const combinedHealth = {
       ...serverHealth,
-      extension: extensionHealth
+      extension: extensionHealth,
+      relay: relayHealth
     };
 
     return {

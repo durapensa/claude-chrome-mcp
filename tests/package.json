@@ -18,10 +18,11 @@
   },
   "jest": {
     "testEnvironment": "node",
-    "testTimeout": 60000,
+    "testTimeout": 15000,
     "verbose": true,
     "testMatch": [
       "**/*.test.js"
-    ]
+    ],
+    "setupFilesAfterEnv": ["<rootDir>/helpers/jest-setup.js"]
   }
 }

@@ -1,16 +1,15 @@
-const { MCPTestClient } = require('../helpers/mcp-test-client');
+const { setupTestEnvironment, teardownTestEnvironment } = require('../helpers/test-lifecycle');
 
 describe('Basic Tab Lifecycle', () => {
   let client;
   
   beforeEach(async () => {
-    client = new MCPTestClient();
-    await client.connect();
+    // Use setup helper that includes health checks
+    client = await setupTestEnvironment();
   });
   
   afterEach(async () => {
-    await client.cleanup();
-    await client.disconnect();
+    await teardownTestEnvironment(client);
   });
 
   test('Create tab, send message, get response, close tab', async () => {
