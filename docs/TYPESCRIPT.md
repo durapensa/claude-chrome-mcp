@@ -249,5 +249,5 @@ When adding new tools or modifying APIs:
 ## Related Documentation
 
 - [**Architecture**](ARCHITECTURE.md) - System design and component overview
-- [**Troubleshooting**](TROUBLESHOOTING.md) - Common issues and debugging for type-related problems
+- [**Problem Resolution**](../claude/problem-resolution.md) - Complete troubleshooting including type-related debugging
 - `/tests/test-typescript-types.ts` - Type compilation tests

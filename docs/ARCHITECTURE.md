@@ -324,6 +324,6 @@ await chrome.storage.local.set({
 
 ## Related Documentation
 
-- [Troubleshooting Guide](TROUBLESHOOTING.md) - Common issues and solutions
-- [Continuation Guide](CONTINUATION.md) - Session handoff procedures
+- [Problem Resolution](../claude/problem-resolution.md) - Complete troubleshooting and timeout resolution
+- [Session Management](../claude/session-management.md) - Session continuation and workflow procedures
 - [TypeScript Types](TYPESCRIPT.md) - API type definitions

@@ -67,9 +67,10 @@ In Claude Desktop, you can now use natural language commands like:
 
 | Guide | Description |
 |-------|-------------|
-| [**Getting Started**](docs/CONTINUATION.md) | Session continuation and standard workflow |
+| [**Getting Started**](claude/session-management.md) | Session continuation and workflow management |
 | [**Architecture**](docs/ARCHITECTURE.md) | System design and components |
-| [**Troubleshooting**](docs/TROUBLESHOOTING.md) | Common issues and debugging methodology |
+| [**Problem Resolution**](claude/problem-resolution.md) | Complete troubleshooting and timeout resolution |
+| [**Development Workflows**](claude/development-workflows.md) | Code changes, testing, and development procedures |
 | [**TypeScript**](docs/TYPESCRIPT.md) | Type definitions and development |
 | [**Restart Capability**](docs/RESTART-CAPABILITY.md) | MCP lifecycle management |
 | [**Event Architecture**](docs/event-driven-architecture-diagram.md) | Visual system diagrams |

@@ -220,7 +220,7 @@ DOM Events Detected by ConversationObserver:
 ## Related Documentation
 
 - [**Architecture**](ARCHITECTURE.md) - Complete system design overview
-- [**Troubleshooting**](TROUBLESHOOTING.md) - Debugging async operations and network issues
+- [**Problem Resolution**](../claude/problem-resolution.md) - Complete debugging procedures for async operations and network issues
 
 ---
 

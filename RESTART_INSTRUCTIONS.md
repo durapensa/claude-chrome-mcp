@@ -36,7 +36,7 @@ mcp__claude-chrome-mcp__extract_conversation_elements --tabId <tab_id>
 
 ### 5. Continue Work
 Type `continue` to resume where we left off. Claude will:
-- Read `/docs/CONTINUATION.md` for session context
+- Read `/claude/session-management.md` for session context
 - Check git log for recent commits
 - Resume from the documented state
 
@@ -44,5 +44,5 @@ Type `continue` to resume where we left off. Claude will:
 ## If Issues Occur
 1. Check Chrome DevTools console for extension errors
 2. Verify MCP server is running with `ps aux | grep mcp-server`
-3. Check `/docs/TROUBLESHOOTING.md` for common issues
+3. Check `/claude/problem-resolution.md` for complete troubleshooting procedures
 4. Ensure you're in the correct directory before restarting Claude Code
