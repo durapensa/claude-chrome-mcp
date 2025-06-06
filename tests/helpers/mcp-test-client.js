@@ -48,12 +48,31 @@ class MCPTestClient {
         arguments: params
       });
       
-      // Track created resources for cleanup
-      if (toolName === 'tab_create' && result.tabId) {
-        this.createdTabs.push(result.tabId);
+      // Handle MCP SDK 1.12.1+ response format
+      if (result.isError) {
+        const errorMessage = result.content?.[0]?.text || 'Unknown error';
+        throw new Error(errorMessage);
       }
       
-      return result;
+      // Parse the actual response from content[0].text
+      let actualResult;
+      if (result.content?.[0]?.type === 'text') {
+        try {
+          actualResult = JSON.parse(result.content[0].text);
+        } catch (parseError) {
+          // If parsing fails, return the text directly
+          actualResult = result.content[0].text;
+        }
+      } else {
+        actualResult = result;
+      }
+      
+      // Track created resources for cleanup
+      if (toolName === 'tab_create' && actualResult.tabId) {
+        this.createdTabs.push(actualResult.tabId);
+      }
+      
+      return actualResult;
     } catch (error) {
       // Provide more context for common errors
       if (error.message?.includes('timeout') || error.message?.includes('Timeout')) {

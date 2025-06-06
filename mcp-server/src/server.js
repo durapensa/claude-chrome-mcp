@@ -223,10 +223,34 @@ class ChromeMCPServer {
     };
   }
 
+  async waitForRelayConnection(timeoutMs = 10000) {
+    if (!this.relayClient) {
+      throw new Error('Relay client not initialized');
+    }
+    
+    // If already connected, return immediately
+    if (this.relayClient.connected) {
+      return;
+    }
+    
+    // Wait for connection with timeout
+    const startTime = Date.now();
+    while (!this.relayClient.connected) {
+      if (Date.now() - startTime > timeoutMs) {
+        throw new Error(`Relay connection timeout after ${timeoutMs}ms`);
+      }
+      // Wait 100ms before checking again
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  }
+
   async forwardToExtension(toolName, params) {
     if (!this.relayClient) {
       throw new Error('Relay client not initialized. MCP client must connect first.');
     }
+    
+    // Wait for relay connection if not ready yet
+    await this.waitForRelayConnection();
     
     const result = await this.relayClient.sendRequest(toolName, params);
     
