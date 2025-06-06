@@ -1,9 +1,12 @@
 # Claude Chrome MCP
 
+**CRITICAL**: Maintain the WHEN/THEN and related structure and logic in this file when making additions or other changes.
+**CRITICAL**: When considering writing to this file, carefully evaluate the WHEN/THEN and related structure and logic to ensure consistancy, simplicity while preserving decision trees, and no looping.
+
 ## 🚨 SESSION MANAGEMENT 🚨
 
 WHEN: User types 'continue'  
-THEN: `mcp system_health` → `TodoRead` → Continue pending tasks OR address Critical Architecture Improvements
+THEN: `mcp system_health` → `TodoRead` → Continue pending tasks OR check [GitHub Issues](https://github.com/durapensa/claude-chrome-mcp/issues) → reference [Architecture Analysis](docs/ARCHITECTURE-ANALYSIS.md)
 
 ## DEVELOPMENT WORKFLOW
 

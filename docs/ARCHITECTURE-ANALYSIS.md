@@ -2,22 +2,6 @@
 
 After examining the `mcp-server/` and `extension/` codebases, this document identifies key architectural patterns, inconsistencies, and areas requiring attention for the critical test suite rewrite.
 
-## 🚨 CRITICAL ACTION ITEMS
-
-**Active Tracking**: [GitHub Issues](https://github.com/durapensa/claude-chrome-mcp/issues)
-
-The architectural analysis below identified these critical issues, now tracked as GitHub Issues for active development:
-
-| Priority | Issue | Status |
-|----------|-------|--------|
-| BLOCKING | [#1 Test Suite Architecture Rewrite](https://github.com/durapensa/claude-chrome-mcp/issues/1) | Open |
-| HIGH | [#2 Unified Resource State Management](https://github.com/durapensa/claude-chrome-mcp/issues/2) | Open |
-| HIGH | [#3 Resource Management Race Conditions](https://github.com/durapensa/claude-chrome-mcp/issues/3) | Open |
-| MEDIUM | [#4 Configuration Fragmentation](https://github.com/durapensa/claude-chrome-mcp/issues/4) | Open |
-| MEDIUM | [#5 Error Recovery Patterns](https://github.com/durapensa/claude-chrome-mcp/issues/5) | Open |
-
-**For detailed problem descriptions, solutions, and progress tracking, see the linked GitHub Issues.**
-
 ## System Architecture Overview
 
 **Core Design Pattern**: WebSocket Relay Bridge
