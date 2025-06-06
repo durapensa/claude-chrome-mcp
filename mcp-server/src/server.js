@@ -69,9 +69,7 @@ class ChromeMCPServer {
     this.operationManager = new OperationManager();
     this.notificationManager = new NotificationManager(this.server, this.errorTracker);
     
-    // Initialize relay client
-    
-    // Connect relay during initialization
+    // Initialize relay client  
     this.relayClient = null;
     
     const originalOnInitialize = this.server.server._oninitialize.bind(this.server.server);
