@@ -17,7 +17,7 @@ class RelayClient extends EventEmitter {
     this.isConnected = false;
     this.messageQueue = [];
     this.reconnectTimer = null;
-    this.relayUrl = process.env.RELAY_URL || `ws://localhost:${port}`;
+    this.relayUrl = `ws://localhost:${port}`;
     this.logger = createLogger('RelayClient');
     
     this.logger.info('Initialized', { clientName: this.clientInfo.name });
