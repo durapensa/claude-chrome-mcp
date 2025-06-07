@@ -19,8 +19,37 @@ let offscreenCreated = false;
 logger.info('Registering event listeners');
 
 // Event-driven extension with WebSocket relay
-chrome.runtime.onInstalled.addListener(() => {
-  logger.info('Installed/Updated - WebSocket relay mode');
+chrome.runtime.onInstalled.addListener((details) => {
+  logger.info('Installed/Updated - WebSocket relay mode', { reason: details.reason });
+  
+  // Show reload notification
+  if (details.reason === 'update' || details.reason === 'install' || details.reason === 'chrome_update') {
+    // Show system notification
+    const notificationId = `reload_${Date.now()}`;
+    const message = details.reason === 'install' 
+      ? 'Claude Chrome MCP installed' 
+      : 'Claude Chrome MCP reloaded';
+    
+    logger.info('Attempting to show notification', { reason: details.reason, message });
+    
+    chrome.notifications.create(notificationId, {
+      type: 'basic',
+      iconUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', // 1x1 transparent PNG
+      title: 'Claude Chrome MCP',
+      message: message,
+      priority: 1
+    }, () => {
+      if (chrome.runtime.lastError) {
+        logger.error('Notification creation failed', { error: chrome.runtime.lastError.message });
+      } else {
+        logger.info('Notification created successfully', { notificationId });
+        // Auto-dismiss after 4 seconds
+        setTimeout(() => {
+          chrome.notifications.clear(notificationId);
+        }, 4000);
+      }
+    });
+  }
 });
 
 // Message queue for early messages

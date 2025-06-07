@@ -53,7 +53,13 @@ mcp tab_get_response --tabId 12345
 mcp tab_close --tabId 12345
 ```
 
-### 🛠️ Development & Testing
+**IMPORTANT SYNC/ASYNC PATTERN**: 
+- MCP commands handle their own timing - DO NOT use `sleep` delays
+- Commands either block until complete OR return immediately with proper async handling
+- BAD: `sleep 3 && mcp system_health`
+- GOOD: `mcp system_health` (runs immediately, shows current state)
+
+### Development & Testing
 
 WHEN: Making code changes
 THEN: Test based on component modified:
@@ -207,6 +213,24 @@ MCP_DEBUG_MODE=true mcp system_health
 - Components include version in relay messages
 
 **Version Source**: Single `VERSION` file at project root
+
+**VERSION BUMP PROCESS**:
+```bash
+# 1. Update VERSION file
+echo "2.6.2" > VERSION
+
+# 2. Run update script (updates all files + validates)
+npm run update-versions
+
+# 3. Commit with detailed message
+git add .
+git commit -m "chore: bump version to 2.6.2"
+
+# 4. Push to GitHub
+git push origin main
+```
+
+**DETAILS**: See docs/VERSION-MANAGEMENT.md for complete process
 
 ### Resource Cleanup Order
 **ISSUE**: Dependencies between cleanup steps

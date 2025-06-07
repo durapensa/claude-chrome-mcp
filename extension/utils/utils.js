@@ -1,6 +1,6 @@
 // Utility functions for Chrome Extension
 
-export function updateBadge(status) {
+export function updateBadge(status, count = null) {
   let text = '';
   let color = '#666666'; // Default gray
   
@@ -10,7 +10,8 @@ export function updateBadge(status) {
       color = '#4CAF50'; // Green
       break;
     case 'mcp-connected':
-      text = 'M';
+      // Show count if provided, otherwise default to 'M'
+      text = count && count > 0 ? count.toString() : 'M';
       color = '#2196F3'; // Blue
       break;
     case 'relay-disconnected':
@@ -20,6 +21,10 @@ export function updateBadge(status) {
     case 'reconnecting':
       text = 'R';
       color = '#FF9800'; // Orange
+      break;
+    case 'reloaded':
+      text = '✓';
+      color = '#4CAF50'; // Green
       break;
     default:
       text = '?';

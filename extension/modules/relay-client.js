@@ -969,7 +969,7 @@ export class ExtensionRelayClient {
         
         // Update badge based on client count
         if (this.connectedClients.size > 0) {
-          updateBadge('mcp-connected');
+          updateBadge('mcp-connected', this.connectedClients.size);
         } else if (this.relayConnected) {
           updateBadge('relay-connected');
         }
