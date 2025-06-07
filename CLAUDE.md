@@ -9,16 +9,41 @@
 ```
 
 **CRITICAL RULES**:
-1. Maintain WHEN/THEN logic structure, decision trees, etc. in this doc, CLAUDE.md
-2. Test ALL changes before committing - NO EXCEPTIONS
-3. Edit existing files rather than create new ones.
-4. As your knowledge and understading of the project improve, make immediate edits to existing docs
-5. Single source of truth:
-  - GitHub Issues for active work
-  - docs for stable knowledge, do not duplicate knowledge across docs
-6. WHEN you encounter new, obsolte, or changed workflows, or find improvements to existing workflows
-   THEN document them here in CLAUDE.md following these CRITICAL RULES
-7. Don't put code examples in documentation files
+
+WHEN: Writing documentation in CLAUDE.md
+THEN: Use WHEN/THEN logic structure and decision trees
+
+WHEN: Making ANY code changes
+THEN: Test changes thoroughly before committing - NO EXCEPTIONS
+
+WHEN: Need to implement new functionality
+THEN: Edit existing files rather than create new ones
+
+WHEN: Your knowledge of the project improves
+THEN: Make immediate edits to existing docs to reflect new understanding
+
+WHEN: Tracking work or knowledge
+THEN: Use single source of truth:
+  - GitHub Issues → active work
+  - docs folder → stable knowledge
+  - NEVER duplicate knowledge across docs
+
+WHEN: Encountering new, obsolete, or changed workflows
+THEN: Document them here in CLAUDE.md following these CRITICAL RULES
+
+WHEN: Documenting in any file
+THEN: Don't include code examples (reference file paths instead)
+
+WHEN: Ready to commit changes
+THEN: Follow this sequence:
+  1. Run `git status` to review changes
+  2. Stage files selectively with `git add <specific-files>`
+  3. NEVER use `git add .` without explicit permission
+  4. Write detailed commit message with implementation details
+  5. Run `git status` again to verify clean working directory
+
+WHEN: Multiple unrelated changes exist
+THEN: Commit them separately with focused commit messages
 
 ## SESSION CONTINUITY
 
