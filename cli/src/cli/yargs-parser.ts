@@ -7,6 +7,7 @@
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import chalk from 'chalk';
+import { CLI_CONFIG } from '../config/defaults';
 
 export interface ParsedArgs {
   command: string;
@@ -31,7 +32,7 @@ export class YargsParser {
     const parser = yargs(argv) // argv is already sliced in main()
       .scriptName('mcp')
       .usage('$0 [OPTIONS] COMMAND [ARGS]')
-      .version('2.0.0')
+      .version(CLI_CONFIG.VERSION)
       .help('help')
       .alias('h', 'help')
       .alias('v', 'version')

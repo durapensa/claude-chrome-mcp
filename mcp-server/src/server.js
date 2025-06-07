@@ -29,6 +29,9 @@ if (process.stdout.write.bind) {
   };
 }
 
+// CRITICAL: Load config first before any other modules
+const config = require('./config');
+
 const { McpServer } = require('@modelcontextprotocol/sdk/server/mcp.js');
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
 const { z } = require('zod');
@@ -55,7 +58,7 @@ class ChromeMCPServer {
     // Initialize core components
     this.server = new McpServer({
       name: 'claude-chrome-mcp',
-      version: '2.6.0'
+      version: config.VERSION
     }, {
       capabilities: {
         tools: {},
@@ -81,7 +84,16 @@ class ChromeMCPServer {
       // Extract client name from initialization
       const clientInfo = request.params.clientInfo;
       const clientName = process.env.CCM_CLIENT_NAME || clientInfo.name || 'Claude Chrome MCP';
-      const clientVersion = clientInfo.version || '2.6.0';
+      const clientVersion = clientInfo.version || config.VERSION;
+      
+      // Check version compatibility
+      if (clientVersion && !config.isVersionCompatible(clientVersion)) {
+        this.logger.warn('Client version mismatch', {
+          clientVersion,
+          serverVersion: config.VERSION,
+          message: config.getVersionMismatchMessage('MCP Client', clientVersion)
+        });
+      }
       
       this.clientInfo = {
         type: 'mcp-client',

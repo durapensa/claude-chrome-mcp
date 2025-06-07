@@ -1,4 +1,5 @@
 // Configuration constants for Claude Chrome MCP Extension
+// For now, keep the original implementation until we can properly test the central config
 
 export const WEBSOCKET_PORT = 54321;
 export const KEEPALIVE_INTERVAL = 20000;
@@ -30,3 +31,9 @@ export const OPERATION_TYPES = {
 };
 
 export const CLAUDE_AI_URL = 'https://claude.ai';
+
+// Add version info from manifest
+// This enables version tracking between components
+const manifest = chrome.runtime.getManifest();
+export const VERSION = manifest.version;
+export const COMPONENT_NAME = 'extension';

@@ -8,9 +8,10 @@ const { MessageRelay } = require('./message-relay');
 const { RelayClient } = require('./websocket-relay-client');
 const EventEmitter = require('events');
 const { createLogger } = require('../utils/logger');
+const config = require('../config');
 
 class EmbeddedRelayManager extends EventEmitter {
-  constructor(clientInfo, port = 54321) {
+  constructor(clientInfo, port = config.WEBSOCKET_PORT) {
     super();
     this.clientInfo = clientInfo;
     this.port = port;

@@ -7,11 +7,10 @@ const WebSocket = require('ws');
 const EventEmitter = require('events');
 const http = require('http');
 const { createLogger } = require('../utils/logger');
-
-const RELAY_PORT = 54321;
+const config = require('../config');
 
 class MessageRelay extends EventEmitter {
-  constructor(port = RELAY_PORT, version = 'unknown') {
+  constructor(port = config.WEBSOCKET_PORT, version = config.VERSION) {
     super();
     this.port = port;
     this.version = version;

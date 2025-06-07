@@ -6,6 +6,8 @@
  * Phase 1: Basic daemon functionality with single server and tool execution.
  */
 
+// Load centralized config early
+import { CLI_CONFIG } from './config/defaults';
 import chalk from 'chalk';
 import { ConfigLoader } from './config/config-loader';
 import { DaemonClient } from './cli/daemon-client';
@@ -171,8 +173,7 @@ class MCPCli {
    * Show version information
    */
   private showVersion(): void {
-    const packageJson = require('../package.json');
-    console.log(`mcp-cli v${packageJson.version}`);
+    console.log(`mcp-cli v${CLI_CONFIG.VERSION}`);
   }
 
   /**

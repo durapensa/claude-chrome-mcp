@@ -7,6 +7,7 @@
 import { ChildProcess, spawn } from 'child_process';
 import { MCPRequest, MCPResponse, MCPTool, MCPToolCallResponse, MCPConnection } from '../types/mcp';
 import { ServerConfig } from '../types/config';
+import { CLI_CONFIG } from '../config/defaults';
 
 export class StdioMCPConnection implements MCPConnection {
   private process: ChildProcess | null = null;
@@ -120,7 +121,7 @@ export class StdioMCPConnection implements MCPConnection {
         },
         clientInfo: {
           name: 'mcp-cli',
-          version: '2.0.0'
+          version: CLI_CONFIG.VERSION
         }
       }
     });

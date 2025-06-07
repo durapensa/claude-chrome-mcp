@@ -6,14 +6,15 @@
 const WebSocket = require('ws');
 const EventEmitter = require('events');
 const { createLogger } = require('../utils/logger');
+const config = require('../config');
 
 class RelayClient extends EventEmitter {
-  constructor(clientInfo, port = 54321) {
+  constructor(clientInfo, port = config.WEBSOCKET_PORT) {
     super();
     this.clientInfo = clientInfo;
     this.ws = null;
-    this.reconnectDelay = 1000;
-    this.maxReconnectDelay = 30000;
+    this.reconnectDelay = config.RECONNECT_INTERVAL;
+    this.maxReconnectDelay = config.MAX_RECONNECT_DELAY;
     this.isConnected = false;
     this.messageQueue = [];
     this.reconnectTimer = null;
@@ -32,7 +33,7 @@ class RelayClient extends EventEmitter {
         this.ws.on('open', () => {
           this.logger.info('Connected to relay');
           this.isConnected = true;
-          this.reconnectDelay = 1000; // Reset delay
+          this.reconnectDelay = config.RECONNECT_INTERVAL; // Reset delay
           
           // Identify ourselves to the relay
           this.send({
@@ -40,7 +41,9 @@ class RelayClient extends EventEmitter {
             clientType: this.clientInfo.type,
             name: this.clientInfo.name,
             capabilities: this.clientInfo.capabilities,
-            isRelayHost: this.clientInfo.isRelayHost || false
+            isRelayHost: this.clientInfo.isRelayHost || false,
+            version: config.VERSION,
+            component: config.COMPONENT_NAME
           });
           
           // Send any queued messages

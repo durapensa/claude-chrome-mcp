@@ -1,6 +1,6 @@
 {
   "name": "claude-chrome-mcp-server",
-  "version": "2.6.0",
+  "version": "2.6.1",
   "description": "MCP server for Claude Chrome integration",
   "main": "src/server.js",
   "bin": {

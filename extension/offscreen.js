@@ -3,37 +3,59 @@
  * This runs in a separate context and can maintain connections for 12+ hours
  */
 
+// Default configuration values
+const WEBSOCKET_PORT = 54321;
+const RECONNECT_INTERVAL = 2000;
+const COMPONENT_NAME = 'extension';
+
+// Version will be set when we receive config from background
+let VERSION = '0.0.0';
+
 class RelayConnection {
   constructor() {
     this.ws = null;
-    this.reconnectDelay = 1000;
+    this.reconnectDelay = RECONNECT_INTERVAL;
     this.maxReconnectDelay = 30000;
     this.messageQueue = [];
     this.isConnected = false;
     this.reconnectTimer = null;
+    this.versionReceived = false;
     
-    // Start connection
-    this.connect();
+    // Request config from background script
+    this.requestConfig();
     
     // Listen for messages from service worker
     chrome.runtime.onMessage.addListener(this.handleMessage.bind(this));
   }
   
+  async requestConfig() {
+    try {
+      // Request version from background script
+      chrome.runtime.sendMessage({ type: 'offscreen_get_config' });
+    } catch (error) {
+      console.error('[Offscreen] Failed to request config:', error);
+      // Start connection anyway with default version
+      this.connect();
+    }
+  }
+  
   connect() {
     try {
-      this.ws = new WebSocket('ws://localhost:54321'); // WebSocket relay port
+      this.ws = new WebSocket(`ws://localhost:${WEBSOCKET_PORT}`); // WebSocket relay port
       
       this.ws.onopen = () => {
         console.log('[Offscreen] WebSocket connected to relay');
         this.isConnected = true;
-        this.reconnectDelay = 1000; // Reset delay on successful connection
+        this.reconnectDelay = RECONNECT_INTERVAL; // Reset delay on successful connection
         
         // Identify ourselves to the relay
         this.ws.send(JSON.stringify({
           type: 'identify',
           clientType: 'extension',
           name: 'Extension',
-          capabilities: ['tabs', 'debugger', 'claude_automation']
+          capabilities: ['tabs', 'debugger', 'claude_automation'],
+          version: VERSION,
+          component: COMPONENT_NAME
         }));
         
         // Send any queued messages
@@ -107,6 +129,19 @@ class RelayConnection {
     }
     
     switch (message.type) {
+      case 'offscreen_config':
+        // Receive config from background script
+        if (message.version) {
+          VERSION = message.version;
+          this.versionReceived = true;
+          console.log('[Offscreen] Received config, version:', VERSION);
+        }
+        // Start connection if not already started
+        if (!this.ws && !this.reconnectTimer) {
+          this.connect();
+        }
+        break;
+        
       case 'send_to_relay':
         this.sendToRelay(message.data);
         sendResponse({ success: true });

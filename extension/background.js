@@ -1,7 +1,7 @@
 // Chrome Extension Background Service Worker - BALANCED VERSION
 // Safe initialization but more aggressive connection attempts
 
-import { MESSAGE_TYPES } from './modules/config.js';
+import { MESSAGE_TYPES, VERSION } from './modules/config.js';
 import { ExtensionRelayClient } from './modules/relay-client.js';
 import { ContentScriptManager } from './modules/content-script-manager.js';
 import { createLogger } from './utils/logger.js';
@@ -31,27 +31,24 @@ async function ensureOffscreenDocument() {
   if (offscreenCreated) return;
   
   try {
-    // Check if offscreen document already exists
-    const existingContexts = await chrome.runtime.getContexts({
-      contextTypes: ['OFFSCREEN_DOCUMENT']
+    // Try to create offscreen document - it will fail if one already exists
+    logger.info('Creating offscreen document for WebSocket connection');
+    await chrome.offscreen.createDocument({
+      url: 'offscreen.html',
+      reasons: ['DOM_SCRAPING'],
+      justification: 'Maintain persistent WebSocket connection to relay server for Chrome automation'
     });
-    
-    if (existingContexts.length === 0) {
-      logger.info('Creating offscreen document for WebSocket connection');
-      await chrome.offscreen.createDocument({
-        url: 'offscreen.html',
-        reasons: ['DOM_SCRAPING'],
-        justification: 'Maintain persistent WebSocket connection to relay server for Chrome automation'
-      });
-      offscreenCreated = true;
-      logger.info('Offscreen document created successfully');
-    } else {
+    offscreenCreated = true;
+    logger.info('Offscreen document created successfully');
+  } catch (error) {
+    // If error is because document already exists, that's OK
+    if (error.message && error.message.includes('already exists')) {
       logger.info('Offscreen document already exists');
       offscreenCreated = true;
+    } else {
+      logger.error('Failed to create offscreen document', { error: error.message });
+      throw error;
     }
-  } catch (error) {
-    logger.error('Failed to create offscreen document', { error: error.message });
-    throw error;
   }
 }
 
@@ -92,6 +89,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   
   if (request.type === 'offscreen_status') {
     logger.debug('Offscreen document status', { status: request.status });
+    return false;
+  }
+  
+  if (request.type === 'offscreen_get_config') {
+    // Send config to offscreen document
+    chrome.runtime.sendMessage({
+      type: 'offscreen_config',
+      version: VERSION
+    });
     return false;
   }
   

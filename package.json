@@ -1,6 +1,6 @@
 {
   "name": "@claude-chrome-mcp/root",
-  "version": "2.6.0",
+  "version": "2.6.1",
   "description": "Claude Chrome MCP - Control Claude.ai browser tabs via MCP",
   "main": "mcp-server/src/server.js",
   "types": "shared/index.ts",
@@ -22,7 +22,9 @@
     "test:comprehensive": "node tests/run-comprehensive-suite.js",
     "typecheck": "tsc --noEmit",
     "version": "node scripts/get-version.js",
-    "version:update": "node scripts/update-versions.js"
+    "version:update": "node scripts/update-versions.js",
+    "config:validate": "node scripts/validate-config.js",
+    "update-versions": "node scripts/update-versions.js && npm run config:validate"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
