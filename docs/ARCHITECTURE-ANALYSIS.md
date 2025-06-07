@@ -51,6 +51,25 @@ The system provides **32 MCP tools** organized across clean domain boundaries:
 
 ## Infrastructure Improvements
 
+### Relay Module Reorganization (v2.7.0+)
+
+**Implementation**: Refactored monolithic message-relay.js into focused, maintainable modules for better separation of concerns.
+
+**Modular Architecture**:
+- **relay-core.js**: Core relay types, message constants, and shared functionality
+- **websocket-server.js**: Server-side WebSocket relay implementation with health endpoints
+- **websocket-client.js**: Client-side WebSocket connection management with reconnection logic
+- **relay-index.js**: Auto-election relay orchestrator that manages server/client roles
+- **mcp-relay-client.js**: MCP-specific relay client wrapper
+
+**Key Benefits**:
+- **Maintainability**: Clear separation between server, client, and coordination logic
+- **Testability**: Individual modules can be tested in isolation
+- **Code Reuse**: Shared relay core functionality across server and client
+- **Debugging**: Easier to trace issues within specific relay components
+
+**Migration Impact**: Zero breaking changes - existing relay functionality preserved while improving internal organization.
+
 ### File-Based Logging (v2.7.0+)
 
 **Implementation**: Winston-based logging with PID-specific file naming to support multiple daemon instances.
@@ -74,23 +93,38 @@ The system provides **32 MCP tools** organized across clean domain boundaries:
 **Implementation**: Replaced active ping/pong system with zero-overhead passive monitoring via existing message flow.
 
 **Architecture Change**:
-- **Before**: Active ping/pong every 30s with network overhead
-- **After**: Health tracking piggybacked on normal message processing
+- **Before**: Active ping/pong every 30s with network overhead and potential false disconnections
+- **After**: Health tracking piggybacked on normal message processing with intelligent idle detection
+
+**Technical Implementation**:
+- **Message Activity Tracking**: Both `messagesReceived` and `messagesSent` counters update `lastActivityAt` timestamp
+- **Extension Integration**: Counters tracked in both relay-client.js and offscreen.js for comprehensive coverage
+- **Health Status Calculation**: Real-time idle time calculation based on message activity patterns
+- **Zero Network Overhead**: No additional network traffic required for health monitoring
 
 **Metrics Tracked**:
-- Connection status: `connected`, `connectedAt`, `lastActivityAt`
-- Traffic counters: `messagesReceived`, `messagesSent`
-- Reliability: `reconnectCount`, `queueLength`
-- Derived metrics: `connectionDuration`, `idleTime`
+- **Connection Status**: `connected`, `connectedAt`, `lastActivityAt`
+- **Traffic Counters**: `messagesReceived`, `messagesSent` with automatic activity timestamp updates
+- **Reliability Metrics**: `reconnectCount`, `queueLength`, connection stability tracking
+- **Derived Analytics**: `connectionDuration`, `idleTime`, activity patterns
 
 **Health Status Categories**:
-- **Active**: <5s since last activity
-- **Idle (seconds)**: 5-30s idle
-- **Idle (minutes)**: 30s+ idle
+- **Active**: <5s since last activity (green indicator)
+- **Idle (seconds)**: 5-30s idle (yellow indicator)  
+- **Idle (minutes)**: 30s+ idle (orange indicator)
+- **Disconnected**: No connection (red indicator)
 
-**User Experience**: Real-time health indicators in popup with activity status, message count badges (↓↑), and reconnection tracking.
+**User Experience Improvements**:
+- **Real-time Popup Indicators**: Live activity status with color-coded health states
+- **Message Count Badges**: Format "↓{received} ↑{sent}" (e.g., "↓15 ↑8") shown when traffic > 0
+- **Intelligent Display Logic**: Message counts only shown when significant activity present
+- **Reconnection Tracking**: Visual feedback on connection stability and recovery patterns
 
-**Benefits**: Zero network overhead, richer metrics, real-time visibility, passive detection via normal operations.
+**Benefits**: 
+- **Performance**: Zero network overhead compared to ping/pong approach
+- **Accuracy**: More accurate connection health based on actual message flow
+- **User Feedback**: Rich real-time visibility into connection state and activity levels
+- **Debugging**: Enhanced troubleshooting with detailed traffic and timing metrics
 
 ### Message Counting for Popup Health Stats (v2.7.0+)
 
@@ -234,13 +268,15 @@ API Tools:   2/5 tested (40.0%) - Missing conversation management sequences
 
 ## Performance & Scalability Concerns
 
-### WebSocket Relay Resilience ✅ **GOOD FOUNDATION**
+### WebSocket Relay Resilience ✅ **IMPROVED FOUNDATION (v2.7.0+)**
 
-#### **Existing Patterns (Solid)**:
-- **Exponential Backoff**: 1s → 30s max delay in `websocket-relay-client.js`
-- **Message Queuing**: Reliable message delivery during disconnections
-- **Health Monitoring**: Ping/pong with 5-minute periodic cleanup
-- **Connection Recovery**: Automatic reconnection with state preservation
+#### **Enhanced Patterns (v2.7.0+)**:
+- **Modular Architecture**: Clean separation between relay coordination, server, and client logic
+- **Exponential Backoff**: 1s → 30s max delay in `websocket-client.js` with auto-election
+- **Message Queuing**: Reliable message delivery during disconnections across modular components  
+- **Passive Health Monitoring**: Zero-overhead health tracking via message activity (replaced ping/pong)
+- **Connection Recovery**: Automatic reconnection with state preservation and role coordination
+- **Real-time Feedback**: Extension popup shows live connection health with traffic indicators
 
 #### **Missing Production Hardening**:
 ```javascript
@@ -311,7 +347,12 @@ await client.call('system_wait_operation', { operationId });
 **Core Components**:
 - **server.js**: Main entry point with modular tool registration
 - **tools/**: Clean domain separation (`system_*`, `chrome_*`, `tab_*`, `api_*`)
-- **relay/**: WebSocket relay management with automatic election
+- **relay/**: Modular WebSocket relay system with automatic election
+  - `relay-index.js`: Auto-election coordinator for server/client roles
+  - `relay-core.js`: Shared message types and relay protocol constants
+  - `websocket-server.js`: Server-side relay with health endpoints
+  - `websocket-client.js`: Client-side connection management with reconnection
+  - `mcp-relay-client.js`: MCP-specific relay client wrapper
 - **utils/**: Operation tracking, error management, logging
 
 **Key Patterns**:
@@ -335,15 +376,24 @@ await client.call('system_wait_operation', { operationId });
 ### Communication Flow
 
 ```
-MCP Client → MCP Server → Embedded Relay → WebSocket → Offscreen Document → Extension Background → Chrome APIs
+MCP Client → MCP Server → Auto-Election Relay → Modular WebSocket → Offscreen Document → Extension Background → Chrome APIs
+                         (relay-index.js)     (server/client)      (passive health)     (tab management)      (Chrome APIs)
 ```
 
 **Operation Lifecycle**:
 1. Tool call creates operation in OperationManager
-2. Request forwarded through WebSocket relay
-3. Extension executes via appropriate handler
-4. Operation milestones tracked and persisted
-5. Response returned through same relay path
+2. Request forwarded through modular relay system (relay-index.js manages server/client roles)
+3. WebSocket communication handled by specialized server/client modules
+4. Extension executes via appropriate handler with passive health monitoring
+5. Operation milestones tracked and persisted
+6. Response returned through same modular relay path with activity tracking
+
+**Relay Module Interactions**:
+- **relay-index.js**: Coordinates auto-election, manages server/client roles
+- **websocket-server.js**: Handles server-side relay when elected as host
+- **websocket-client.js**: Manages client connections with reconnection logic
+- **relay-core.js**: Provides shared message types and protocol constants
+- **Passive Health**: Message activity automatically updates connection health metrics
 
 ## Issues Requiring Immediate Attention
 
@@ -430,6 +480,18 @@ The following strategic improvements were identified during documentation review
 - **Decision**: WebSocket-based real-time communication
 - **Rationale**: Better performance, real-time messaging
 - **Impact**: Complete communication path redesign
+
+### Modular Relay System (v2.7.0)
+- **Decision**: Refactor monolithic relay into focused modules
+- **Rationale**: Better maintainability, testability, and debugging
+- **Impact**: Improved code organization while preserving functionality
+- **Components**: relay-core.js, websocket-server.js, websocket-client.js, relay-index.js
+
+### Passive Connection Health Monitoring (v2.7.0)
+- **Decision**: Replace ping/pong with passive message activity tracking
+- **Rationale**: Zero network overhead, more accurate health assessment
+- **Impact**: Better performance, richer metrics, improved user feedback
+- **Benefits**: Real-time popup indicators, traffic counting, idle detection
 
 ### Modular Tool Organization
 - **Decision**: Clean domain separation (`system_*`, `chrome_*`, `tab_*`, `api_*`)

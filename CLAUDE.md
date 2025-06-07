@@ -4,8 +4,9 @@
 
 **ARCHITECTURE OVERVIEW**: 
 ```
-[AI Agent/Claude Code] → [MCP Server] → [WebSocket Relay] → [Chrome Extension] → [Chrome Browser]
-                         32 tools         Port 54321         Manages tabs        Controls Chrome
+[AI Agent/Claude Code] → [MCP Server] → [Modular Relay System] → [Chrome Extension] → [Chrome Browser]
+                         32 tools         Auto-election         Passive health        Controls Chrome
+                                         Port 54321           monitoring
 ```
 
 **CRITICAL RULES**:
@@ -144,7 +145,7 @@ IF: Still failing
 # Level 3: Full diagnostic
 mcp system_enable_extension_debug_mode
 mcp system_get_extension_logs --limit 50
-# Look for WebSocket errors or "relay" in logs
+# Look for WebSocket errors, relay module issues, or connection patterns
 ```
 
 ### Operation Failures
@@ -266,6 +267,26 @@ mcp system_get_extension_logs --limit 50
 ```
 
 ## ARCHITECTURE GOTCHAS
+
+### Relay System Architecture (v2.7.0+)
+**DESIGN**: Modular relay system with auto-election and passive health monitoring
+**WHEN**: Debugging connection issues
+**THEN**: Understand these architectural improvements:
+
+**Modular Components**:
+- `relay-core.js` - Shared message types and constants
+- `websocket-server.js` - Server-side relay with health endpoints  
+- `websocket-client.js` - Client connection management with reconnection
+- `relay-index.js` - Auto-election coordinator (server/client roles)
+- `mcp-relay-client.js` - MCP-specific wrapper
+
+**Connection Health Monitoring**:
+- **Passive Monitoring**: Health tracked via normal message flow (zero overhead)
+- **Real-time Metrics**: Message counts, activity timestamps, idle detection
+- **User Visibility**: Extension popup shows live connection status with traffic indicators
+- **No Ping/Pong**: Eliminated active health checks in favor of message activity tracking
+
+**Benefits**: Better maintainability, improved debugging, zero health monitoring overhead, richer user feedback
 
 ### Configuration Management
 **SOLUTION**: Centralized config with environment overrides
