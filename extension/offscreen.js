@@ -21,6 +21,15 @@ class RelayConnection {
     this.reconnectTimer = null;
     this.versionReceived = false;
     
+    // Passive health monitoring
+    this.connectionHealth = {
+      connectedAt: null,
+      lastActivityAt: null,
+      messagesReceived: 0,
+      messagesSent: 0,
+      reconnectCount: 0
+    };
+    
     // Request config from background script
     this.requestConfig();
     
@@ -48,6 +57,10 @@ class RelayConnection {
         this.isConnected = true;
         this.reconnectDelay = RECONNECT_INTERVAL; // Reset delay on successful connection
         
+        // Track connection health
+        this.connectionHealth.connectedAt = Date.now();
+        this.connectionHealth.lastActivityAt = Date.now();
+        
         // Identify ourselves to the relay
         this.ws.send(JSON.stringify({
           type: 'identify',
@@ -67,7 +80,8 @@ class RelayConnection {
         // Notify service worker of connection
         chrome.runtime.sendMessage({
           type: 'relay_connection_status',
-          status: 'connected'
+          status: 'connected',
+          health: this.getHealthMetrics()
         });
       };
       
@@ -75,12 +89,16 @@ class RelayConnection {
         console.log('[Offscreen] WebSocket closed:', event.code, event.reason);
         this.isConnected = false;
         
+        // Track disconnection
+        this.connectionHealth.reconnectCount++;
+        
         // Notify service worker
         chrome.runtime.sendMessage({
           type: 'relay_connection_status',
           status: 'disconnected',
           code: event.code,
-          reason: event.reason
+          reason: event.reason,
+          health: this.getHealthMetrics()
         });
         
         // Schedule reconnection
@@ -95,6 +113,10 @@ class RelayConnection {
         try {
           const message = JSON.parse(event.data);
           console.log('[Offscreen] Received from relay:', message.type);
+          
+          // Track activity
+          this.connectionHealth.lastActivityAt = Date.now();
+          this.connectionHealth.messagesReceived++;
           
           // Forward to service worker - pass through the message type directly
           chrome.runtime.sendMessage(message);
@@ -145,29 +167,34 @@ class RelayConnection {
       case 'send_to_relay':
         this.sendToRelay(message.data);
         sendResponse({ success: true });
-        break;
+        return false; // Synchronous response
         
       case 'get_connection_status':
         sendResponse({
           connected: this.isConnected,
-          queueLength: this.messageQueue.length
+          queueLength: this.messageQueue.length,
+          health: this.getHealthMetrics()
         });
-        break;
+        return false; // Synchronous response
         
       case 'ping':
         sendResponse({ pong: true });
-        break;
+        return false; // Synchronous response
         
       default:
         console.log('[Offscreen] Unknown message type:', message.type);
+        return false; // No response needed
     }
     
-    return true; // Keep message channel open for async response
+    // Only return true for cases that need async response
   }
   
   sendToRelay(data) {
     if (this.isConnected && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(data));
+      // Track activity
+      this.connectionHealth.lastActivityAt = Date.now();
+      this.connectionHealth.messagesSent++;
     } else {
       // Queue message for when connection is restored
       console.log('[Offscreen] Queueing message, not connected');
@@ -179,6 +206,22 @@ class RelayConnection {
       }
     }
   }
+  
+  getHealthMetrics() {
+    const now = Date.now();
+    return {
+      connected: this.isConnected,
+      connectedAt: this.connectionHealth.connectedAt,
+      lastActivityAt: this.connectionHealth.lastActivityAt,
+      connectionDuration: this.connectionHealth.connectedAt ? now - this.connectionHealth.connectedAt : 0,
+      idleTime: this.connectionHealth.lastActivityAt ? now - this.connectionHealth.lastActivityAt : null,
+      messagesReceived: this.connectionHealth.messagesReceived,
+      messagesSent: this.connectionHealth.messagesSent,
+      reconnectCount: this.connectionHealth.reconnectCount,
+      queueLength: this.messageQueue.length
+    };
+  }
+  
 }
 
 // Initialize relay connection

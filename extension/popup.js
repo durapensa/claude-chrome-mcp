@@ -65,7 +65,36 @@ function updatePopupUI(health) {
       statusDot.className = 'status-dot connected';
     }
     if (statusDetail) {
-      statusDetail.textContent = 'Connected to WebSocket Relay';
+      let detailText = 'Connected to WebSocket Relay';
+      
+      // Add health metrics if available
+      if (health.connectionHealth) {
+        const { lastActivityAt, messagesReceived, messagesSent, reconnectCount } = health.connectionHealth;
+        
+        // Add activity indicator
+        if (lastActivityAt) {
+          const idleTime = Date.now() - lastActivityAt;
+          if (idleTime < 5000) {
+            detailText += ' • Active';
+          } else if (idleTime < 30000) {
+            detailText += ' • Idle ' + Math.floor(idleTime / 1000) + 's';
+          } else {
+            detailText += ' • Idle ' + Math.floor(idleTime / 60000) + 'm';
+          }
+        }
+        
+        // Add message counts if significant
+        if (messagesReceived > 0 || messagesSent > 0) {
+          detailText += ` • ↓${messagesReceived} ↑${messagesSent}`;
+        }
+        
+        // Add reconnect count if any
+        if (reconnectCount > 0) {
+          detailText += ` • ${reconnectCount} reconnects`;
+        }
+      }
+      
+      statusDetail.textContent = detailText;
     }
     if (helpSection) {
       helpSection.style.display = 'none';

@@ -34,6 +34,17 @@ export class ExtensionRelayClient {
     this.relayConnected = false;
     this.pendingRequests = new Map(); // Track requests awaiting responses
     
+    // Connection health metrics from offscreen document
+    this.connectionHealth = {
+      connected: false,
+      connectedAt: null,
+      lastActivityAt: null,
+      messagesReceived: 0,
+      messagesSent: 0,
+      reconnectCount: 0,
+      queueLength: 0
+    };
+    
     // Track extension startup for reload confirmation
     this.startupTimestamp = Date.now();
     
@@ -230,7 +241,8 @@ export class ExtensionRelayClient {
       relayConnected: this.relayConnected,
       connectedClients: Array.from(this.connectedClients.values()),
       extensionConnected: this.relayConnected,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      connectionHealth: this.connectionHealth
     };
   }
 
@@ -878,6 +890,12 @@ export class ExtensionRelayClient {
   // Offscreen WebSocket relay methods
   handleRelayStatus(message) {
     console.log('CCM ExtensionRelayClient: Relay status update:', message);
+    
+    // Update health metrics if provided
+    if (message.health) {
+      this.connectionHealth = { ...this.connectionHealth, ...message.health };
+    }
+    
     if (message.status === 'connected') {
       console.log('CCM ExtensionRelayClient: WebSocket relay connected');
       this.relayConnected = true;
