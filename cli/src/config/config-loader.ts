@@ -88,7 +88,7 @@ export class ConfigLoader {
     
     // Expand paths in daemon config
     daemon.socket = this.expandPath(daemon.socket);
-    daemon.logFile = this.expandPath(daemon.logFile);
+    daemon.logFile = this.expandPath(daemon.logFile);  // Keep ${PID} for later substitution
 
     // Process defaults with defaults
     const defaults = {
@@ -163,8 +163,11 @@ export class ConfigLoader {
     // Expand ~ to home directory
     let expandedPath = inputPath.replace(/^~/, os.homedir());
 
-    // Expand environment variables like ${VAR} and $VAR
-    expandedPath = expandedPath.replace(/\$\{([^}]+)\}/g, (_, varName) => {
+    // Expand environment variables like ${VAR} and $VAR, but preserve ${PID}
+    expandedPath = expandedPath.replace(/\$\{([^}]+)\}/g, (match, varName) => {
+      if (varName === 'PID') {
+        return match; // Preserve ${PID} for later substitution
+      }
       return process.env[varName] || '';
     });
     
@@ -204,8 +207,11 @@ export class ConfigLoader {
   private static expandEnvironmentVariable(value: string): string {
     if (typeof value !== 'string') return value;
 
-    // Expand ${VAR} and $VAR patterns
-    return value.replace(/\$\{([^}]+)\}/g, (_, varName) => {
+    // Expand ${VAR} and $VAR patterns, but preserve ${PID}
+    return value.replace(/\$\{([^}]+)\}/g, (match, varName) => {
+      if (varName === 'PID') {
+        return match; // Preserve ${PID} for later substitution
+      }
       return process.env[varName] || '';
     }).replace(/\$([A-Z_][A-Z0-9_]*)/g, (_, varName) => {
       return process.env[varName] || '';

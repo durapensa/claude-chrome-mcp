@@ -326,20 +326,33 @@ class MCPCli {
 
     try {
       await this.client.connect();
-      const status = await this.client.getServerStatus();
+      const [serverStatus, daemonStatus] = await Promise.all([
+        this.client.getServerStatus(),
+        this.client.getDaemonStatus()
+      ]);
       
       if (this.options.json) {
-        console.log(JSON.stringify(status, null, 2));
+        console.log(JSON.stringify({ servers: serverStatus, daemon: daemonStatus }, null, 2));
       } else {
         console.log(chalk.bold('Daemon Status:'));
         console.log(`  Running: ${chalk.green('Yes')}`);
-        console.log(`  Servers: ${status.stats.running_servers}/${status.stats.total_servers}`);
-        console.log(`  Tools: ${status.stats.total_tools}`);
+        console.log(`  Servers: ${serverStatus.stats.running_servers}/${serverStatus.stats.total_servers}`);
+        console.log(`  Tools: ${serverStatus.stats.total_tools}`);
+        
+        // Show daemon info
+        if (daemonStatus.daemon) {
+          console.log(`  Log File: ${daemonStatus.daemon.logFile}`);
+          if (daemonStatus.daemon.logStats?.exists) {
+            const { formatFileSize } = require('./utils/logger');
+            console.log(`  Log Size: ${formatFileSize(daemonStatus.daemon.logStats.size)}`);
+          }
+          console.log(`  Process: PID ${daemonStatus.process.pid}, uptime ${Math.floor(daemonStatus.process.uptime)}s`);
+        }
         
         // Show MCP server processes if any are running
-        if (status.servers && status.servers.length > 0) {
+        if (serverStatus.servers && serverStatus.servers.length > 0) {
           console.log(chalk.bold('\nMCP Servers:'));
-          for (const server of status.servers) {
+          for (const server of serverStatus.servers) {
             const statusColor = 
               server.status === 'ready' ? chalk.green :
               server.status === 'error' ? chalk.red :

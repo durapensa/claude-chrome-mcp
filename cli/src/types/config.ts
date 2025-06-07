@@ -56,7 +56,7 @@ export interface ServerConfig {
 
 export const DEFAULT_DAEMON_CONFIG: Required<DaemonConfig> = {
   socket: '~/.config/mcp/daemon.sock',
-  logFile: '~/.config/mcp/daemon.log',
+  logFile: '~/.local/share/mcp/logs/mcp-cli-daemon-PID-${PID}.log',
   logLevel: 'info',
   idleTimeout: '1h'
 };

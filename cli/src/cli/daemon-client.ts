@@ -233,6 +233,21 @@ export class DaemonClient {
   }
 
   /**
+   * Get daemon status
+   */
+  async getDaemonStatus(): Promise<any> {
+    const response = await this.sendRequest({
+      type: 'daemon_status'
+    });
+    
+    if (response.status === 'success') {
+      return response.data;
+    } else {
+      throw new Error(response.error || 'Failed to get daemon status');
+    }
+  }
+
+  /**
    * Start a server
    */
   async startServer(serverId: string): Promise<any> {

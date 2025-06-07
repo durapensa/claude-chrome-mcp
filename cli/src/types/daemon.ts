@@ -13,6 +13,7 @@ export type DaemonRequestType =
   | 'tool_call' 
   | 'list_tools' 
   | 'server_status' 
+  | 'daemon_status'
   | 'start_server'
   | 'stop_server'
   | 'shutdown';

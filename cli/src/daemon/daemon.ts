@@ -12,6 +12,8 @@ import { ToolRegistry } from './tool-registry';
 import { ConfigLoader } from '../config/config-loader';
 import { MCPCliConfig, ServerConfig, DaemonConfig, DefaultsConfig } from '../types/config';
 import { DaemonRequest, DaemonResponse } from '../types/daemon';
+import { createLogger, getLogFileStats } from '../utils/logger';
+import * as winston from 'winston';
 
 export class MCPDaemon {
   private server: net.Server | null = null;
@@ -24,6 +26,7 @@ export class MCPDaemon {
   private socketPath: string;
   private isShuttingDown = false;
   private clients = new Set<net.Socket>();
+  private logger: winston.Logger;
 
   constructor(
     config: MCPCliConfig,
@@ -38,6 +41,21 @@ export class MCPDaemon {
     this.socketPath = daemon.socket;
     this.serverManager = new ServerManager();
     this.toolRegistry = new ToolRegistry();
+    
+    // Initialize logger with PID substitution
+    const logFile = daemon.logFile.replace(/\$\{PID\}/g, process.pid.toString());
+    this.logger = createLogger({
+      logFile,
+      logLevel: daemon.logLevel,
+      componentName: 'mcp-daemon'
+    });
+    
+    // Log startup information
+    this.logger.info(`MCP Daemon starting (PID: ${process.pid})`, {
+      logFile,
+      socketPath: daemon.socket,
+      logLevel: daemon.logLevel
+    });
   }
 
   /**
@@ -177,6 +195,7 @@ export class MCPDaemon {
   private async handleRequest(socket: net.Socket, request: DaemonRequest): Promise<void> {
     const { type, request_id } = request;
 
+    (this.logger as any).logRequest('info', `Handling request: ${type}`, request_id);
     console.log(`Handling request: ${type} (id: ${request_id})`);
 
     try {
@@ -191,6 +210,10 @@ export class MCPDaemon {
 
         case 'server_status':
           await this.handleServerStatus(socket, request);
+          break;
+          
+        case 'daemon_status':
+          await this.handleDaemonStatus(socket, request);
           break;
 
         case 'start_server':
@@ -399,6 +422,46 @@ export class MCPDaemon {
     // Initiate shutdown
     this.shutdown().catch(error => {
       console.error('Error during shutdown:', error);
+    });
+  }
+
+  /**
+   * Handle daemon status request
+   */
+  private async handleDaemonStatus(socket: net.Socket, request: DaemonRequest): Promise<void> {
+    const { request_id } = request;
+    
+    // Get log file stats (substitute PID in path)
+    const logFile = this.daemon.logFile.replace(/\$\{PID\}/g, process.pid.toString());
+    const logStats = getLogFileStats(logFile);
+    
+    // Get current process info
+    const processInfo = {
+      pid: process.pid,
+      uptime: process.uptime(),
+      memoryUsage: process.memoryUsage(),
+      nodeVersion: process.version
+    };
+    
+    // Get daemon configuration
+    const daemonInfo = {
+      socketPath: this.socketPath,
+      logFile,
+      logLevel: this.daemon.logLevel,
+      idleTimeout: this.daemon.idleTimeout,
+      logStats
+    };
+    
+    this.sendResponse(socket, {
+      request_id,
+      status: 'success',
+      data: {
+        daemon: daemonInfo,
+        process: processInfo,
+        servers: this.serverManager.getStats(),
+        tools: this.toolRegistry.getStats(),
+        clients: this.clients.size
+      }
     });
   }
 
