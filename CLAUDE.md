@@ -363,16 +363,21 @@ mcp tab_create --injectContentScript # Start work
 mcp tab_list                         # What's open?
 mcp chrome_reload_extension          # Fix most issues
 
+# Resource state management
+mcp resource_state_summary           # View all tracked resources
+mcp resource_cleanup_orphaned        # Find/clean orphaned resources
+
 # Debug when stuck
 mcp tab_debug_page --tabId <id>      # Tab state
 mcp system_get_extension_logs        # Recent errors
 ```
 
-### Tool Categories (32 total)
+### Tool Categories (44 total)
 - **System** (7): Health, operations, debugging
 - **Chrome** (9): Browser control, debugging, monitoring  
 - **Tab** (11): Claude.ai interaction, batching
 - **API** (5): Conversation management
+- **Resource** (12): State management, resource tracking
 
 ## DECISION TREES
 
