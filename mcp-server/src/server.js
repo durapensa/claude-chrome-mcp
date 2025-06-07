@@ -43,6 +43,7 @@ const os = require('os');
 const { ErrorTracker } = require('./utils/error-tracker');
 const { createLogger } = require('./utils/logger');
 const { OperationManager } = require('./utils/operation-manager');
+const { ResourceStateManager } = require('./utils/resource-state-manager');
 const { NotificationManager } = require('./utils/notification-manager');
 const { MCPRelayClient } = require('./relay/mcp-relay-client');
 
@@ -70,6 +71,7 @@ class ChromeMCPServer {
     this.errorTracker = new ErrorTracker();
     this.debug = createLogger('ChromeMCPServer');
     this.operationManager = new OperationManager();
+    this.resourceStateManager = new ResourceStateManager();
     this.notificationManager = new NotificationManager(this.server, this.errorTracker);
     
     // Initialize relay client  
@@ -267,6 +269,36 @@ class ChromeMCPServer {
         text: JSON.stringify(result, null, 2)
       }]
     };
+  }
+
+  /**
+   * Forward to extension with automatic resource state sync
+   * @param {string} toolName - Extension tool to call
+   * @param {Object} params - Tool parameters
+   * @param {Function} syncHandler - (response, server, params) => void - Called on success to sync state
+   * @returns {Object} Formatted result
+   */
+  async forwardWithResourceSync(toolName, params, syncHandler) {
+    try {
+      // Forward to extension for actual operation
+      const result = await this.forwardToExtension(toolName, params);
+      
+      // Parse the extension response
+      const extensionResponse = JSON.parse(result.content[0].text);
+      
+      if (extensionResponse.success && syncHandler) {
+        // Call sync handler to update resource state
+        syncHandler(extensionResponse, this, params);
+      }
+      
+      return result;
+    } catch (error) {
+      this.debug.warn(`Failed to sync resource state for ${toolName}`, { 
+        params, 
+        error: error.message 
+      });
+      throw error;
+    }
   }
 
   async waitForOperation(params) {

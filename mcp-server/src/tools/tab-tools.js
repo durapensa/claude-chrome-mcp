@@ -110,11 +110,48 @@ const tabTools = [
 ];
 
 /**
+ * Resource state sync handlers for tab tools
+ */
+const resourceSyncHandlers = {
+  tabCreate: (response, server, params) => {
+    const { injectContentScript } = params;
+    if (response.tabId && injectContentScript && response.injectionResult?.success) {
+      // Register content script injection
+      server.resourceStateManager.registerContentScript(
+        response.tabId, 
+        server.config?.VERSION || '2.7.0',
+        ['MAIN', 'ISOLATED']
+      );
+      server.debug.debug(`ResourceState: Content script registered`, { 
+        tabId: response.tabId 
+      });
+    }
+  },
+
+  tabClose: (response, server, params) => {
+    const { tabId } = params;
+    if (response.success) {
+      // Clean up all resources for this tab
+      server.resourceStateManager.detachDebuggerSession(tabId);
+      server.resourceStateManager.stopNetworkMonitoring(tabId);
+      server.resourceStateManager.unregisterContentScript(tabId);
+      server.resourceStateManager.releaseOperationLock(tabId, 'tab_closed');
+      
+      server.debug.debug(`ResourceState: All resources cleaned for closed tab`, { tabId });
+    }
+  }
+};
+
+/**
  * Tab tool handlers
  */
 const tabHandlers = {
   'tab_create': async (server, args) => {
-    return await server.forwardToExtension('tab_create', args);
+    return await server.forwardWithResourceSync(
+      'tab_create', 
+      args, 
+      resourceSyncHandlers.tabCreate
+    );
   },
 
   'tab_list': async (server, args) => {
@@ -122,7 +159,11 @@ const tabHandlers = {
   },
 
   'tab_close': async (server, args) => {
-    return await server.forwardToExtension('tab_close', args);
+    return await server.forwardWithResourceSync(
+      'tab_close', 
+      args, 
+      resourceSyncHandlers.tabClose
+    );
   },
 
   'tab_send_message': async (server, args) => {

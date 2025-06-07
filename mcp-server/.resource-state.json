@@ -1,0 +1,50 @@
+{
+  "debuggerSessions": [
+    [
+      948573410,
+      {
+        "tabId": 948573410,
+        "attached": true,
+        "attachedAt": 1749339705626,
+        "source": "self",
+        "purpose": "chrome_debug_attach",
+        "protocol": "Runtime",
+        "recovery": {
+          "canDetach": true,
+          "verified": false,
+          "lastVerified": null
+        }
+      }
+    ]
+  ],
+  "operationLocks": [],
+  "networkMonitoring": [],
+  "contentScripts": [
+    [
+      948573410,
+      {
+        "tabId": 948573410,
+        "injected": true,
+        "injectedAt": 1749339696811,
+        "version": "2.7.0",
+        "worlds": [
+          "MAIN",
+          "ISOLATED"
+        ],
+        "recovery": {
+          "canVerify": true,
+          "lastVerified": null,
+          "needsReinjection": false
+        }
+      }
+    ]
+  ],
+  "pendingRequests": [],
+  "relayClients": [],
+  "metadata": {
+    "lastSaved": 1749339728468,
+    "lastLoaded": null,
+    "version": "1.0.0",
+    "extensionStartupTime": null
+  }
+}

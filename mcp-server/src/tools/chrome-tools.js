@@ -73,6 +73,38 @@ const chromeTools = [
 ];
 
 /**
+ * Resource state sync handlers for chrome tools
+ */
+const resourceSyncHandlers = {
+  debuggerAttach: (response, server, params) => {
+    const { tabId } = params;
+    const source = response.alreadyAttached ? 'existing' : 'self';
+    server.resourceStateManager.attachDebuggerSession(tabId, source, 'chrome_debug_attach');
+    server.debug.debug(`ResourceState: Debugger session registered`, { tabId, source });
+  },
+
+  debuggerDetach: (response, server, params) => {
+    const { tabId } = params;
+    if (response.wasDetached) {
+      server.resourceStateManager.detachDebuggerSession(tabId);
+      server.debug.debug(`ResourceState: Debugger session unregistered`, { tabId });
+    }
+  },
+
+  networkMonitoringStart: (response, server, params) => {
+    const { tabId } = params;
+    server.resourceStateManager.startNetworkMonitoring(tabId, `session_${tabId}_${Date.now()}`);
+    server.debug.debug(`ResourceState: Network monitoring registered`, { tabId });
+  },
+
+  networkMonitoringStop: (response, server, params) => {
+    const { tabId } = params;
+    server.resourceStateManager.stopNetworkMonitoring(tabId);
+    server.debug.debug(`ResourceState: Network monitoring unregistered`, { tabId });
+  }
+};
+
+/**
  * Chrome tool handlers
  */
 const chromeHandlers = {
@@ -81,11 +113,19 @@ const chromeHandlers = {
   },
 
   'chrome_debug_attach': async (server, args) => {
-    return await server.forwardToExtension('chrome_debug_attach', args);
+    return await server.forwardWithResourceSync(
+      'chrome_debug_attach', 
+      args, 
+      resourceSyncHandlers.debuggerAttach
+    );
   },
 
   'chrome_debug_detach': async (server, args) => {
-    return await server.forwardToExtension('chrome_debug_detach', args);
+    return await server.forwardWithResourceSync(
+      'chrome_debug_detach', 
+      args, 
+      resourceSyncHandlers.debuggerDetach
+    );
   },
 
   'chrome_debug_status': async (server, args) => {
@@ -101,11 +141,19 @@ const chromeHandlers = {
   },
 
   'chrome_start_network_monitoring': async (server, args) => {
-    return await server.forwardToExtension('chrome_start_network_monitoring', args);
+    return await server.forwardWithResourceSync(
+      'chrome_start_network_monitoring', 
+      args, 
+      resourceSyncHandlers.networkMonitoringStart
+    );
   },
 
   'chrome_stop_network_monitoring': async (server, args) => {
-    return await server.forwardToExtension('chrome_stop_network_monitoring', args);
+    return await server.forwardWithResourceSync(
+      'chrome_stop_network_monitoring', 
+      args, 
+      resourceSyncHandlers.networkMonitoringStop
+    );
   },
 
   'chrome_get_network_requests': async (server, args) => {

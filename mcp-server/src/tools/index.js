@@ -6,6 +6,7 @@ const { systemTools, systemHandlers } = require('./system-tools');
 const { chromeTools, chromeHandlers } = require('./chrome-tools');
 const { tabTools, tabHandlers } = require('./tab-tools');
 const { apiTools, apiHandlers } = require('./api-tools');
+const { resourceTools, resourceHandlers } = require('./resource-tools');
 
 /**
  * Combined tools array for MCP server registration
@@ -15,6 +16,7 @@ const { apiTools, apiHandlers } = require('./api-tools');
  * - chrome_*: Browser control and extension management  
  * - tab_*: Tab operations via tabId only
  * - api_*: Claude.ai API operations via conversationId only
+ * - resource_*: Critical resource state management
  */
 const allTools = [
   // System infrastructure tools
@@ -27,7 +29,10 @@ const allTools = [
   ...tabTools,
   
   // Claude.ai API operations via conversationId only
-  ...apiTools
+  ...apiTools,
+  
+  // Critical resource state management
+  ...resourceTools
 ];
 
 /**
@@ -38,7 +43,8 @@ const allHandlers = {
   ...systemHandlers,
   ...chromeHandlers,
   ...tabHandlers,
-  ...apiHandlers
+  ...apiHandlers,
+  ...resourceHandlers
 };
 
 /**
