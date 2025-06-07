@@ -278,7 +278,8 @@ export class ExtensionRelayClient {
           timestamp: this.startupTimestamp,
           uptime: Date.now() - this.startupTimestamp,
           startupTime: new Date(this.startupTimestamp).toISOString()
-        }
+        },
+        connectionHealth: this.connectionHealth
       }
     };
   }
@@ -919,6 +920,10 @@ export class ExtensionRelayClient {
     // Use proper logger instead of console.log
     this.logger.debug(`Message from relay: ${message.type}`, message);
     
+    // Track message received
+    this.connectionHealth.messagesReceived++;
+    this.connectionHealth.lastActivityAt = Date.now();
+    
     const fromClient = message._from;
     
     // Check if this is an MCP tool request from an MCP server
@@ -1006,6 +1011,10 @@ export class ExtensionRelayClient {
         type: 'send_to_relay',
         data: message
       });
+      
+      // Track message sent
+      this.connectionHealth.messagesSent++;
+      this.connectionHealth.lastActivityAt = Date.now();
     } catch (error) {
       console.error('CCM ExtensionRelayClient: Failed to send to relay:', error);
       throw error;
