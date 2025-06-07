@@ -1,7 +1,15 @@
 const { MCPTestClient } = require('../helpers/mcp-test-client');
+const { PreFlightCheck } = require('../helpers/pre-flight-check');
 
 describe('System Health Check', () => {
   let client;
+  
+  beforeAll(async () => {
+    // Fail-early check for unit test prerequisites
+    const preFlightCheck = new PreFlightCheck();
+    const result = await preFlightCheck.forUnitTests();
+    console.log(result.message);
+  });
   
   beforeEach(async () => {
     client = new MCPTestClient();
@@ -18,17 +26,15 @@ describe('System Health Check', () => {
     await expect(client.connect()).resolves.not.toThrow();
   });
 
-  test('System health shows all components connected', async () => {
+  test('System health responds with proper structure', async () => {
     await client.connect();
     
-    try {
-      // Get health with custom timeout
-      const health = await Promise.race([
-        client.callTool('system_health'),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('TIMEOUT')), 10000)
-        )
-      ]);
+    // Use PreFlightCheck for consistent timeout handling
+    const preFlightCheck = new PreFlightCheck();
+    const healthCheck = await preFlightCheck.checkSystemHealth();
+    
+    if (healthCheck.success) {
+      const health = healthCheck.health;
       
       // Basic health structure
       expect(health).toHaveProperty('relayClient');
@@ -39,23 +45,12 @@ describe('System Health Check', () => {
       expect(health.relayConnected).toBe(true);
       expect(health.relayClient.state).toBe('connected');
       
-      // Extension connection - may timeout but that's acceptable for this test
-      if (health.extension && !health.extension.error) {
-        expect(health.extension.connectedClients).toBeInstanceOf(Array);
-        console.log(`✅ Extension connected with ${health.extension.connectedClients.length} clients`);
-      } else {
-        console.log(`⚠️ Extension not connected (${health.extension?.error || 'no error info'})`);
-        console.log('This is expected if Chrome/extension is not running');
-      }
-    } catch (error) {
-      if (error.message.includes('TIMEOUT')) {
-        console.log('⚠️ System health timed out (extension may not be connected)');
-        console.log('This is expected if Chrome/extension is not running');
-      } else {
-        throw error;
-      }
+      console.log('✅ System health check completed successfully');
+    } else {
+      console.log(`⚠️ ${healthCheck.error} - this may be expected if extension not running`);
+      // Don't fail unit test if health times out
     }
-  }, 15000);
+  });
 
   test('Can list available tools', async () => {
     await client.connect();

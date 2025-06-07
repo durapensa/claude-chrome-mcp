@@ -1,7 +1,16 @@
 const { MCPTestClient } = require('../helpers/mcp-test-client');
+const { PreFlightCheck } = require('../helpers/pre-flight-check');
 
 describe('Timeout Behavior', () => {
   let client;
+  let preFlightResult;
+  
+  beforeAll(async () => {
+    // Fail-early check for contract test prerequisites
+    const preFlightCheck = new PreFlightCheck();
+    preFlightResult = await preFlightCheck.forContractTests();
+    console.log(preFlightResult.message);
+  });
   
   beforeEach(async () => {
     client = new MCPTestClient();

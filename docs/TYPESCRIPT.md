@@ -1,4 +1,13 @@
-# TypeScript Types Documentation
+# Claude Chrome MCP: TypeScript Reference
+## TypeScript Types Documentation
+
+## Quick Navigation
+**Related Documentation:**
+- [CLAUDE.md](../CLAUDE.md) - Commands and workflows
+- [Architecture](ARCHITECTURE.md) - System design
+- [GitHub Issues](https://github.com/durapensa/claude-chrome-mcp/issues) - Active work
+
+**Need Help?** See [Troubleshooting](TROUBLESHOOTING.md)
 
 ## Overview
 
@@ -249,5 +258,5 @@ When adding new tools or modifying APIs:
 ## Related Documentation
 
 - [**Architecture**](ARCHITECTURE.md) - System design and component overview
-- [**Problem Resolution**](../claude/problem-resolution.md) - Complete troubleshooting including type-related debugging
+- [**Troubleshooting**](../CLAUDE.md#troubleshooting) - Complete troubleshooting including type-related debugging
 - `/tests/test-typescript-types.ts` - Type compilation tests

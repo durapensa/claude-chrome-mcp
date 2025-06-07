@@ -1,4 +1,13 @@
-# Test Suite Architecture
+# Claude Chrome MCP: Test Suite
+## Test Suite Architecture
+
+## Quick Navigation
+**Related Documentation:**
+- [CLAUDE.md](../CLAUDE.md) - Commands and workflows
+- [Architecture Analysis](../docs/ARCHITECTURE-ANALYSIS.md) - Current state
+- [GitHub Issues](https://github.com/durapensa/claude-chrome-mcp/issues) - Active work
+
+**Need Help?** See [Troubleshooting](../docs/TROUBLESHOOTING.md)
 
 ## Overview
 

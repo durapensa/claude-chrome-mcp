@@ -148,3 +148,10 @@ discovery-data/
 # Claude Code local settings (explicit, redundant but clear)
 .claude/settings.local.json
 */.claude/settings.local.json
+
+# macOS system files
+.DS_Store
+*/.DS_Store
+
+# Local development files
+*.local.md

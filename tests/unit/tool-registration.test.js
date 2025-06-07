@@ -1,7 +1,15 @@
 const { MCPTestClient } = require('../helpers/mcp-test-client');
+const { PreFlightCheck } = require('../helpers/pre-flight-check');
 
 describe('Tool Registration', () => {
   let client;
+  
+  beforeAll(async () => {
+    // Fail-early check for unit test prerequisites
+    const preFlightCheck = new PreFlightCheck();
+    const result = await preFlightCheck.forUnitTests();
+    console.log(result.message);
+  });
   
   beforeEach(async () => {
     client = new MCPTestClient();
@@ -29,11 +37,11 @@ describe('Tool Registration', () => {
     const tabTools = response.tools.filter(t => t.name.includes('tab_'));
     
     const expectedTabTools = [
-      'mcp__claude-chrome-mcp__tab_create',
-      'mcp__claude-chrome-mcp__tab_list', 
-      'mcp__claude-chrome-mcp__tab_close',
-      'mcp__claude-chrome-mcp__tab_send_message',
-      'mcp__claude-chrome-mcp__tab_get_response'
+      'tab_create',
+      'tab_list', 
+      'tab_close',
+      'tab_send_message',
+      'tab_get_response'
     ];
     
     for (const expectedTool of expectedTabTools) {
@@ -50,8 +58,8 @@ describe('Tool Registration', () => {
     const systemTools = response.tools.filter(t => t.name.includes('system_'));
     
     const expectedSystemTools = [
-      'mcp__claude-chrome-mcp__system_health',
-      'mcp__claude-chrome-mcp__system_get_extension_logs'
+      'system_health',
+      'system_get_extension_logs'
     ];
     
     for (const expectedTool of expectedSystemTools) {
@@ -67,8 +75,8 @@ describe('Tool Registration', () => {
     const apiTools = response.tools.filter(t => t.name.includes('api_'));
     
     const expectedApiTools = [
-      'mcp__claude-chrome-mcp__api_list_conversations',
-      'mcp__claude-chrome-mcp__api_get_conversation_metadata'
+      'api_list_conversations',
+      'api_get_conversation_metadata'
     ];
     
     for (const expectedTool of expectedApiTools) {

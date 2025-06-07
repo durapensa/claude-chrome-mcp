@@ -1,4 +1,5 @@
-# Claude Chrome MCP TypeScript Types Documentation
+# Claude Chrome MCP: TypeScript Types
+## TypeScript Types Documentation
 
 This document provides a comprehensive overview of all TypeScript types available in the Claude Chrome MCP project.
 

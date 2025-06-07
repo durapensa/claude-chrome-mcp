@@ -69,16 +69,16 @@ In Claude Desktop, you can now use natural language commands like:
 |-------|-------------|
 | [**Architecture Analysis**](docs/ARCHITECTURE-ANALYSIS.md) | Critical issues and improvement roadmap |
 | [**Architecture**](docs/ARCHITECTURE.md) | System design and components |
-| [**Problem Resolution**](claude/problem-resolution.md) | Complete troubleshooting and timeout resolution |
-| [**Development Workflows**](claude/development-workflows.md) | Code changes, testing, and development procedures |
+| [**Troubleshooting**](CLAUDE.md#troubleshooting) | Complete troubleshooting and timeout resolution |
+| [**Development Workflows**](CLAUDE.md#development-workflow) | Code changes, testing, and development procedures |
 | [**TypeScript**](docs/TYPESCRIPT.md) | Type definitions and development |
-| [**Restart Capability**](docs/RESTART-CAPABILITY.md) | MCP lifecycle management |
+| [**CLI Tools**](docs/CLI-TROUBLESHOOTING.md) | Command-line interface and setup |
 | [**Event Architecture**](docs/event-driven-architecture-diagram.md) | Visual system diagrams |
 
 ## Project Resources
 
 - [**MCP Configuration**](CLAUDE.md) - Quick commands and setup
-- [**Changelog**](CHANGELOG.md) - Release history  
+- [**GitHub Releases**](https://github.com/durapensa/claude-chrome-mcp/releases) - Release history  
 - [**GitHub Issue Script**](docs/create-claude-code-issue.sh) - Claude Code integration utilities
 
 ### CLI Tool (Optional)

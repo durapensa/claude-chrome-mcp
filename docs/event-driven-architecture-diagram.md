@@ -1,4 +1,5 @@
-# Event-Driven Completion Detection Architecture
+# Claude Chrome MCP: Event-Driven Architecture
+## Event-Driven Completion Detection System
 
 ## System Overview Diagram
 
@@ -220,7 +221,7 @@ DOM Events Detected by ConversationObserver:
 ## Related Documentation
 
 - [**Architecture**](ARCHITECTURE.md) - Complete system design overview
-- [**Problem Resolution**](../claude/problem-resolution.md) - Complete debugging procedures for async operations and network issues
+- [**Troubleshooting**](../CLAUDE.md#troubleshooting) - Complete debugging procedures for async operations and network issues
 
 ---
 

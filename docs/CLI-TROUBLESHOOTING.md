@@ -1,4 +1,5 @@
-# Universal MCP CLI - Troubleshooting
+# Claude Chrome MCP: CLI Tools
+## Universal MCP CLI Troubleshooting
 
 ## Common Issues
 

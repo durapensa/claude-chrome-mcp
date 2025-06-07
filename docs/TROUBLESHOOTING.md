@@ -1,21 +1,26 @@
-# Troubleshooting Guide
+# Claude Chrome MCP: Troubleshooting
+## Quick Reference Guide
 
-**⚠️ This file has been reorganized for better decision tree flow.**
+**For complete troubleshooting workflows, see [CLAUDE.md](../CLAUDE.md) TROUBLESHOOTING section.**
 
-**For complete problem resolution workflows, see:**
-[Problem Resolution](../claude/problem-resolution.md)
+## Quick Reference - Most Common Issues
 
-This includes:
-- Complete MCP timeout resolution (4-step systematic process)
-- Connection issue diagnostics (WebSocket relay problems)
-- Operation failure troubleshooting (operationId, forwarding, notifications)
-- Diagnostic tool selection by issue type
-- Logging and debugging procedures
+**MCP tools timeout:**
+1. `mcp chrome_reload_extension` (wait 5 seconds)
+2. `mcp system_health` 
+3. Request user manually reload extension at chrome://extensions/
 
-**For development-specific troubleshooting, see:**
-[Development Workflows](../claude/development-workflows.md)
+**Operations hang or don't complete:**
+1. Verify target tab is valid/active
+2. Check operation state/content script injection
+3. Close target tab and open new Claude.ai tab (DOM observer detached)
 
-**Quick Reference - Most Common Issues:**
-- **MCP tools timeout**: `mcp chrome_reload_extension` (wait 5 seconds)
-- **Relay not connected**: `mcp system_health` → follow problem resolution steps
-- **After extension reload**: Close old tabs, create fresh ones
+**Need diagnostics:**
+- `system_health` → Monitor network → Execute → Check logs → Stop monitoring
+- Enable debug mode: `system_enable_extension_debug_mode` → `system_get_extension_logs`
+
+## Component-Specific Issues
+
+**CLI-specific troubleshooting:** See [CLI-TROUBLESHOOTING.md](CLI-TROUBLESHOOTING.md)
+
+**Test-related issues:** See [tests/README.md](../tests/README.md)

@@ -1,28 +1,53 @@
-# Claude Chrome MCP Architecture
+# Claude Chrome MCP: Architecture
+## System Design and Components
+
+## Quick Navigation
+**Related Documentation:**
+- [CLAUDE.md](../CLAUDE.md) - Commands and workflows
+- [Architecture Analysis](ARCHITECTURE-ANALYSIS.md) - Current state analysis
+- [GitHub Issues](https://github.com/durapensa/claude-chrome-mcp/issues) - Active work
+
+**Need Help?** See [Troubleshooting](TROUBLESHOOTING.md)
 
 ## Overview
 
-Claude Chrome MCP enables multiple AI agents (Claude Code, Claude Desktop, Cursor, etc.) to control Chrome browsers simultaneously through a clean, event-driven architecture. The system uses Chrome's offscreen documents API for persistent WebSocket connections and a lightweight message relay for routing, with all coordination logic residing in the Chrome extension.
+Claude Chrome MCP enables multiple AI agents (Claude Code, Claude Desktop, Cursor, etc.) to control Chrome browsers simultaneously through a clean, event-driven architecture. This document describes the **stable system design principles** and core patterns.
+
+**For current state analysis, issues, and evidence-based findings:** See [Architecture Analysis](ARCHITECTURE-ANALYSIS.md)
 
 ## Core Architecture Principles
 
+**Design Philosophy:**
 1. **MCP Servers are Isolated** - Each server operates independently, unaware of others
 2. **Relay is Stateless** - Pure message router with no business logic
 3. **Extension is the Brain** - All coordination, locking, and conflict resolution
 4. **Persistent Connections** - Offscreen documents maintain WebSocket without keepalives
 5. **Event-Driven** - No polling, pure push-based messaging
 6. **Protocol-Compliant** - Uses MCP protocol's clientInfo for identification
-7. **Async Operations** - Long-running operations return immediately with tracking (via OperationManager)
+7. **Async Operations** - Long-running operations return immediately with tracking
+
+## MCP Tools Ecosystem
+
+**32 Tools Across 4 Domains:**
+- **System Tools (7)**: `system_health`, `system_wait_operation`, debug and relay management
+- **Chrome Tools (9)**: `chrome_debug_attach`, `chrome_execute_script`, network monitoring
+- **Tab Tools (11)**: `tab_create`, `tab_send_message`, response forwarding, content extraction
+- **API Tools (5)**: `api_list_conversations`, `api_delete_conversations`, search and metadata
 
 ## Async Operation Pattern
 
-**Implemented in**: `api_delete_conversations` (mcp-server/src/tools/api-tools.js)  
-**TODO**: Review other bulk operations for similar async treatment:
-- Batch operations that might timeout (e.g., bulk tab operations)
-- Long-running API calls (e.g., conversation exports)  
-- Multi-step operations with progress tracking
+**Design Principle**: Long-running operations return immediately with operation tracking.
 
-**Pattern**: Tool returns `{ success: true, operationId, status: "async_queued" }` immediately, then uses `OperationManager` for background processing and `system_wait_operation` for completion tracking.
+**Implementation Pattern**: 
+```javascript
+// Tool returns immediately
+{ success: true, operationId: "op_delete_conversations_1234", status: "async_queued" }
+
+// Background processing via OperationManager
+// Completion tracking via system_wait_operation
+```
+
+**Used by**: `api_delete_conversations`, suitable for any bulk or long-running operations.
 
 ## System Architecture
 
@@ -297,7 +322,7 @@ await chrome.storage.local.set({
 ## Next Architecture Tasks
 
 ### Remove Backward Compatibility
-- System is now fully WebSocket-based (v2.6.0)
+- System uses WebSocket-based communication
 - Old message formats and HTTP polling code can be removed
 - Simplify relay by removing legacy format support
 - Clean up any temporary compatibility layers
@@ -335,6 +360,11 @@ await chrome.storage.local.set({
 
 ## Related Documentation
 
-- [Architecture Analysis](ARCHITECTURE-ANALYSIS.md) - Critical issues and improvement roadmap
-- [Test Suite V3 Design](TEST-SUITE-V3-DESIGN.md) - New test architecture design
+**For Implementation Details:**
+- [Architecture Analysis](ARCHITECTURE-ANALYSIS.md) - Current state, critical issues, evidence-based findings
+- [Test Suite Documentation](../tests/README.md) - Test architecture and usage
 - [TypeScript Types](TYPESCRIPT.md) - API type definitions
+
+**For Operations:**
+- [CLAUDE.md](../CLAUDE.md) - Commands, workflows, troubleshooting
+- [GitHub Issues](https://github.com/durapensa/claude-chrome-mcp/issues) - Active development work
