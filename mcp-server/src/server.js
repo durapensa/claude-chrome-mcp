@@ -88,7 +88,7 @@ class ChromeMCPServer {
       
       // Check version compatibility
       if (clientVersion && !config.isVersionCompatible(clientVersion)) {
-        this.logger.warn('Client version mismatch', {
+        this.debug.warn('Client version mismatch', {
           clientVersion,
           serverVersion: config.VERSION,
           message: config.getVersionMismatchMessage('MCP Client', clientVersion)
