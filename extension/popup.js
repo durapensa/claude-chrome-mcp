@@ -114,7 +114,7 @@ function updatePopupUI(health) {
               <div class="client-icon">${icon}</div>
               <div>
                 <div class="client-name" title="${displayName}">${displayName}</div>
-                <div class="client-id">${client.id}</div>
+                <div class="client-id">${client.id}${client.type === 'mcp-client' && client.pid ? ` • PID: ${client.pid}` : ''}</div>
               </div>
             </div>
             <div class="client-type-badge ${client.type}">${client.type || 'unknown'}</div>
@@ -124,6 +124,10 @@ function updatePopupUI(health) {
               <div class="stat-label">Connected</div>
               <div class="stat-value">${formatDuration(Date.now() - client.connectedAt)}</div>
             </div>
+            ${client.version ? `<div class="stat-item">
+              <div class="stat-label">Version</div>
+              <div class="stat-value">${client.version}</div>
+            </div>` : ''}
           </div>
         </div>
       `}).join('');

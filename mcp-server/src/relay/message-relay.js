@@ -82,6 +82,8 @@ class MessageRelay extends EventEmitter {
               id,
               type: client.info.type,
               name: client.info.name,
+              pid: client.info.pid || null,
+              version: client.info.version || null,
               connectedFor: Date.now() - client.info.connectedAt,
               isRelayHost: client.info.isRelayHost || false,
               lastPingAt: client.info.lastPingAt,
@@ -221,11 +223,15 @@ class MessageRelay extends EventEmitter {
       client.info.type = message.clientType || 'unknown';
       client.info.name = message.name || fromClientId;
       client.info.isRelayHost = message.isRelayHost || false;
+      client.info.pid = message.pid || null;
+      client.info.version = message.version || null;
       this.logger.info('Client identified', { 
         fromClientId, 
         clientType: client.info.type, 
         clientName: client.info.name,
-        isRelayHost: client.info.isRelayHost 
+        isRelayHost: client.info.isRelayHost,
+        pid: client.info.pid,
+        version: client.info.version
       });
       this.broadcastClientList();
       return;
@@ -315,6 +321,8 @@ class MessageRelay extends EventEmitter {
       id: id,
       type: client.info.type,
       name: client.info.name,
+      pid: client.info.pid || null,
+      version: client.info.version || null,
       connectedAt: client.info.connectedAt,
       isRelayHost: client.info.isRelayHost || false
     }));

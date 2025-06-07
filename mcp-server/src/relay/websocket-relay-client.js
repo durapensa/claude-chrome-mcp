@@ -42,7 +42,8 @@ class RelayClient extends EventEmitter {
             name: this.clientInfo.name,
             capabilities: this.clientInfo.capabilities,
             isRelayHost: this.clientInfo.isRelayHost || false,
-            version: config.VERSION,
+            pid: process.pid,
+            version: this.clientInfo.version || config.VERSION,
             component: config.COMPONENT_NAME
           });
           
