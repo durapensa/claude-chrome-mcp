@@ -410,6 +410,67 @@ MCP Client → MCP Server → Auto-Election Relay → Modular WebSocket → Offs
 - **Cleanup Order Dependencies**: Debugger → Operations → Content Scripts → Network Monitoring
 - **State Synchronization**: Prevent server/extension state drift
 
+#### **State Fragmentation Analysis (Issue #2)**
+
+**Critical Finding**: 12+ disconnected state management systems across WebSocket boundary create severe coordination problems.
+
+**Complete State Inventory**:
+
+**CRITICAL STATE** (Lost on extension restart - breaks functionality):
+1. **debuggerSessions** (`relay-client.js:26, 296-527`) - Chrome debugger attachment tracking
+   - Risk: Orphaned debugger sessions prevent tab operations
+   - Impact: Permanent tab operation failures until manual cleanup
+
+2. **operationLock.locks** (`tab-operation-lock.js:5, 28-84`) - Tab operation mutual exclusion
+   - Risk: Deadlocks preventing concurrent operations  
+   - Impact: Permanent tab locks requiring extension reload
+
+3. **capturedRequests** (`relay-client.js:315-385`) - Network monitoring state
+   - Risk: Debugger conflicts and resource leaks
+   - Impact: Network monitoring failures and session conflicts
+
+4. **injectedTabs** (`content-script-manager.js:7, 52-150`) - Content script injection tracking
+   - Risk: Double injection or missing scripts
+   - Impact: Broken message communication with Claude.ai
+
+**OPERATIONAL STATE** (Coordination issues):
+5. **operationRegistry** (`content-script-manager.js:86-371`) - Content script operation tracking
+   - Separate from server OperationManager with no consistency guarantee
+   - Impact: Lost operation tracking across WebSocket boundary
+
+6. **pendingRequests** (`relay-client.js:35, 216-1053`) - MCP request/response tracking
+   - Risk: Lost requests and response handling failures
+   - Impact: Hung operations and timeout errors
+
+7. **connectedClients** (`relay-client.js:25, 232-1000`) - Relay client state
+   - Risk: Incorrect client state tracking
+   - Impact: Communication failures and routing errors
+
+**RECOVERABLE STATE** (Degrades UX but self-heals):
+8. **messageQueue.queue** (`message-queue.js:5-55`) - Message buffering
+9. **connectionHealth** metrics (multiple files) - Connection statistics
+10. **injectionTimestamps** (`content-script-manager.js:8, 69-76`) - Navigation timing
+11. **lockTimeouts** (`tab-operation-lock.js:6, 36-54`) - Lock timeout management
+12. **offscreen.messageQueue** (`offscreen.js:19, 74-221`) - WebSocket message queue
+
+**Root Cause**: Extension uses 12+ separate in-memory state stores with no persistence or coordination. Extension crashes/reloads lose all state while browser resources (debugger sessions, content scripts) persist, creating dangerous inconsistencies.
+
+**State Synchronization Problem**:
+```javascript
+// Server: mcp-server/src/utils/operation-manager.js:30
+this.operations.set(operationId, operation);
+
+// Extension: extension/modules/content-script-manager.js:102  
+conversationObserver.operationRegistry.set(operationId, {...});
+// Two separate operation tracking systems with no sync!
+```
+
+**Recovery Requirements**:
+- **Critical State Persistence**: debuggerSessions, operationLocks, networkMonitoring, contentScripts
+- **Cross-boundary State Sync**: Unified OperationManager with extension coordination
+- **Extension Restart Recovery**: Verify and cleanup orphaned browser resources
+- **State Consistency Verification**: Detect and resolve state drift between components
+
 ### **Priority 3 (Configuration Centralization)**  
 **Issue #4**: Eliminate configuration fragmentation
 - **Critical Duplications**: WEBSOCKET_PORT, Claude.ai URLs, timeout values
