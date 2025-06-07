@@ -1,6 +1,6 @@
 {
   "name": "@claude-chrome-mcp/root",
-  "version": "2.6.1",
+  "version": "2.7.0",
   "description": "Claude Chrome MCP - Control Claude.ai browser tabs via MCP",
   "main": "mcp-server/src/server.js",
   "types": "shared/index.ts",

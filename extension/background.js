@@ -111,6 +111,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return false;
   }
   
+  // Handle any message with _from field (messages from other relay clients)
+  if (request._from) {
+    logger.debug('Message from relay client', { 
+      from: request._from, 
+      messageType: request.type,
+      hasId: !!request.id 
+    });
+    // Forward to relay client
+    if (relayClient) {
+      relayClient.handleRelayMessage(request);
+    }
+    return false;
+  }
+  
   if (request.type === 'offscreen_heartbeat') {
     // Acknowledge heartbeat from offscreen document
     return false;

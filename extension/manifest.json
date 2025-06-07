@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Claude Chrome MCP",
-  "version": "2.6.1",
+  "version": "2.7.0",
   "description": "Enable Claude Desktop to interact with claude.ai through MCP",
   "permissions": [
     "debugger",

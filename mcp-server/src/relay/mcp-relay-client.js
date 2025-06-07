@@ -1,10 +1,12 @@
+/**
+ * MCP Relay Client
+ * Handles MCP protocol over WebSocket relay transport
+ */
+
 const EventEmitter = require('events');
+const { AutoElectionRelay } = require('./relay-index');
 const { ErrorTracker } = require('../utils/error-tracker');
 const { createLogger } = require('../utils/logger');
-const { EmbeddedRelayManager } = require('./embedded-relay-manager');
-
-// MCP Relay Client for MCP server
-// Uses persistent WebSocket connection via relay for all communication
 
 class MCPRelayClient extends EventEmitter {
   constructor(clientInfo = {}, operationManager = null, notificationManager = null) {
@@ -12,123 +14,144 @@ class MCPRelayClient extends EventEmitter {
     this.clientInfo = clientInfo;
     this.operationManager = operationManager;
     this.notificationManager = notificationManager;
+    this.logger = createLogger('MCPRelayClient');
+    
+    // Connection state
     this.connected = false;
+    this.connectionState = 'disconnected';
+    this.lastSuccessfulConnection = null;
+    
+    // Request/response tracking
     this.requestCounter = 0;
     this.pendingRequests = new Map();
     
-    // Embedded relay manager handles election automatically
-    this.relayManager = null;
+    // Relay transport
+    this.relay = null;
     
-    // Connection state tracking
-    this.connectionState = 'disconnected'; // disconnected, connecting, connected, reconnecting
-    this.lastSuccessfulConnection = null;
-    
-    // Enhanced debugging and error tracking
+    // Error tracking
     this.errorTracker = new ErrorTracker();
-    this.logger = createLogger('RelayClient');
     
-    this.logger.info('Initializing WebSocket relay mode');
-    this.initializeRelayClient();
+    this.logger.info('Initializing MCP relay client');
   }
-
-  initializeRelayClient() {
-    this.relayManager = new EmbeddedRelayManager(this.clientInfo);
-    
-    // Handle relay events
-    this.relayManager.on('connected', () => {
-      this.logger.info('Connected to relay');
-      this.connected = true;
-      this.connectionState = 'connected';
-      this.lastSuccessfulConnection = Date.now();
-      this.emit('connected');
-    });
-    
-    this.relayManager.on('disconnected', () => {
-      this.logger.info('Disconnected from relay');
-      this.connected = false;
-      this.connectionState = 'disconnected';
-      this.emit('connection_lost');
-    });
-    
-    this.relayManager.on('message', (message) => {
-      this.handleRelayMessage(message);
-    });
-    
-    this.relayManager.on('relayClientConnected', (client) => {
-      this.logger.info('New client connected to relay', { clientName: client.name });
-    });
-    
-    this.relayManager.on('relayClientDisconnected', (clientId) => {
-      this.logger.info('Client disconnected from relay', { clientId });
-    });
-  }
-
-  handleRelayMessage(message) {
-    // Handle messages from relay - new format has _from injected
-    if (message._from) {
-      // Check if this is a response to one of our requests
-      if (message.id && this.pendingRequests.has(message.id)) {
-        const callback = this.pendingRequests.get(message.id);
-        this.pendingRequests.delete(message.id);
-        
-        // Extract the result from the response
-        if (message.type === 'error') {
-          callback(new Error(message.error || 'Unknown error'));
-        } else if (message.type === 'response' && message.result !== undefined) {
-          callback(null, message.result);
-        } else {
-          // Fallback to sending the whole message object if no result field
-          callback(null, message);
-        }
-        return;
-      }
-      
-      // Handle log notifications from extension
-      if (message.type === 'log_notification' && message.log) {
-        this.handleExtensionLog(message.log);
-        return;
-      }
-      
-      // Handle batched logs from extension
-      if (message.type === 'log_batch' && message.logs) {
-        message.logs.forEach(log => this.handleExtensionLog(log));
-        return;
-      }
-      
-      // Otherwise, emit the message for other handlers
-      this.emit('message', message);
-    }
-  }
-
-
+  
   async connect() {
     if (this.connectionState === 'connecting') {
       this.logger.warn('Connection already in progress');
       return;
     }
-
+    
     this.connectionState = 'connecting';
     
     try {
-      this.logger.info('Initializing embedded relay...');
-      await this.relayManager.initialize();
-      // Events will be handled by the relay manager listeners
+      // Initialize relay with auto-election
+      this.relay = new AutoElectionRelay(this.clientInfo);
       
-      const status = this.relayManager.getStatus();
-      if (status.isRelayHost) {
-        this.logger.info('Running as relay host');
-      } else {
-        this.logger.info('Connected to existing relay');
-      }
+      // Handle relay events
+      this.relay.on('connected', (info) => {
+        this.logger.info('Connected to relay', info);
+        this.connected = true;
+        this.connectionState = 'connected';
+        this.lastSuccessfulConnection = Date.now();
+        this.emit('connected');
+      });
+      
+      this.relay.on('disconnected', (reason) => {
+        this.logger.info('Disconnected from relay', reason);
+        this.connected = false;
+        this.connectionState = 'disconnected';
+        this.emit('connection_lost');
+      });
+      
+      this.relay.on('message', (message) => {
+        this.handleRelayMessage(message);
+      });
+      
+      this.relay.on('relayClientConnected', (client) => {
+        this.logger.info('New client connected to relay', { 
+          clientName: client.name,
+          clientType: client.type 
+        });
+      });
+      
+      this.relay.on('relayClientDisconnected', (clientId) => {
+        this.logger.info('Client disconnected from relay', { clientId });
+      });
+      
+      // Initialize the relay
+      await this.relay.initialize();
+      
+      const status = this.relay.getStatus();
+      this.logger.info('Relay initialized', {
+        isHost: status.isRelayHost,
+        connected: status.relayConnected
+      });
+      
     } catch (error) {
-      this.logger.error('Failed to initialize relay', error);
+      this.logger.error('Failed to connect', error);
       this.connectionState = 'disconnected';
       throw error;
     }
   }
-
-
-
+  
+  handleRelayMessage(message) {
+    // Debug log all messages
+    this.logger.debug('handleRelayMessage called', {
+      hasFrom: !!message._from,
+      messageType: message.type,
+      messageId: message.id,
+      messageKeys: Object.keys(message)
+    });
+    
+    // Check if this is a response to one of our requests FIRST
+    // Responses don't need _from since they're correlated by request ID
+    if (message.id && this.pendingRequests.has(message.id)) {
+      const { resolve, reject, timeoutId } = this.pendingRequests.get(message.id);
+      this.pendingRequests.delete(message.id);
+      clearTimeout(timeoutId);
+      
+      // Handle response
+      if (message.type === 'error') {
+        reject(new Error(message.error || 'Unknown error'));
+      } else if (message.type === 'response' && message.result !== undefined) {
+        resolve(message.result);
+      } else {
+        // Fallback to sending the whole message if no result field
+        resolve(message);
+      }
+      return;
+    }
+    
+    // For non-response messages (requests, notifications), _from is required
+    if (!message._from) {
+      this.logger.warn('Received message without _from field', { 
+        messageType: message.type,
+        messageKeys: Object.keys(message)
+      });
+      return;
+    }
+    
+    // Handle log notifications from extension
+    if (message.type === 'log_notification' && message.log) {
+      this.handleExtensionLog(message.log);
+      return;
+    }
+    
+    // Handle batched logs from extension
+    if (message.type === 'log_batch' && message.logs) {
+      message.logs.forEach(log => this.handleExtensionLog(log));
+      return;
+    }
+    
+    // Handle operation milestones
+    if (message.type === 'operation_milestone') {
+      this.handleOperationMilestone(message);
+      return;
+    }
+    
+    // Emit other messages for application handling
+    this.emit('message', message);
+  }
+  
   async handleOperationMilestone(message) {
     const { operationId, milestone, timestamp, tabId, ...data } = message;
     
@@ -144,100 +167,10 @@ class MCPRelayClient extends EventEmitter {
       await this.notificationManager.sendProgress(operationId, milestone, { tabId, ...data });
     }
   }
-
-  async sendRequest(type, params = {}) {
-    // Handle relay mode only
-    if (!this.relayManager || !this.relayManager.client || !this.relayManager.client.isConnected) {
-      if (this.connectionState === 'disconnected') {
-        this.logger.info('Attempting to reconnect to relay for request');
-        await this.connect();
-      }
-      
-      if (!this.relayManager.client || !this.relayManager.client.isConnected) {
-        throw new Error('Not connected to relay and reconnection failed');
-      }
-    }
-    
-    const requestId = `req-${++this.requestCounter}`;
-    
-    return new Promise((resolve, reject) => {
-      const timeoutMs = 10000;
-      
-      this.pendingRequests.set(requestId, (error, response) => {
-        clearTimeout(timeoutId);
-        if (error) {
-          reject(error);
-        } else {
-          resolve(response);
-        }
-      });
-      
-      // Send via relay - broadcast to extension clients
-      this.relayManager.client.multicast('extension', {
-        id: requestId,
-        type,
-        params,
-        timestamp: Date.now()
-      });
-      
-      const timeoutId = setTimeout(() => {
-        if (this.pendingRequests.has(requestId)) {
-          this.pendingRequests.delete(requestId);
-          reject(new Error(`Request timeout after ${timeoutMs}ms (requestId: ${requestId}, type: ${type})`));
-        }
-      }, timeoutMs);
-    });
-  }
-
-  async gracefulShutdown() {
-    this.logger.info('Initiating graceful shutdown');
-    this.connectionState = 'shutting_down';
-    
-    // Close connection
-    await this.close();
-    
-    // Force exit immediately
-    process.exit(0);
-  }
-
-  async close() {
-    this.connectionState = 'shutting_down';
-    
-    if (this.relayManager) {
-      await this.relayManager.stop();
-      this.relayManager = null;
-    }
-    
-    this.connected = false;
-    
-    // Clear pending requests
-    for (const [requestId, callback] of this.pendingRequests) {
-      callback(new Error('Client shutting down'));
-    }
-    this.pendingRequests.clear();
-  }
-
-  async disconnect() {
-    // Alias for close() to match expected interface
-    return this.close();
-  }
-
-  getConnectionStats() {
-    const relayStatus = this.relayManager ? this.relayManager.getStatus() : null;
-    return {
-      state: this.connectionState,
-      lastSuccessfulConnection: this.lastSuccessfulConnection,
-      pendingRequests: this.pendingRequests.size,
-      relayConnected: this.connected,
-      relayMode: true,
-      ...relayStatus
-    };
-  }
   
-  // Handle extension log notifications
   async handleExtensionLog(logEntry) {
     try {
-      // Forward to NotificationManager using standard MCP logging notification
+      // Forward to NotificationManager using standard MCP logging
       if (this.notificationManager) {
         const { level, component, message, data } = logEntry;
         
@@ -253,7 +186,7 @@ class MCPRelayClient extends EventEmitter {
             source: 'extension',
             component
           },
-          `extension.${component}` // Logger name format: extension.{component}
+          `extension.${component}` // Logger name format
         );
       }
       
@@ -261,7 +194,7 @@ class MCPRelayClient extends EventEmitter {
       const { level, component, message, data } = logEntry;
       const prefix = `[Extension:${component}]`;
       
-      // Map extension log levels to server logger methods
+      // Map to local logger
       switch (level) {
         case 'ERROR':
           this.logger.error(`${prefix} ${message}`, null, data);
@@ -286,7 +219,6 @@ class MCPRelayClient extends EventEmitter {
     }
   }
   
-  // Map extension log levels to MCP standard log levels
   mapToMcpLogLevel(extensionLevel) {
     // MCP levels: debug, info, notice, warning, error, critical, alert, emergency
     const levelMap = {
@@ -299,7 +231,81 @@ class MCPRelayClient extends EventEmitter {
     
     return levelMap[extensionLevel] || 'info';
   }
+  
+  async sendRequest(type, params = {}) {
+    if (!this.relay || !this.connected) {
+      throw new Error('Not connected to relay');
+    }
+    
+    const requestId = `req-${++this.requestCounter}`;
+    const timeoutMs = 10000;
+    
+    return new Promise((resolve, reject) => {
+      // Set up timeout
+      const timeoutId = setTimeout(() => {
+        this.pendingRequests.delete(requestId);
+        reject(new Error(`Request timeout after ${timeoutMs}ms (requestId: ${requestId}, type: ${type})`));
+      }, timeoutMs);
+      
+      // Store request handler
+      this.pendingRequests.set(requestId, { resolve, reject, timeoutId });
+      
+      // Send via relay - multicast to all extension clients
+      this.relay.multicast('extension', {
+        id: requestId,
+        type,
+        params,
+        timestamp: Date.now()
+      });
+    });
+  }
+  
+  async gracefulShutdown() {
+    this.logger.info('Initiating graceful shutdown');
+    this.connectionState = 'shutting_down';
+    
+    // Clear pending requests
+    for (const [requestId, { reject, timeoutId }] of this.pendingRequests) {
+      clearTimeout(timeoutId);
+      reject(new Error('Client shutting down'));
+    }
+    this.pendingRequests.clear();
+    
+    // Close relay connection
+    await this.close();
+    
+    // Force exit
+    process.exit(0);
+  }
+  
+  async close() {
+    this.connectionState = 'shutting_down';
+    
+    if (this.relay) {
+      await this.relay.stop();
+      this.relay = null;
+    }
+    
+    this.connected = false;
+  }
+  
+  async disconnect() {
+    // Alias for close() for compatibility
+    return this.close();
+  }
+  
+  getConnectionStats() {
+    const relayStatus = this.relay ? this.relay.getStatus() : null;
+    
+    return {
+      state: this.connectionState,
+      lastSuccessfulConnection: this.lastSuccessfulConnection,
+      pendingRequests: this.pendingRequests.size,
+      relayConnected: this.connected,
+      relayMode: true,
+      ...relayStatus
+    };
+  }
 }
-
 
 module.exports = { MCPRelayClient };

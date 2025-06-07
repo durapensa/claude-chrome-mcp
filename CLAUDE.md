@@ -18,6 +18,7 @@
   - docs for stable knowledge, do not duplicate knowledge across docs
 6. WHEN you encounter new, obsolte, or changed workflows, or find improvements to existing workflows
    THEN document them here in CLAUDE.md following these CRITICAL RULES
+7. Don't put code examples in documentation files
 
 ## SESSION CONTINUITY
 
