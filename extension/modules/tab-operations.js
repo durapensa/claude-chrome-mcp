@@ -86,21 +86,50 @@ export const tabOperationMethods = {
     }
     
     try {
-      await chrome.tabs.remove(tabId);
-      console.log(`CCM Extension: Closed tab ${tabId}`);
-      
-      // Clean up any associated data
-      this.operationLock.releaseLock(tabId);
-      if (this.contentScriptManager) {
-        this.contentScriptManager.removeTab(tabId);
+      // Use centralized cleanup method with proper dependency ordering
+      if (typeof this.cleanupTabResources === 'function') {
+        const result = await this.cleanupTabResources(tabId, { 
+          closeTab: true, // Include tab closure in centralized cleanup
+          reason: 'closeClaudeTab_command' 
+        });
+        
+        if (result.success) {
+          console.log(`CCM Extension: Successfully closed tab ${tabId} with proper cleanup`, { 
+            steps: result.steps 
+          });
+          return { success: true, cleanupSteps: result.steps };
+        } else {
+          console.error(`CCM Extension: Tab cleanup had errors for tab ${tabId}`, { 
+            steps: result.steps, 
+            errors: result.errors 
+          });
+          return { 
+            success: result.errors.length === 0, 
+            error: result.errors.length > 0 ? `Cleanup errors: ${result.errors.map(e => e.error).join(', ')}` : undefined,
+            cleanupSteps: result.steps,
+            cleanupErrors: result.errors
+          };
+        }
+      } else {
+        // Fallback to old method if centralized cleanup not available
+        console.warn(`CCM Extension: Using fallback cleanup for tab ${tabId}`);
+        
+        await chrome.tabs.remove(tabId);
+        console.log(`CCM Extension: Closed tab ${tabId}`);
+        
+        // Clean up any associated data
+        this.operationLock.releaseLock(tabId);
+        if (this.contentScriptManager) {
+          this.contentScriptManager.removeTab(tabId);
+        }
+        
+        // Clean up debugger session if exists
+        if (this.debuggerSessions && this.debuggerSessions.has(tabId)) {
+          await this.detachDebugger(tabId);
+        }
+        
+        return { success: true };
       }
-      
-      // Clean up debugger session if exists
-      if (this.debuggerSessions && this.debuggerSessions.has(tabId)) {
-        await this.detachDebugger(tabId);
-      }
-      
-      return { success: true };
     } catch (error) {
       console.error(`CCM Extension: Failed to close tab ${tabId}:`, error);
       return { success: false, error: error.message };

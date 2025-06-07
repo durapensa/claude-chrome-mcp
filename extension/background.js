@@ -272,17 +272,30 @@ setTimeout(async () => {
   }
 }, 100); // Minimal delay for service worker stability
 
-// Handle tab cleanup
+// Handle tab cleanup with proper dependency ordering
 chrome.tabs.onRemoved.addListener(async (tabId) => {
-  if (contentScriptManager) {
-    contentScriptManager.removeTab(tabId);
-  }
-  if (relayClient && relayClient.operationLock) {
-    relayClient.operationLock.releaseLock(tabId);
-  }
-  // Clean up debugger session if exists
-  if (relayClient && relayClient.debuggerSessions && relayClient.debuggerSessions.has(tabId)) {
-    await relayClient.detachDebugger(tabId);
+  if (relayClient && typeof relayClient.cleanupTabResources === 'function') {
+    // Use centralized cleanup method with proper ordering
+    try {
+      await relayClient.cleanupTabResources(tabId, { 
+        closeTab: false, // Tab already closed by Chrome
+        reason: 'tab_removed_event' 
+      });
+    } catch (error) {
+      logger.error(`Tab cleanup failed for tab ${tabId}`, { error: error.message });
+    }
+  } else {
+    // Fallback to old method if centralized cleanup not available
+    logger.warn(`Relaying to fallback cleanup for tab ${tabId}`);
+    if (contentScriptManager) {
+      contentScriptManager.removeTab(tabId);
+    }
+    if (relayClient && relayClient.operationLock) {
+      relayClient.operationLock.releaseLock(tabId);
+    }
+    if (relayClient && relayClient.debuggerSessions && relayClient.debuggerSessions.has(tabId)) {
+      await relayClient.detachDebugger(tabId);
+    }
   }
 });
 

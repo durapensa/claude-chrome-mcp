@@ -49,6 +49,72 @@ The system provides **32 MCP tools** organized across clean domain boundaries:
 - **Operation Management**: Complex tools use async operation tracking with persistence
 - **Type Safety**: Full Zod schema validation and TypeScript definitions in `shared/mcp-tool-types.ts`
 
+## Infrastructure Improvements
+
+### File-Based Logging (v2.7.0+)
+
+**Implementation**: Winston-based logging with PID-specific file naming to support multiple daemon instances.
+
+**Key Features**:
+- **PID-specific naming**: `mcp-cli-daemon-PID-{PID}.log` enables concurrent daemon instances
+- **Log rotation**: 10MB max files, 5 file rotation to prevent disk bloat
+- **Dual transport**: JSON logs to files, human-readable console output for warnings/errors
+- **Exception tracking**: Separate files for uncaught exceptions and promise rejections
+- **Runtime substitution**: `${PID}` placeholder preserved in config, substituted at startup
+
+**File Locations**:
+- CLI daemon: `~/.local/share/mcp/logs/mcp-cli-daemon-PID-{PID}.log`
+- MCP server: `~/.claude-chrome-mcp/logs/claude-chrome-mcp-server-PID-{PID}.log`
+- Exceptions: `daemon-exceptions.log`, `daemon-rejections.log`
+
+**Configuration**: `daemon.logFile` and `daemon.logLevel` in CLI config, with config loader preserving `${PID}` for runtime substitution.
+
+### Passive Connection Health Monitoring (v2.7.0+)
+
+**Implementation**: Replaced active ping/pong system with zero-overhead passive monitoring via existing message flow.
+
+**Architecture Change**:
+- **Before**: Active ping/pong every 30s with network overhead
+- **After**: Health tracking piggybacked on normal message processing
+
+**Metrics Tracked**:
+- Connection status: `connected`, `connectedAt`, `lastActivityAt`
+- Traffic counters: `messagesReceived`, `messagesSent`
+- Reliability: `reconnectCount`, `queueLength`
+- Derived metrics: `connectionDuration`, `idleTime`
+
+**Health Status Categories**:
+- **Active**: <5s since last activity
+- **Idle (seconds)**: 5-30s idle
+- **Idle (minutes)**: 30s+ idle
+
+**User Experience**: Real-time health indicators in popup with activity status, message count badges (↓↑), and reconnection tracking.
+
+**Benefits**: Zero network overhead, richer metrics, real-time visibility, passive detection via normal operations.
+
+### Message Counting for Popup Health Stats (v2.7.0+)
+
+**Implementation**: Real-time message traffic counters displayed in extension popup for operational visibility.
+
+**Counter Tracking**:
+- **Message reception**: `this.connectionHealth.messagesReceived++` in both relay-client.js and offscreen.js
+- **Message transmission**: `this.connectionHealth.messagesSent++` in both relay-client.js and offscreen.js  
+- **Activity tracking**: Both counters update `lastActivityAt` timestamp for idle time calculation
+
+**Popup Display Logic**:
+- Shows message counts only when significant: `if (messagesReceived > 0 || messagesSent > 0)`
+- Format: `↓{received} ↑{sent}` (e.g., "↓15 ↑8") 
+- Displayed alongside activity status and reconnection count
+- Updates in real-time via health status messages
+
+**User Experience**:
+- Provides immediate feedback on connection activity
+- Helps distinguish between connection problems and normal idle state
+- Visual indicators: ↓ for received, ↑ for sent messages
+- Integrated with existing health status display in popup
+
+**Technical Benefits**: Enables users to quickly assess connection health, distinguish active vs idle connections, and verify message flow without requiring debug tools.
+
 ## Key Strengths
 
 ✅ **Modular Tool Organization**: Clean separation of concerns across domains  

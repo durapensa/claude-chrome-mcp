@@ -34,6 +34,9 @@ THEN: Document them here in CLAUDE.md following these CRITICAL RULES
 WHEN: Documenting in any file
 THEN: Don't include code examples (reference file paths instead)
 
+WHEN: Writing any documentation, issues, or code
+THEN: NEVER use emoji or pictogram glyphs - remove them when found
+
 WHEN: Ready to commit changes
 THEN: Follow this sequence:
   1. Run `git status` to review changes
@@ -179,6 +182,32 @@ mcp tab_list                         # Note any orphaned tabs
 # Close each orphaned tab, then create fresh ones
 ```
 
+### Inactivity Disconnection Investigation (Issue #7)
+
+WHEN: Extension disconnects after inactivity
+THEN: Collect investigation data:
+
+```bash
+# 1. Document the gap
+mcp daemon status                    # Note uptime vs extension startup
+mcp system_health                    # Capture connection status
+
+# 2. Check for patterns
+mcp system_get_extension_logs --limit 50
+# LOOK FOR: Time gap between last activity and restart
+
+# 3. Record timeline
+# Note: Time of last known working state
+# Note: Time of disconnection discovery
+# Note: Manual intervention required (reload at chrome://extensions/)
+
+# 4. Update GitHub Issue #7 with findings:
+# - Duration of inactivity before disconnection
+# - Whether recovery was automatic or manual
+# - Any error patterns in logs
+# - Browser idle state during disconnection
+```
+
 ## DIAGNOSTIC RECIPES
 
 ### Network Monitoring Pattern
@@ -209,6 +238,32 @@ THEN: Check these known bottlenecks:
 - Tab creation: 2-3 seconds (normal)
 - Response retrieval: 1-5 seconds (depends on Claude)
 - If slower → Enable debug logs and check for errors
+
+### Log File Access
+
+WHEN: Need persistent logs for debugging
+THEN: Access log files at these locations:
+```bash
+# CLI daemon logs (check actual path with 'mcp daemon status')
+~/.local/share/mcp/logs/mcp-cli-daemon-PID-{PID}.log
+
+# MCP server logs  
+~/.claude-chrome-mcp/logs/claude-chrome-mcp-server-PID-{PID}.log
+
+# Exception logs
+daemon-exceptions.log
+daemon-rejections.log
+```
+
+**Commands for log access**:
+```bash
+# Check daemon status (shows log file path and size)
+mcp daemon status
+
+# Extension debug logs
+mcp system_enable_extension_debug_mode
+mcp system_get_extension_logs --limit 50
+```
 
 ## ARCHITECTURE GOTCHAS
 

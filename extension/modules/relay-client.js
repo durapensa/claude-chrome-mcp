@@ -1226,6 +1226,151 @@ export class ExtensionRelayClient {
       this.logger.error('Failed to send log to MCP', { error: error.message });
     }
   }
+
+  // Centralized tab resource cleanup with proper dependency ordering
+  async cleanupTabResources(tabId, options = {}) {
+    const { closeTab = false, reason = 'cleanup' } = options;
+    const cleanupSteps = [];
+    let errors = [];
+
+    this.logger.debug(`Starting tab resource cleanup for tab ${tabId}`, { reason, closeTab });
+
+    try {
+      // Step 1: Stop network monitoring (if active)
+      if (this.capturedRequests && this.capturedRequests.has(tabId)) {
+        try {
+          // Stop network monitoring by disabling Network events
+          if (this.debuggerSessions.has(tabId)) {
+            await new Promise((resolve, reject) => {
+              chrome.debugger.sendCommand({ tabId }, 'Network.disable', {}, () => {
+                if (chrome.runtime.lastError) {
+                  // Non-critical error, continue cleanup
+                  this.logger.warn(`Failed to disable network monitoring for tab ${tabId}: ${chrome.runtime.lastError.message}`);
+                } else {
+                  this.logger.debug(`Network monitoring stopped for tab ${tabId}`);
+                }
+                resolve();
+              });
+            });
+          }
+          
+          // Clean up captured requests
+          this.capturedRequests.delete(tabId);
+          cleanupSteps.push('network_monitoring_stopped');
+        } catch (error) {
+          errors.push({ step: 'network_monitoring', error: error.message });
+          this.logger.warn(`Network monitoring cleanup failed for tab ${tabId}`, { error: error.message });
+        }
+      }
+
+      // Step 2: Wait for pending operations to complete
+      if (this.operationLock) {
+        try {
+          const lockInfo = this.operationLock.getLockInfo(tabId);
+          if (lockInfo) {
+            this.logger.debug(`Waiting for operation to complete on tab ${tabId}`, { operation: lockInfo.operation });
+            
+            // Wait up to 5 seconds for operation to complete
+            const timeout = 5000;
+            const startTime = Date.now();
+            
+            while (this.operationLock.getLockInfo(tabId) && (Date.now() - startTime) < timeout) {
+              await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            
+            if (this.operationLock.getLockInfo(tabId)) {
+              this.logger.warn(`Operation still pending after timeout on tab ${tabId}, force releasing lock`);
+            }
+          }
+          cleanupSteps.push('operations_waited');
+        } catch (error) {
+          errors.push({ step: 'wait_operations', error: error.message });
+          this.logger.warn(`Operation wait failed for tab ${tabId}`, { error: error.message });
+        }
+      }
+
+      // Step 3: Detach debugger (must happen before tab closure)
+      if (this.debuggerSessions && this.debuggerSessions.has(tabId)) {
+        try {
+          const result = await this.detachDebugger(tabId);
+          if (result.wasDetached) {
+            cleanupSteps.push('debugger_detached');
+          } else {
+            cleanupSteps.push('debugger_not_detached');
+          }
+        } catch (error) {
+          errors.push({ step: 'debugger_detach', error: error.message });
+          this.logger.error(`Debugger detach failed for tab ${tabId}`, { error: error.message });
+        }
+      }
+
+      // Step 4: Release operation locks
+      if (this.operationLock) {
+        try {
+          const wasLocked = this.operationLock.getLockInfo(tabId) !== null;
+          this.operationLock.releaseLock(tabId);
+          if (wasLocked) {
+            cleanupSteps.push('lock_released');
+          }
+        } catch (error) {
+          errors.push({ step: 'lock_release', error: error.message });
+          this.logger.warn(`Lock release failed for tab ${tabId}`, { error: error.message });
+        }
+      }
+
+      // Step 5: Remove content scripts
+      if (this.contentScriptManager) {
+        try {
+          const wasTracked = this.contentScriptManager.injectedTabs.has(tabId);
+          this.contentScriptManager.removeTab(tabId);
+          if (wasTracked) {
+            cleanupSteps.push('content_scripts_removed');
+          }
+        } catch (error) {
+          errors.push({ step: 'content_scripts', error: error.message });
+          this.logger.warn(`Content script cleanup failed for tab ${tabId}`, { error: error.message });
+        }
+      }
+
+      // Step 6: Close tab (only if requested)
+      if (closeTab) {
+        try {
+          await chrome.tabs.remove(tabId);
+          cleanupSteps.push('tab_closed');
+        } catch (error) {
+          errors.push({ step: 'tab_close', error: error.message });
+          this.logger.error(`Tab closure failed for tab ${tabId}`, { error: error.message });
+        }
+      }
+
+      this.logger.debug(`Tab resource cleanup completed for tab ${tabId}`, { 
+        steps: cleanupSteps, 
+        errors: errors.length,
+        reason 
+      });
+
+      return {
+        success: errors.length === 0,
+        steps: cleanupSteps,
+        errors: errors,
+        tabId: tabId
+      };
+
+    } catch (error) {
+      this.logger.error(`Tab resource cleanup failed for tab ${tabId}`, { 
+        error: error.message, 
+        reason,
+        completedSteps: cleanupSteps 
+      });
+      
+      return {
+        success: false,
+        steps: cleanupSteps,
+        errors: [{ step: 'cleanup_process', error: error.message }],
+        tabId: tabId
+      };
+    }
+  }
 }
 
 // Mix in all operation methods
