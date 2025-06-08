@@ -60,9 +60,9 @@ The `update-versions` script automatically updates:
 ## Configuration Files
 
 Each component has its own configuration:
-- `/mcp-server/src/config.js` - Reads VERSION file
-- `/cli/src/config/defaults.ts` - Reads VERSION file
-- `/extension/modules/config.js` - Reads from manifest.json
+- `/mcp-server/src/config.js` - Central MCP server config (reads VERSION file, contains all Claude URL templates and validation)
+- `/cli/src/config/defaults.ts` - Central CLI config (reads VERSION file)
+- `/extension/modules/config.js` - Extension config (reads from manifest.json)
 - `/extension/offscreen.js` - Gets version dynamically from background
 
 ## Version Checking
@@ -91,5 +91,5 @@ npm run config:validate
 If version inconsistencies occur:
 1. Run `npm run config:validate` to identify issues
 2. Run `npm run update-versions` to fix them
-3. Rebuild CLI if needed: `cd cli && npm run build`
+3. Rebuild CLI if needed: `npm run build`
 4. Reload extension at chrome://extensions/

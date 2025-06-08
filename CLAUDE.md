@@ -299,7 +299,7 @@ MCP_DEBUG_MODE=true mcp system_health
 ```
 
 **Config Locations**:
-- `mcp-server/src/config.js` - Central MCP server config
+- `mcp-server/src/config.js` - Central MCP server config (includes all Claude URL templates and validation)
 - `cli/src/config/defaults.ts` - Central CLI config
 - `extension/modules/config.js` - Extension config (with version from manifest)
 - Environment variables (MCP_* prefix) - Server & CLI only
