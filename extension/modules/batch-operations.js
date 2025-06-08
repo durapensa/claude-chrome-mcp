@@ -1,106 +1,160 @@
 // Batch Operations for Chrome Extension
 // Methods for batch messaging and response collection
 
+import { 
+  withErrorHandling, 
+  validateParams 
+} from '../utils/error-handler.js';
+
 export const batchOperationMethods = {
   async batchSendMessages(params) {
-    const { messages, sequential = false } = params;
+    // Validate parameters with custom array validator
+    const validationError = validateParams(
+      params, 
+      ['messages'],
+      {
+        messages: (value) => {
+          if (!Array.isArray(value)) {
+            return 'Messages must be an array';
+          }
+          if (value.length === 0) {
+            return 'Messages array is required and must not be empty';
+          }
+          return true;
+        }
+      }
+    );
     
-    if (!Array.isArray(messages) || messages.length === 0) {
+    if (validationError) {
       return { 
         success: false, 
-        reason: 'Messages array is required and must not be empty' 
+        reason: validationError.error 
       };
     }
+
+    const { messages, sequential = false } = params;
     
-    const results = [];
-    const startTime = Date.now();
-    
-    if (sequential) {
-      // Send messages one by one, waiting for each to complete
-      for (const msg of messages) {
-        try {
-          const sendResult = await this.sendMessageToClaudeTab({
-            tabId: msg.tabId,
-            message: msg.message
-          });
+    // Extract core logic for error handling
+    const coreBatchSendLogic = async () => {
+      const results = [];
+      const startTime = Date.now();
+      
+      if (sequential) {
+        // Send messages one by one, waiting for each to complete
+        for (const msg of messages) {
+          const wrappedSendMessage = withErrorHandling(
+            async () => {
+              const sendResult = await this.sendMessageToClaudeTab({
+                tabId: msg.tabId,
+                message: msg.message
+              });
+              
+              return {
+                tabId: msg.tabId,
+                success: sendResult.success,
+                result: sendResult,
+                timestamp: Date.now()
+              };
+            },
+            `CCM Extension: Failed to send message to tab ${msg.tabId}`
+          );
           
-          results.push({
-            tabId: msg.tabId,
-            success: sendResult.success,
-            result: sendResult,
-            timestamp: Date.now()
-          });
+          const messageResult = await wrappedSendMessage();
+          
+          // Handle error case by converting to expected format
+          if (!messageResult.success) {
+            results.push({
+              tabId: msg.tabId,
+              success: false,
+              error: messageResult.error,
+              timestamp: Date.now()
+            });
+          } else {
+            results.push(messageResult);
+          }
           
           // Small delay between sequential messages
           if (messages.indexOf(msg) < messages.length - 1) {
             await new Promise(resolve => setTimeout(resolve, 500));
           }
-        } catch (error) {
-          results.push({
-            tabId: msg.tabId,
-            success: false,
-            error: error.message,
-            timestamp: Date.now()
-          });
         }
-      }
-    } else {
-      // Send all messages in parallel
-      const promises = messages.map(async (msg) => {
-        try {
-          const sendResult = await this.sendMessageToClaudeTab({
-            tabId: msg.tabId,
-            message: msg.message
-          });
+      } else {
+        // Send all messages in parallel
+        const promises = messages.map(async (msg) => {
+          const wrappedSendMessage = withErrorHandling(
+            async () => {
+              const sendResult = await this.sendMessageToClaudeTab({
+                tabId: msg.tabId,
+                message: msg.message
+              });
+              
+              return {
+                tabId: msg.tabId,
+                success: sendResult.success,
+                result: sendResult,
+                timestamp: Date.now()
+              };
+            },
+            `CCM Extension: Failed to send message to tab ${msg.tabId}`
+          );
           
-          return {
-            tabId: msg.tabId,
-            success: sendResult.success,
-            result: sendResult,
-            timestamp: Date.now()
-          };
-        } catch (error) {
-          return {
-            tabId: msg.tabId,
-            success: false,
-            error: error.message,
-            timestamp: Date.now()
-          };
-        }
-      });
+          const messageResult = await wrappedSendMessage();
+          
+          // Handle error case by converting to expected format
+          if (!messageResult.success) {
+            return {
+              tabId: msg.tabId,
+              success: false,
+              error: messageResult.error,
+              timestamp: Date.now()
+            };
+          } else {
+            return messageResult;
+          }
+        });
+        
+        const parallelResults = await Promise.allSettled(promises);
+        parallelResults.forEach((result, index) => {
+          if (result.status === 'fulfilled') {
+            results.push(result.value);
+          } else {
+            results.push({
+              tabId: messages[index].tabId,
+              success: false,
+              error: result.reason,
+              timestamp: Date.now()
+            });
+          }
+        });
+      }
       
-      const parallelResults = await Promise.allSettled(promises);
-      parallelResults.forEach((result, index) => {
-        if (result.status === 'fulfilled') {
-          results.push(result.value);
-        } else {
-          results.push({
-            tabId: messages[index].tabId,
-            success: false,
-            error: result.reason,
-            timestamp: Date.now()
-          });
-        }
-      });
-    }
-    
-    const successCount = results.filter(r => r.success).length;
-    const failureCount = results.length - successCount;
-    
-    return {
-      success: failureCount === 0,
-      summary: {
-        total: results.length,
-        successful: successCount,
-        failed: failureCount,
-        sequential: sequential,
-        durationMs: Date.now() - startTime
-      },
-      results: results
+      const successCount = results.filter(r => r.success).length;
+      const failureCount = results.length - successCount;
+      
+      return {
+        success: failureCount === 0,
+        summary: {
+          total: results.length,
+          successful: successCount,
+          failed: failureCount,
+          sequential: sequential,
+          durationMs: Date.now() - startTime
+        },
+        results: results
+      };
     };
+
+    // This method already handles its own errors and returns proper format
+    return await coreBatchSendLogic();
   },
 
   async batchGetResponses(params) {
+    // Validate parameters
+    const validationError = validateParams(params, ['tabIds']);
+    if (validationError) {
+      return validationError;
+    }
+
     const {
       tabIds,
       timeoutMs = 30000,
@@ -108,10 +162,10 @@ export const batchOperationMethods = {
       pollIntervalMs = 1000
     } = params;
     
-    const results = [];
-    const startTime = Date.now();
-    
-    try {
+    // Extract core logic for error handling
+    const coreBatchGetLogic = async () => {
+      const results = [];
+      const startTime = Date.now();
       if (waitForAll) {
         // Wait for all responses to complete
         const promises = tabIds.map(async (tabId) => {
@@ -222,25 +276,44 @@ export const batchOperationMethods = {
         waitForAll,
         requestedTabs: tabIds.length
       };
-      
-    } catch (error) {
+    };
+
+    // Use error handler utility with custom error format
+    const wrappedBatchGet = withErrorHandling(
+      coreBatchGetLogic,
+      'CCM Extension: Error getting batch responses'
+    );
+
+    const result = await wrappedBatchGet();
+    
+    // If error, format as expected custom response  
+    if (!result.success) {
       return {
         success: false,
-        error: error.message,
-        results,
+        error: result.error,
+        results: [],
         summary: {
           total: tabIds.length,
-          completed: results.filter(r => r.success).length,
-          failed: results.filter(r => !r.success).length + 1
+          completed: 0,
+          failed: tabIds.length
         }
       };
     }
+    
+    return result;
   },
 
   async getClaudeResponseStatus(params) {
+    // Validate parameters
+    const validationError = validateParams(params, ['tabId']);
+    if (validationError) {
+      return validationError;
+    }
+
     const { tabId } = params;
     
-    try {
+    // Extract core logic for error handling
+    const coreStatusLogic = async () => {
       await this.ensureDebuggerAttached(tabId);
       
       const script = `
@@ -326,15 +399,27 @@ export const batchOperationMethods = {
         ...result.result?.value,
         tabId: tabId
       };
-      
-    } catch (error) {
+    };
+
+    // Use error handler utility with custom error format
+    const wrappedStatus = withErrorHandling(
+      coreStatusLogic,
+      `CCM Extension: Error getting response status for tab ${tabId}`
+    );
+
+    const result = await wrappedStatus();
+    
+    // If error, format as expected custom response
+    if (!result.success) {
       return {
         success: false,
-        error: error.message,
+        error: result.error,
         tabId: tabId,
         status: 'error'
       };
     }
+    
+    return result;
   },
 
   // NEW REORGANIZED TOOL METHODS
@@ -344,13 +429,33 @@ export const batchOperationMethods = {
    * Supports send_messages, get_responses, and send_and_get operations
    */
   async handleTabBatchOperations(params) {
+    // Validate required operation parameter
+    const validationError = validateParams(params, ['operation']);
+    if (validationError) {
+      throw new Error(validationError.error);
+    }
+
     const { operation, messages, tabIds, ...batchParams } = params;
     
     switch (operation) {
       case 'send_messages':
-        if (!messages || !Array.isArray(messages)) {
-          throw new Error('messages parameter required for send_messages operation');
+        // Validate messages parameter
+        const messagesValidation = validateParams(
+          { messages }, 
+          ['messages'],
+          {
+            messages: (value) => {
+              if (!Array.isArray(value)) {
+                return 'messages parameter required for send_messages operation and must be an array';
+              }
+              return true;
+            }
+          }
+        );
+        if (messagesValidation) {
+          throw new Error(messagesValidation.error);
         }
+        
         return await this.batchSendMessages({
           messages: messages,
           sequential: batchParams.sequential,
@@ -359,9 +464,23 @@ export const batchOperationMethods = {
         });
         
       case 'get_responses':
-        if (!tabIds || !Array.isArray(tabIds)) {
-          throw new Error('tabIds parameter required for get_responses operation');
+        // Validate tabIds parameter
+        const tabIdsValidation = validateParams(
+          { tabIds }, 
+          ['tabIds'],
+          {
+            tabIds: (value) => {
+              if (!Array.isArray(value)) {
+                return 'tabIds parameter required for get_responses operation and must be an array';
+              }
+              return true;
+            }
+          }
+        );
+        if (tabIdsValidation) {
+          throw new Error(tabIdsValidation.error);
         }
+        
         return await this.batchGetResponses({
           tabIds: tabIds,
           timeoutMs: batchParams.timeoutMs,
@@ -370,8 +489,21 @@ export const batchOperationMethods = {
         });
         
       case 'send_and_get':
-        if (!messages || !Array.isArray(messages)) {
-          throw new Error('messages parameter required for send_and_get operation');
+        // Validate messages parameter
+        const sendAndGetValidation = validateParams(
+          { messages }, 
+          ['messages'],
+          {
+            messages: (value) => {
+              if (!Array.isArray(value)) {
+                return 'messages parameter required for send_and_get operation and must be an array';
+              }
+              return true;
+            }
+          }
+        );
+        if (sendAndGetValidation) {
+          throw new Error(sendAndGetValidation.error);
         }
         
         // First send messages

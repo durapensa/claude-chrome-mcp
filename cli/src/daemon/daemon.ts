@@ -13,6 +13,13 @@ import { ConfigLoader } from '../config/config-loader';
 import { MCPCliConfig, ServerConfig, DaemonConfig, DefaultsConfig } from '../types/config';
 import { DaemonRequest, DaemonResponse } from '../types/daemon';
 import { createLogger, getLogFileStats } from '../utils/logger';
+import { 
+  formatDaemonError, 
+  withErrorResponse, 
+  setupSocketErrorHandlers,
+  withFileSystemError,
+  safeJsonParse 
+} from '../utils/error-handler';
 import * as winston from 'winston';
 
 export class MCPDaemon {
@@ -67,13 +74,19 @@ export class MCPDaemon {
 
     // Ensure socket directory exists
     const socketDir = path.dirname(this.socketPath);
-    if (!fs.existsSync(socketDir)) {
-      fs.mkdirSync(socketDir, { recursive: true });
+    const safeExists = withFileSystemError(fs.existsSync, 'Check socket directory exists', socketDir);
+    const safeMkdir = withFileSystemError(fs.mkdirSync, 'Create socket directory', socketDir);
+    
+    if (!safeExists(socketDir)) {
+      safeMkdir(socketDir, { recursive: true });
     }
 
     // Remove existing socket file
-    if (fs.existsSync(this.socketPath)) {
-      fs.unlinkSync(this.socketPath);
+    const safeSocketExists = withFileSystemError(fs.existsSync, 'Check socket file exists', this.socketPath);
+    const safeUnlink = withFileSystemError(fs.unlinkSync, 'Remove existing socket file', this.socketPath);
+    
+    if (safeSocketExists(this.socketPath)) {
+      safeUnlink(this.socketPath);
     }
 
     // Create Unix domain socket server
@@ -87,10 +100,11 @@ export class MCPDaemon {
         console.log(`MCP daemon listening on ${this.socketPath}`);
         
         // Set socket permissions to be accessible by user
+        const safeChmod = withFileSystemError(fs.chmodSync, 'Set socket permissions', this.socketPath);
         try {
-          fs.chmodSync(this.socketPath, 0o600);
+          safeChmod(this.socketPath, 0o600);
         } catch (error) {
-          console.warn('Failed to set socket permissions:', error);
+          console.warn('Failed to set socket permissions:', (error as Error).message);
         }
 
         // Initialize configured servers
@@ -130,14 +144,19 @@ export class MCPDaemon {
     (async () => {
       for (const [serverId, config] of Object.entries(this.servers)) {
         if (config.auto_start) {
-          try {
-            console.log(`Auto-starting server: ${serverId}`);
-            const server = await this.serverManager.startServer(serverId);
-            this.toolRegistry.registerServerTools(server);
-            console.log(`Server ${serverId} started successfully`);
-          } catch (error) {
-            console.error(`Failed to auto-start server ${serverId}:`, (error as Error).message);
-          }
+          const wrappedAutoStart = withErrorResponse(
+            async () => {
+              console.log(`Auto-starting server: ${serverId}`);
+              const server = await this.serverManager.startServer(serverId);
+              this.toolRegistry.registerServerTools(server);
+              console.log(`Server ${serverId} started successfully`);
+              return { success: true };
+            },
+            `Failed to auto-start server ${serverId}`,
+            (error) => ({ success: false, error: error.message })
+          );
+          
+          await wrappedAutoStart();
         }
       }
     })();
@@ -152,41 +171,43 @@ export class MCPDaemon {
 
     let buffer = '';
 
-    socket.on('data', (data) => {
-      buffer += data.toString();
-      
-      // Process complete JSON requests
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-      
-      for (const line of lines) {
-        if (line.trim()) {
-          try {
-            const request: DaemonRequest = JSON.parse(line);
-            this.handleRequest(socket, request).catch(error => {
-              console.error('Error handling request:', error);
-              this.sendResponse(socket, {
-                request_id: request.request_id,
-                status: 'error',
-                error: (error as Error).message
-              });
-            });
-          } catch (error) {
-            console.error('Invalid JSON from client:', line);
+    // Set up socket error handlers
+    setupSocketErrorHandlers(
+      socket,
+      {
+        onError: () => {
+          this.clients.delete(socket);
+        },
+        onClose: () => {
+          this.clients.delete(socket);
+          console.log(`Client disconnected (${this.clients.size} remaining)`);
+        },
+        onData: (data) => {
+          buffer += data.toString();
+          
+          // Process complete JSON requests
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          
+          for (const line of lines) {
+            if (line.trim()) {
+              const request = safeJsonParse<DaemonRequest>(line, 'Parse client request');
+              if (request) {
+                this.handleRequest(socket, request).catch(error => {
+                  console.error('Error handling request:', error);
+                  this.sendResponse(socket, formatDaemonError(
+                    request.request_id,
+                    error as Error,
+                    'Request handling'
+                  ));
+                });
+              }
+            }
           }
         }
-      }
-    });
-
-    socket.on('close', () => {
-      this.clients.delete(socket);
-      console.log(`Client disconnected (${this.clients.size} remaining)`);
-    });
-
-    socket.on('error', (error) => {
-      console.error('Client socket error:', error);
-      this.clients.delete(socket);
-    });
+      },
+      'Client socket'
+    );
   }
 
   /**
@@ -198,49 +219,48 @@ export class MCPDaemon {
     (this.logger as any).logRequest('info', `Handling request: ${type}`, request_id);
     console.log(`Handling request: ${type} (id: ${request_id})`);
 
-    try {
-      switch (type) {
-        case 'tool_call':
-          await this.handleToolCall(socket, request);
-          break;
+    const wrappedHandler = withErrorResponse(
+      async () => {
+        switch (type) {
+          case 'tool_call':
+            await this.handleToolCall(socket, request);
+            break;
 
-        case 'list_tools':
-          await this.handleListTools(socket, request);
-          break;
+          case 'list_tools':
+            await this.handleListTools(socket, request);
+            break;
 
-        case 'server_status':
-          await this.handleServerStatus(socket, request);
-          break;
-          
-        case 'daemon_status':
-          await this.handleDaemonStatus(socket, request);
-          break;
+          case 'server_status':
+            await this.handleServerStatus(socket, request);
+            break;
+            
+          case 'daemon_status':
+            await this.handleDaemonStatus(socket, request);
+            break;
 
-        case 'start_server':
-          await this.handleStartServer(socket, request);
-          break;
+          case 'start_server':
+            await this.handleStartServer(socket, request);
+            break;
 
-        case 'stop_server':
-          await this.handleStopServer(socket, request);
-          break;
+          case 'stop_server':
+            await this.handleStopServer(socket, request);
+            break;
 
-        case 'shutdown':
-          await this.handleShutdown(socket, request);
-          break;
+          case 'shutdown':
+            await this.handleShutdown(socket, request);
+            break;
 
-        default:
-          this.sendResponse(socket, {
-            request_id,
-            status: 'error',
-            error: `Unknown request type: ${type}`
-          });
-      }
-    } catch (error) {
-      this.sendResponse(socket, {
-        request_id,
-        status: 'error',
-        error: (error as Error).message
-      });
+          default:
+            throw new Error(`Unknown request type: ${type}`);
+        }
+      },
+      `Handle ${type} request`,
+      (error) => formatDaemonError(request_id, error, `Handle ${type} request`)
+    );
+
+    const result = await wrappedHandler();
+    if (result && 'status' in result && result.status === 'error') {
+      this.sendResponse(socket, result);
     }
   }
 
@@ -469,13 +489,19 @@ export class MCPDaemon {
    * Send response to client
    */
   private sendResponse(socket: net.Socket, response: DaemonResponse): void {
-    try {
-      console.log(`Sending response: ${response.status} (id: ${response.request_id})`);
-      const message = JSON.stringify(response) + '\n';
-      socket.write(message);
-    } catch (error) {
-      console.error('Error sending response:', error);
-    }
+    const wrappedSend = withErrorResponse(
+      () => {
+        console.log(`Sending response: ${response.status} (id: ${response.request_id})`);
+        const message = JSON.stringify(response) + '\n';
+        socket.write(message);
+        return Promise.resolve();
+      },
+      'Send response to client',
+      (error) => ({ success: false, error: error.message })
+    );
+    
+    // Fire and forget - errors are logged but don't propagate
+    wrappedSend();
   }
 
   /**
@@ -508,8 +534,11 @@ export class MCPDaemon {
     }
 
     // Remove socket file
-    if (fs.existsSync(this.socketPath)) {
-      fs.unlinkSync(this.socketPath);
+    const safeExists = withFileSystemError(fs.existsSync, 'Check socket exists for cleanup', this.socketPath);
+    const safeUnlink = withFileSystemError(fs.unlinkSync, 'Remove socket file on shutdown', this.socketPath);
+    
+    if (safeExists(this.socketPath)) {
+      safeUnlink(this.socketPath);
     }
 
     console.log('MCP daemon shut down successfully');

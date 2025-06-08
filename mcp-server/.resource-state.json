@@ -37,13 +37,67 @@
           "needsReinjection": false
         }
       }
+    ],
+    [
+      948573500,
+      {
+        "tabId": 948573500,
+        "injected": true,
+        "injectedAt": 1749343830522,
+        "version": "2.7.0",
+        "worlds": [
+          "MAIN",
+          "ISOLATED"
+        ],
+        "recovery": {
+          "canVerify": true,
+          "lastVerified": null,
+          "needsReinjection": false
+        }
+      }
+    ],
+    [
+      948573519,
+      {
+        "tabId": 948573519,
+        "injected": true,
+        "injectedAt": 1749343949820,
+        "version": "2.7.0",
+        "worlds": [
+          "MAIN",
+          "ISOLATED"
+        ],
+        "recovery": {
+          "canVerify": true,
+          "lastVerified": null,
+          "needsReinjection": false
+        }
+      }
+    ],
+    [
+      948573521,
+      {
+        "tabId": 948573521,
+        "injected": true,
+        "injectedAt": 1749344167310,
+        "version": "2.7.0",
+        "worlds": [
+          "MAIN",
+          "ISOLATED"
+        ],
+        "recovery": {
+          "canVerify": true,
+          "lastVerified": null,
+          "needsReinjection": false
+        }
+      }
     ]
   ],
   "pendingRequests": [],
   "relayClients": [],
   "metadata": {
-    "lastSaved": 1749339728468,
-    "lastLoaded": null,
+    "lastSaved": 1749345475541,
+    "lastLoaded": 1749345474187,
     "version": "1.0.0",
     "extensionStartupTime": null
   }

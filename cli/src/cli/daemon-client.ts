@@ -7,15 +7,18 @@
 import * as net from 'net';
 import * as fs from 'fs';
 import { DaemonRequest, DaemonResponse } from '../types/daemon';
+import { 
+  setupSocketErrorHandlers,
+  safeJsonParse,
+  RequestManager,
+  withFileSystemError,
+  withErrorHandling
+} from '../utils/error-handler';
 
 export class DaemonClient {
   private socket: net.Socket | null = null;
   private requestId = 0;
-  private pendingRequests = new Map<string, {
-    resolve: (response: DaemonResponse) => void;
-    reject: (error: Error) => void;
-    timeout: NodeJS.Timeout;
-  }>();
+  private requestManager = new RequestManager<DaemonRequest, DaemonResponse>(5000);
 
   constructor(private socketPath: string) {}
 
@@ -28,7 +31,8 @@ export class DaemonClient {
     }
 
     // Check if daemon is running
-    if (!fs.existsSync(this.socketPath)) {
+    const safeExists = withFileSystemError(fs.existsSync, 'Check daemon socket', this.socketPath);
+    if (!safeExists(this.socketPath)) {
       throw new Error('Daemon is not running. Socket file not found.');
     }
 
@@ -36,41 +40,41 @@ export class DaemonClient {
       this.socket = net.createConnection(this.socketPath);
 
       let buffer = '';
-      this.socket.on('data', (data) => {
-        buffer += data.toString();
-        
-        // Process complete JSON responses
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-        
-        for (const line of lines) {
-          if (line.trim()) {
-            try {
-              const response: DaemonResponse = JSON.parse(line);
-              this.handleResponse(response);
-            } catch (error) {
-              console.error('Invalid JSON from daemon:', line);
+      
+      // Set up comprehensive socket error handling
+      setupSocketErrorHandlers(
+        this.socket,
+        {
+          onError: (error) => {
+            reject(new Error(`Failed to connect to daemon: ${error.message}`));
+          },
+          onClose: () => {
+            this.socket = null;
+            // Use RequestManager for consistent cleanup
+            this.requestManager.cleanup(new Error('Connection to daemon lost'));
+          },
+          onData: (data) => {
+            buffer += data.toString();
+            
+            // Process complete JSON responses
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+            
+            for (const line of lines) {
+              if (line.trim()) {
+                const response = safeJsonParse<DaemonResponse>(line, 'Daemon response');
+                if (response) {
+                  this.handleResponse(response);
+                }
+              }
             }
           }
-        }
-      });
+        },
+        'Daemon client socket'
+      );
 
       this.socket.on('connect', () => {
         resolve();
-      });
-
-      this.socket.on('error', (error) => {
-        reject(new Error(`Failed to connect to daemon: ${error.message}`));
-      });
-
-      this.socket.on('close', () => {
-        this.socket = null;
-        // Reject all pending requests
-        for (const [requestId, { reject, timeout }] of this.pendingRequests) {
-          clearTimeout(timeout);
-          reject(new Error('Connection to daemon lost'));
-        }
-        this.pendingRequests.clear();
       });
     });
   }
@@ -100,26 +104,24 @@ export class DaemonClient {
     };
 
     return new Promise((resolve, reject) => {
-      const timeoutHandle = setTimeout(() => {
-        this.pendingRequests.delete(requestId);
-        reject(new Error(`Request timeout after ${timeout}ms: ${request.type}`));
-      }, timeout);
-
-      this.pendingRequests.set(requestId, { resolve, reject, timeout: timeoutHandle });
+      // Use RequestManager for consistent timeout handling
+      this.requestManager.registerRequest(
+        requestId,
+        resolve,
+        reject,
+        `Daemon ${request.type}`,
+        timeout
+      );
 
       try {
         const message = JSON.stringify(fullRequest) + '\n';
         if (this.socket) {
           this.socket.write(message);
         } else {
-          clearTimeout(timeoutHandle);
-          this.pendingRequests.delete(requestId);
-          reject(new Error('Socket disconnected while sending'));
+          this.requestManager.rejectRequest(requestId, new Error('Socket disconnected while sending'));
         }
       } catch (error) {
-        clearTimeout(timeoutHandle);
-        this.pendingRequests.delete(requestId);
-        reject(new Error(`Failed to send request: ${(error as Error).message}`));
+        this.requestManager.rejectRequest(requestId, new Error(`Failed to send request: ${(error as Error).message}`));
       }
     });
   }
@@ -143,30 +145,27 @@ export class DaemonClient {
     };
 
     return new Promise((resolve, reject) => {
-      const timeoutHandle = setTimeout(() => {
-        this.pendingRequests.delete(requestId);
-        reject(new Error(`Request timeout: ${request.type}`));
-      }, timeout);
-
-      const handler = {
-        resolve: (response: DaemonResponse) => {
-          if (response.status === 'success') {
-            clearTimeout(timeoutHandle);
-            this.pendingRequests.delete(requestId);
-            resolve(response.data);
-          } else if (response.status === 'progress' && onProgress && response.progress) {
-            onProgress(response.progress);
-          } else if (response.status === 'error') {
-            clearTimeout(timeoutHandle);
-            this.pendingRequests.delete(requestId);
-            reject(new Error(response.error || 'Unknown error'));
-          }
-        },
-        reject,
-        timeout: timeoutHandle
+      // Custom resolver for progress handling
+      const progressResolver = (response: DaemonResponse) => {
+        if (response.status === 'success') {
+          resolve(response.data);
+        } else if (response.status === 'progress' && onProgress && response.progress) {
+          onProgress(response.progress);
+          // Don't resolve yet, keep waiting for final response
+          return;
+        } else if (response.status === 'error') {
+          reject(new Error(response.error || 'Unknown error'));
+        }
       };
 
-      this.pendingRequests.set(requestId, handler);
+      // Register with custom progress handler  
+      this.requestManager.registerRequest(
+        requestId,
+        progressResolver,
+        reject,
+        `Daemon ${request.type} with progress`,
+        timeout
+      );
 
       const message = JSON.stringify(fullRequest) + '\n';
       this.socket!.write(message);
@@ -177,10 +176,8 @@ export class DaemonClient {
    * Handle response from daemon
    */
   private handleResponse(response: DaemonResponse): void {
-    const pending = this.pendingRequests.get(response.request_id);
-    if (pending) {
-      pending.resolve(response);
-    }
+    // Use RequestManager for consistent response handling
+    this.requestManager.resolveRequest(response.request_id, response);
   }
 
   /**
@@ -290,7 +287,8 @@ export class DaemonClient {
    * Check if daemon is running
    */
   static isDaemonRunning(socketPath: string): boolean {
-    return fs.existsSync(socketPath);
+    const safeExists = withFileSystemError(fs.existsSync, 'Check daemon running', socketPath);
+    return safeExists(socketPath);
   }
 
   /**
@@ -332,14 +330,15 @@ export class DaemonClient {
     const fs = await import('fs');
     
     // Path to the daemon script - try compiled version first, then source
+    const safeExists = withFileSystemError(fs.existsSync, 'Check daemon script exists');
     let daemonScript = path.resolve(__dirname, '../daemon/daemon.js');
     
-    if (!fs.existsSync(daemonScript)) {
+    if (!safeExists(daemonScript)) {
       // Try development path (when running with ts-node)
       daemonScript = path.resolve(__dirname, '../../dist/daemon/daemon.js');
     }
     
-    if (!fs.existsSync(daemonScript)) {
+    if (!safeExists(daemonScript)) {
       throw new Error(`Daemon script not found. Tried: ${path.resolve(__dirname, '../daemon/daemon.js')} and ${path.resolve(__dirname, '../../dist/daemon/daemon.js')}`);
     }
     

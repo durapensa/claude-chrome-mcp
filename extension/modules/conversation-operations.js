@@ -2,10 +2,16 @@
 // Methods for managing Claude conversations, metadata, and transcripts
 
 import { ensureClaudeTabForApi, ensureConversationTab, getClaudeTabsWithConversations } from '../utils/tab-management.js';
+import { 
+  withErrorHandling, 
+  withErrorThrow, 
+  validateParams 
+} from '../utils/error-handler.js';
 
 export const conversationOperationMethods = {
   async getClaudeConversations() {
-    try {
+    // Extract core logic for error handling
+    const coreGetConversationsLogic = async () => {
       // Get current Claude tabs with conversation ID mapping
       const tabsResult = await getClaudeTabsWithConversations(this);
       if (!tabsResult.success) {
@@ -83,17 +89,29 @@ export const conversationOperationMethods = {
       }));
 
       return conversations;
+    };
 
-    } catch (error) {
-      console.error('CCM Extension: Error fetching conversations:', error);
-      throw new Error(`Failed to fetch conversations: ${error.message}`);
-    }
+    // Use error handler utility with throw pattern
+    const wrappedGetConversations = withErrorThrow(
+      coreGetConversationsLogic,
+      'CCM Extension: Error fetching conversations',
+      'Failed to fetch conversations'
+    );
+
+    return await wrappedGetConversations();
   },
 
   async exportConversationTranscript(params) {
+    // Validate parameters
+    const validationError = validateParams(params, ['tabId']);
+    if (validationError) {
+      return validationError;
+    }
+    
     const { tabId, format = 'markdown' } = params;
     
-    try {
+    // Extract core logic for error handling
+    const coreExportLogic = async () => {
       // First extract conversation elements using our new tool
       const elements = await this.extractConversationElements({ tabId });
       
@@ -389,14 +407,26 @@ export const conversationOperationMethods = {
           statistics: statistics
         };
       }
-      
-    } catch (error) {
-      return { 
-        success: false, 
-        reason: 'Error exporting transcript', 
-        error: error.message 
+    };
+
+    // Use error handler utility with custom error format
+    const wrappedExport = withErrorHandling(
+      coreExportLogic,
+      'CCM Extension: Error exporting transcript'
+    );
+
+    const result = await wrappedExport();
+    
+    // If error, format as expected custom response
+    if (!result.success) {
+      return {
+        success: false,
+        reason: 'Error exporting transcript',
+        error: result.error
       };
     }
+    
+    return result;
   },
 
   async getConversationMetadata(params) {
@@ -673,7 +703,8 @@ export const conversationOperationMethods = {
   },
 
   async searchClaudeConversations(params) {
-    try {
+    // Extract core logic for error handling
+    const coreSearchLogic = async () => {
       // First get all conversations
       const allConversations = await this.getClaudeConversations();
       
@@ -737,10 +768,15 @@ export const conversationOperationMethods = {
         conversations: filtered,
         total: filtered.length
       };
-      
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
+    };
+
+    // Use error handler utility
+    const wrappedSearch = withErrorHandling(
+      coreSearchLogic,
+      'CCM Extension: Error searching conversations'
+    );
+
+    return await wrappedSearch();
   },
 
   async bulkDeleteConversations(params) {
@@ -793,18 +829,33 @@ export const conversationOperationMethods = {
   },
 
   async openClaudeConversationTab(params) {
+    // Validate parameters with custom validator
+    const validationError = validateParams(
+      params, 
+      ['conversationId'],
+      {
+        conversationId: (value) => {
+          if (typeof value !== 'string') {
+            return 'conversationId must be a string';
+          }
+          return true;
+        }
+      }
+    );
+    
+    if (validationError) {
+      throw new Error(validationError.error);
+    }
+    
     const { 
       conversationId, 
       activate = true, 
       waitForLoad = true, 
       loadTimeoutMs = 10000 
     } = params;
-    
-    if (!conversationId || typeof conversationId !== 'string') {
-      throw new Error('conversationId is required and must be a string');
-    }
 
-    try {
+    // Extract core logic for error handling
+    const coreOpenTabLogic = async () => {
       // Use shared utility to ensure conversation tab exists
       const tabResult = await ensureConversationTab(this, conversationId, {
         activate,
@@ -892,11 +943,16 @@ export const conversationOperationMethods = {
         conversationTitle: conversationTitle,
         hasMessages: hasMessages
       };
+    };
 
-    } catch (error) {
-      console.error(`CCM Extension: Error opening conversation ${conversationId}:`, error);
-      throw new Error(`Failed to open conversation: ${error.message}`);
-    }
+    // Use error handler utility with throw pattern
+    const wrappedOpenTab = withErrorThrow(
+      coreOpenTabLogic,
+      `CCM Extension: Error opening conversation ${conversationId}`,
+      'Failed to open conversation'
+    );
+
+    return await wrappedOpenTab();
   },
 
   // NEW REORGANIZED TOOL METHODS
@@ -906,13 +962,26 @@ export const conversationOperationMethods = {
    * Pure URL generation without tab creation (for api_get_conversation_url)
    */
   async getConversationUrl(params) {
-    const { conversationId } = params;
-    
-    // Validate UUID format
+    // Validate parameters with custom UUID validator
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(conversationId)) {
-      throw new Error('conversationId must be a valid UUID format');
+    const validationError = validateParams(
+      params, 
+      ['conversationId'],
+      {
+        conversationId: (value) => {
+          if (!uuidRegex.test(value)) {
+            return 'conversationId must be a valid UUID format';
+          }
+          return true;
+        }
+      }
+    );
+    
+    if (validationError) {
+      throw new Error(validationError.error);
     }
+
+    const { conversationId } = params;
 
     // Return the conversation URL
     return {
@@ -927,11 +996,28 @@ export const conversationOperationMethods = {
    * Supports single or multiple conversation deletions (for api_delete_conversations)
    */
   async handleApiDeleteConversations(params) {
-    const { conversationIds, batchSize = 5, delayMs = 1000 } = params;
+    // Validate parameters with custom array validator
+    const validationError = validateParams(
+      params, 
+      ['conversationIds'],
+      {
+        conversationIds: (value) => {
+          if (!Array.isArray(value)) {
+            return 'conversationIds must be an array';
+          }
+          if (value.length === 0) {
+            return 'conversationIds must be a non-empty array';
+          }
+          return true;
+        }
+      }
+    );
     
-    if (!conversationIds || !Array.isArray(conversationIds) || conversationIds.length === 0) {
-      throw new Error('conversationIds must be a non-empty array');
+    if (validationError) {
+      throw new Error(validationError.error);
     }
+
+    const { conversationIds, batchSize = 5, delayMs = 1000 } = params;
     
     // Handle single vs bulk deletion
     if (conversationIds.length === 1) {

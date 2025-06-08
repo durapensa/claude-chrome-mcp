@@ -7,6 +7,11 @@
 import { StdioMCPConnection } from './mcp-connection';
 import { MCPServer, ServerStatus } from '../types/daemon';
 import { ServerConfig } from '../types/config';
+import { 
+  withTimeout,
+  withErrorHandling,
+  TimeoutConfig
+} from '../utils/error-handler';
 
 export class ServerManager {
   private servers = new Map<string, MCPServer>();
@@ -68,12 +73,11 @@ export class ServerManager {
       const connection = new StdioMCPConnection(id, server.config);
       
       // Connect to the server with timeout
-      await Promise.race([
-        connection.connect(),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Server startup timeout (30s)')), 30000)
-        )
-      ]);
+      const timeoutConfig: TimeoutConfig = {
+        timeoutMs: 30000,
+        errorMessage: `Server ${id} startup timeout (30s)`
+      };
+      await withTimeout(connection.connect(), timeoutConfig);
 
       // Get available tools
       const tools = await connection.listTools();
@@ -117,13 +121,21 @@ export class ServerManager {
 
     console.log(`Stopping server: ${id}`);
 
-    try {
-      if (server.connection) {
-        await server.connection.close();
+    // Use error handler for connection cleanup
+    const safeStop = withErrorHandling(
+      async () => {
+        if (server.connection) {
+          await server.connection.close();
+        }
+      },
+      `Stop server ${id}`,
+      (error) => {
+        console.error(`Error stopping server ${id}:`, error.message);
+        return error; // Non-blocking error
       }
-    } catch (error) {
-      console.error(`Error stopping server ${id}:`, (error as Error).message);
-    }
+    );
+    
+    await safeStop();
 
     server.status = 'stopped';
     server.connection = null;
@@ -184,14 +196,15 @@ export class ServerManager {
     // Update usage timestamp
     this.updateServerUsage(serverId);
 
-    // Call the tool
-    try {
-      const result = await server.connection.callTool(toolName, args);
-      return result;
-    } catch (error) {
-      console.error(`Tool call failed on server ${serverId}:`, (error as Error).message);
-      throw error;
-    }
+    // Call the tool with error handling
+    const wrappedCall = withErrorHandling(
+      async () => {
+        return await server.connection!.callTool(toolName, args);
+      },
+      `Tool call ${toolName} on server ${serverId}`
+    );
+    
+    return await wrappedCall();
   }
 
   /**
@@ -283,21 +296,27 @@ export class ServerManager {
       return false;
     }
 
-    try {
-      if (server.config.health_check) {
-        // Use configured health check tool
-        await server.connection.callTool(server.config.health_check, {});
-      } else {
-        // Default health check - list tools
-        await server.connection.listTools();
+    const wrappedHealthCheck = withErrorHandling(
+      async () => {
+        if (server.config.health_check) {
+          // Use configured health check tool
+          await server.connection!.callTool(server.config.health_check, {});
+        } else {
+          // Default health check - list tools
+          await server.connection!.listTools();
+        }
+        return true;
+      },
+      `Health check for server ${id}`,
+      (error) => {
+        console.error(`Health check failed for server ${id}:`, error.message);
+        server.status = 'error';
+        server.error = error.message;
+        return false;
       }
-      return true;
-    } catch (error) {
-      console.error(`Health check failed for server ${id}:`, (error as Error).message);
-      server.status = 'error';
-      server.error = (error as Error).message;
-      return false;
-    }
+    );
+    
+    return await wrappedHealthCheck();
   }
 
   /**

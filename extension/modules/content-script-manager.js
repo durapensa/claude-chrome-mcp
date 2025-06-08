@@ -1,6 +1,7 @@
 // Content Script Manager for injecting scripts into Claude.ai tabs
 
 import { CLAUDE_AI_URL } from './config.js';
+import { withErrorHandling } from '../utils/error-handler.js';
 
 export class ContentScriptManager {
   constructor() {
@@ -16,7 +17,8 @@ export class ContentScriptManager {
       return { success: true, alreadyInjected: true };
     }
 
-    try {
+    // Extract core injection logic to a separate method for error handling
+    const coreInjection = async () => {
       // Get tab info to verify it's a Claude.ai tab
       const tab = await chrome.tabs.get(tabId);
       if (!tab.url || !tab.url.includes('claude.ai')) {
@@ -53,12 +55,15 @@ export class ContentScriptManager {
       this.injectionTimestamps.set(tabId, Date.now());
       console.log(`CCM: Content script injected successfully in tab ${tabId}`);
       return { success: true, method: 'inline_isolated_injection', result };
+    };
 
-    } catch (error) {
-      console.error(`CCM: Failed to inject content script into tab ${tabId}:`, error);
-      console.error(`CCM: Error details:`, error.stack);
-      return { success: false, error: error.message, stack: error.stack };
-    }
+    // Use error handler utility with consistent logging and error format
+    const wrappedInjection = withErrorHandling(
+      coreInjection, 
+      `CCM: Failed to inject content script into tab ${tabId}`
+    );
+
+    return await wrappedInjection();
   }
 
   removeTab(tabId) {

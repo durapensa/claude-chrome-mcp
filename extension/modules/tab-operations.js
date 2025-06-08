@@ -2,13 +2,20 @@
 
 import { generateOperationId, isClaudeAiUrl } from '../utils/utils.js';
 import { OPERATION_TIMEOUT, COMPLETION_TIMEOUT } from './config.js';
+import { 
+  withErrorHandling, 
+  withLockManagement, 
+  withChromeAPIErrorHandling, 
+  validateParams 
+} from '../utils/error-handler.js';
 
 // Tab operation methods to be mixed into ExtensionRelayClient
 export const tabOperationMethods = {
   async spawnClaudeTab(params = {}) {
     console.log('CCM Extension: Spawning new Claude.ai tab', params);
     
-    try {
+    // Extract core logic for error handling
+    const coreSpawnLogic = async () => {
       // Create new tab
       const tab = await chrome.tabs.create({
         url: params.url || 'https://claude.ai/new',
@@ -63,14 +70,15 @@ export const tabOperationMethods = {
         tabId: tab.id,
         tab: tab
       };
-      
-    } catch (error) {
-      console.error('CCM Extension: Failed to spawn Claude tab:', error);
-      return {
-        success: false,
-        error: error.message
-      };
-    }
+    };
+
+    // Use error handler utility
+    const wrappedSpawn = withErrorHandling(
+      coreSpawnLogic, 
+      'CCM Extension: Failed to spawn Claude tab'
+    );
+
+    return await wrappedSpawn();
   },
 
   async closeClaudeTab(params) {
@@ -79,13 +87,16 @@ export const tabOperationMethods = {
     console.log('CCM Extension: params keys:', Object.keys(params || {}));
     console.log('CCM Extension: tabId value:', params?.tabId);
     
-    const { tabId } = params;
-    
-    if (!tabId) {
-      return { success: false, error: 'No tabId provided' };
+    // Validate parameters
+    const validationError = validateParams(params, ['tabId']);
+    if (validationError) {
+      return validationError;
     }
     
-    try {
+    const { tabId } = params;
+    
+    // Extract core logic for error handling
+    const coreCloseLogic = async () => {
       // Use centralized cleanup method with proper dependency ordering
       if (typeof this.cleanupTabResources === 'function') {
         const result = await this.cleanupTabResources(tabId, { 
@@ -130,14 +141,20 @@ export const tabOperationMethods = {
         
         return { success: true };
       }
-    } catch (error) {
-      console.error(`CCM Extension: Failed to close tab ${tabId}:`, error);
-      return { success: false, error: error.message };
-    }
+    };
+
+    // Use error handler utility
+    const wrappedClose = withErrorHandling(
+      coreCloseLogic, 
+      `CCM Extension: Failed to close tab ${tabId}`
+    );
+
+    return await wrappedClose();
   },
 
   async getClaudeTabs() {
-    try {
+    // Extract core logic for error handling
+    const coreGetTabsLogic = async () => {
       const tabs = await chrome.tabs.query({ url: 'https://claude.ai/*' });
       
       const tabInfo = tabs.map(tab => ({
@@ -155,24 +172,28 @@ export const tabOperationMethods = {
         tabs: tabInfo,
         count: tabInfo.length
       };
-      
-    } catch (error) {
-      console.error('CCM Extension: Failed to get Claude tabs:', error);
-      return {
-        success: false,
-        error: error.message
-      };
-    }
+    };
+
+    // Use error handler utility
+    const wrappedGetTabs = withErrorHandling(
+      coreGetTabsLogic, 
+      'CCM Extension: Failed to get Claude tabs'
+    );
+
+    return await wrappedGetTabs();
   },
 
   async focusClaudeTab(params) {
-    const { tabId } = params;
-    
-    if (!tabId) {
-      return { success: false, error: 'No tabId provided' };
+    // Validate parameters
+    const validationError = validateParams(params, ['tabId']);
+    if (validationError) {
+      return validationError;
     }
     
-    try {
+    const { tabId } = params;
+    
+    // Extract core logic for error handling
+    const coreFocusLogic = async () => {
       // Update tab to make it active
       await chrome.tabs.update(tabId, { active: true });
       
@@ -184,21 +205,28 @@ export const tabOperationMethods = {
       
       console.log(`CCM Extension: Focused tab ${tabId}`);
       return { success: true };
-      
-    } catch (error) {
-      console.error(`CCM Extension: Failed to focus tab ${tabId}:`, error);
-      return { success: false, error: error.message };
-    }
+    };
+
+    // Use error handler utility
+    const wrappedFocus = withErrorHandling(
+      coreFocusLogic, 
+      `CCM Extension: Failed to focus tab ${tabId}`
+    );
+
+    return await wrappedFocus();
   },
 
   async extractConversationElements(params) {
-    const { tabId } = params;
-    
-    if (!tabId) {
-      return { success: false, error: 'No tabId provided' };
+    // Validate parameters
+    const validationError = validateParams(params, ['tabId']);
+    if (validationError) {
+      return validationError;
     }
     
-    try {
+    const { tabId } = params;
+    
+    // Extract core logic for error handling
+    const coreExtractLogic = async () => {
       const results = await chrome.scripting.executeScript({
         target: { tabId: tabId },
         func: function() {
@@ -252,11 +280,15 @@ export const tabOperationMethods = {
         success: true,
         elements: results[0].result
       };
-      
-    } catch (error) {
-      console.error(`CCM Extension: Failed to extract elements from tab ${tabId}:`, error);
-      return { success: false, error: error.message };
-    }
+    };
+
+    // Use error handler utility
+    const wrappedExtract = withErrorHandling(
+      coreExtractLogic, 
+      `CCM Extension: Failed to extract elements from tab ${tabId}`
+    );
+
+    return await wrappedExtract();
   },
 
   async sendMessageToClaudeTab(params) {
@@ -264,44 +296,45 @@ export const tabOperationMethods = {
     const { tabId, message, waitForReady = true, operationId: serverOperationId } = params;
     console.log(`CCM Extension: extracted serverOperationId:`, serverOperationId);
     
-    if (!tabId || !message) {
-      return { success: false, error: 'Missing required parameters' };
+    // Validate parameters
+    const validationError = validateParams(params, ['tabId', 'message']);
+    if (validationError) {
+      return validationError;
     }
     
-    try {
-      // Acquire lock for this tab operation
-      await this.operationLock.acquireLock(tabId, 'send_message');
-      
+    // Define Chrome API error mappings for sendMessage call
+    const chromeAPIErrorMappings = {
+      'Receiving end does not exist': {
+        error: 'Content script not available in target tab. Tab may not have content script injected or may be on a non-Claude.ai page.',
+        errorType: 'content_script_missing',
+        additionalFields: { tabId }
+      }
+    };
+    
+    // Extract core message sending logic
+    const coreMessageSendLogic = async () => {
       // OPERATION ID UNIFICATION: Use server operation ID if provided, otherwise generate one
       const operationId = serverOperationId || generateOperationId();
       console.log(`CCM Extension: Using operation ID: ${operationId} (from server: ${!!serverOperationId})`);
       
-      // Register operation in content script with error handling
-      try {
-        await chrome.tabs.sendMessage(tabId, {
-          type: 'register_operation',
-          operationId: operationId,
-          operationType: 'send_message',
-          params: { message, tabId }
-        });
-      } catch (error) {
-        this.operationLock.releaseLock(tabId);
-        
-        if (error.message.includes('Receiving end does not exist')) {
-          return { 
-            success: false, 
-            error: 'Content script not available in target tab. Tab may not have content script injected or may be on a non-Claude.ai page.',
-            tabId: tabId,
-            errorType: 'content_script_missing'
-          };
-        } else {
-          return { 
-            success: false, 
-            error: `Failed to register operation: ${error.message}`,
-            tabId: tabId,
-            errorType: 'communication_error'
-          };
-        }
+      // Register operation in content script with Chrome API error handling
+      const wrappedSendMessage = withChromeAPIErrorHandling(
+        async () => {
+          await chrome.tabs.sendMessage(tabId, {
+            type: 'register_operation',
+            operationId: operationId,
+            operationType: 'send_message',
+            params: { message, tabId }
+          });
+        },
+        `CCM Extension: Failed to register operation for tab ${tabId}`,
+        chromeAPIErrorMappings,
+        { tabId, errorType: 'communication_error' }
+      );
+      
+      const sendMessageResult = await wrappedSendMessage();
+      if (!sendMessageResult.success) {
+        return sendMessageResult;
       }
       
       // Execute message sending
@@ -356,9 +389,6 @@ export const tabOperationMethods = {
         args: [message, waitForReady]
       });
       
-      // Release lock
-      this.operationLock.releaseLock(tabId);
-      
       const result = results[0].result;
       if (result.success) {
         // Update operation status to waiting_response
@@ -386,22 +416,31 @@ export const tabOperationMethods = {
       } else {
         return result;
       }
-      
-    } catch (error) {
-      console.error(`CCM Extension: Failed to send message to tab ${tabId}:`, error);
-      this.operationLock.releaseLock(tabId);
-      return { success: false, error: error.message };
-    }
+    };
+
+    // Use lock management wrapper
+    const wrappedWithLock = withLockManagement(
+      coreMessageSendLogic,
+      `CCM Extension: Failed to send message to tab ${tabId}`,
+      (lockKey) => this.operationLock.acquireLock(lockKey, 'send_message'),
+      (lockKey) => this.operationLock.releaseLock(lockKey),
+      () => tabId
+    );
+
+    return await wrappedWithLock();
   },
 
   async getClaudeResponse(params) {
-    const { tabId, operationId, timeoutMs = 30000 } = params;
-    
-    if (!tabId) {
-      return { success: false, error: 'No tabId provided' };
+    // Validate parameters
+    const validationError = validateParams(params, ['tabId']);
+    if (validationError) {
+      return validationError;
     }
     
-    try {
+    const { tabId, operationId, timeoutMs = 30000 } = params;
+    
+    // Extract core logic for error handling
+    const coreGetResponseLogic = async () => {
       const startTime = Date.now();
       const checkInterval = 500;
       
@@ -474,10 +513,14 @@ export const tabOperationMethods = {
         error: 'timeout',
         description: `Response not received within ${timeoutMs}ms`
       };
-      
-    } catch (error) {
-      console.error(`CCM Extension: Failed to get response from tab ${tabId}:`, error);
-      return { success: false, error: error.message };
-    }
+    };
+
+    // Use error handler utility
+    const wrappedGetResponse = withErrorHandling(
+      coreGetResponseLogic, 
+      `CCM Extension: Failed to get response from tab ${tabId}`
+    );
+
+    return await wrappedGetResponse();
   }
 };

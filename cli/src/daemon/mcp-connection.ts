@@ -8,15 +8,18 @@ import { ChildProcess, spawn } from 'child_process';
 import { MCPRequest, MCPResponse, MCPTool, MCPToolCallResponse, MCPConnection } from '../types/mcp';
 import { ServerConfig } from '../types/config';
 import { CLI_CONFIG } from '../config/defaults';
+import { 
+  setupProcessErrorHandlers,
+  withTimeoutWrapper,
+  safeJsonParse,
+  parseJsonWithContext,
+  RequestManager
+} from '../utils/error-handler';
 
 export class StdioMCPConnection implements MCPConnection {
   private process: ChildProcess | null = null;
   private requestId = 0;
-  private pendingRequests = new Map<string, {
-    resolve: (value: MCPResponse) => void;
-    reject: (error: Error) => void;
-    timeout: NodeJS.Timeout;
-  }>();
+  private requestManager = new RequestManager<MCPRequest, MCPResponse>(30000);
   private isInitialized = false;
   private tools: MCPTool[] = [];
 
@@ -67,31 +70,34 @@ export class StdioMCPConnection implements MCPConnection {
         for (const line of lines) {
           if (line.trim()) {
             console.log(`Server ${this.serverId} stdout:`, line.trim());
-            try {
-              const message = JSON.parse(line);
+            const message = safeJsonParse(line, `Server ${this.serverId} JSON parse`);
+            if (message) {
               this.handleMessage(message);
-            } catch (error) {
-              console.error(`Invalid JSON from server ${this.serverId}:`, line);
             }
           }
         }
       });
 
-      this.process.stderr?.on('data', (data: Buffer) => {
-        const message = data.toString().trim();
-        if (message) {
-          console.error(`Server ${this.serverId} stderr:`, message);
-        }
-      });
-
-      this.process.on('error', (error) => {
-        reject(new Error(`Server ${this.serverId} process error: ${error.message}`));
-      });
-
-      this.process.on('exit', (code, signal) => {
-        console.log(`Server ${this.serverId} exited with code ${code}, signal ${signal}`);
-        this.cleanup();
-      });
+      // Set up comprehensive process error handlers
+      setupProcessErrorHandlers(
+        this.process,
+        {
+          onError: (error) => {
+            reject(new Error(`Server ${this.serverId} process error: ${error.message}`));
+          },
+          onExit: (code, signal) => {
+            console.log(`Server ${this.serverId} exited with code ${code}, signal ${signal}`);
+            this.cleanup();
+          },
+          onStderr: (data) => {
+            const message = data.toString().trim();
+            if (message) {
+              console.error(`Server ${this.serverId} stderr:`, message);
+            }
+          }
+        },
+        `Server ${this.serverId}`
+      );
 
       // Initialize immediately - MCP server should respond when ready
       this.initialize()
@@ -154,14 +160,16 @@ export class StdioMCPConnection implements MCPConnection {
       const requestId = request.id.toString();
       console.log(`Server ${this.serverId}: Creating request ${requestId} for ${request.method}`);
       
-      const timeout = setTimeout(() => {
-        console.error(`Server ${this.serverId}: Request ${requestId} timed out after 30s`);
-        this.pendingRequests.delete(requestId);
-        reject(new Error(`Request timeout for ${request.method} (ID: ${requestId})`));
-      }, 30000); // 30 second timeout
-
-      this.pendingRequests.set(requestId, { resolve, reject, timeout });
-      console.log(`Server ${this.serverId}: Added request ${requestId} to pending queue (${this.pendingRequests.size} total)`);
+      // Use RequestManager for consistent timeout handling
+      this.requestManager.registerRequest(
+        requestId,
+        resolve,
+        reject,
+        `Server ${this.serverId} ${request.method}`,
+        30000
+      );
+      
+      console.log(`Server ${this.serverId}: Added request ${requestId} to pending queue (${this.requestManager.getPendingCount()} total)`);
 
       // Send the request
       const message = JSON.stringify(request) + '\n';
@@ -176,14 +184,9 @@ export class StdioMCPConnection implements MCPConnection {
   private handleMessage(message: any): void {
     console.log(`Server ${this.serverId}: Handling message:`, JSON.stringify(message));
     
-    if (message.id && this.pendingRequests.has(message.id.toString())) {
-      // This is a response to our request
-      console.log(`Server ${this.serverId}: Found pending request for ID ${message.id}`);
-      const pending = this.pendingRequests.get(message.id.toString())!;
-      clearTimeout(pending.timeout);
-      this.pendingRequests.delete(message.id.toString());
-      console.log(`Server ${this.serverId}: Resolving request ${message.id}, ${this.pendingRequests.size} requests remaining`);
-      pending.resolve(message);
+    if (message.id && this.requestManager.resolveRequest(message.id.toString(), message)) {
+      // This is a response to our request - RequestManager handled it
+      console.log(`Server ${this.serverId}: Resolved request ${message.id}, ${this.requestManager.getPendingCount()} requests remaining`);
     } else if (message.method) {
       // This is a notification or request from the server
       console.log(`Server ${this.serverId} notification:`, message.method);
@@ -259,12 +262,8 @@ export class StdioMCPConnection implements MCPConnection {
    * Cleanup resources
    */
   private cleanup(): void {
-    // Reject all pending requests
-    for (const [requestId, pending] of this.pendingRequests) {
-      clearTimeout(pending.timeout);
-      pending.reject(new Error('Connection closed'));
-    }
-    this.pendingRequests.clear();
+    // Use RequestManager for consistent cleanup
+    this.requestManager.cleanup(new Error('Connection closed'));
 
     // Kill the process if it's still running
     if (this.process) {

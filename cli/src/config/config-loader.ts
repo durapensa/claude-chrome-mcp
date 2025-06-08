@@ -15,6 +15,10 @@ import {
   DEFAULT_DEFAULTS_CONFIG,
   DEFAULT_SERVER_EXTENSIONS
 } from '../types/config';
+import { 
+  withFileSystemError,
+  parseJsonWithContext
+} from '../utils/error-handler';
 
 export class ConfigLoader {
   private static readonly CONFIG_PATHS = [
@@ -47,7 +51,8 @@ export class ConfigLoader {
     // Try default paths in order
     for (const defaultPath of this.CONFIG_PATHS) {
       const expandedPath = this.expandPath(defaultPath);
-      if (fs.existsSync(expandedPath)) {
+      const safeExists = withFileSystemError(fs.existsSync, 'Check config file', expandedPath);
+      if (safeExists(expandedPath)) {
         return this.loadFromPath(expandedPath);
       }
     }
@@ -61,8 +66,9 @@ export class ConfigLoader {
    */
   private static loadFromPath(filePath: string): MCPCliConfig {
     try {
-      const content = fs.readFileSync(filePath, 'utf-8');
-      const config = JSON.parse(content);
+      const safeReadFile = withFileSystemError(fs.readFileSync, 'Read config file', filePath);
+      const content = safeReadFile(filePath, 'utf-8') as string;
+      const config = parseJsonWithContext(content, `Config file ${filePath}`);
       
       // Expand environment variables in the configuration
       return this.expandEnvironmentVariables(config);
@@ -226,12 +232,17 @@ export class ConfigLoader {
     const configPath = path.join(configDir, 'config.json');
 
     // Create config directory if it doesn't exist
-    if (!fs.existsSync(configDir)) {
-      fs.mkdirSync(configDir, { recursive: true });
+    const safeExists = withFileSystemError(fs.existsSync, 'Check config directory');
+    const safeMkdir = withFileSystemError(fs.mkdirSync, 'Create config directory', configDir);
+    const safeConfigExists = withFileSystemError(fs.existsSync, 'Check config file', configPath);
+    const safeWriteFile = withFileSystemError(fs.writeFileSync, 'Write config file', configPath);
+    
+    if (!safeExists(configDir)) {
+      safeMkdir(configDir, { recursive: true });
     }
 
     // Create default config if it doesn't exist
-    if (!fs.existsSync(configPath)) {
+    if (!safeConfigExists(configPath)) {
       const defaultConfig: MCPCliConfig = {
         mcpServers: {
           "claude-chrome-mcp": {
@@ -247,7 +258,7 @@ export class ConfigLoader {
         defaults: DEFAULT_DEFAULTS_CONFIG
       };
 
-      fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2));
+      safeWriteFile(configPath, JSON.stringify(defaultConfig, null, 2));
     }
 
     return configPath;

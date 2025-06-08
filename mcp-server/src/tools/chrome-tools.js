@@ -2,75 +2,7 @@
 // Browser control tools for extension management, debugging, and DOM operations
 
 const { z } = require('zod');
-
-/**
- * Chrome tool definitions
- */
-const chromeTools = [
-  {
-    name: 'chrome_reload_extension',
-    description: 'Reload the Chrome extension to apply code changes',
-    zodSchema: {}
-  },
-  {
-    name: 'chrome_debug_attach',
-    description: 'Attach Chrome debugger to a tab for advanced operations',
-    zodSchema: {
-      tabId: z.number().describe('The tab ID to attach debugger to')
-    }
-  },
-  {
-    name: 'chrome_debug_detach',
-    description: 'Detach Chrome debugger from a tab',
-    zodSchema: {
-      tabId: z.number().describe('The tab ID to detach debugger from')
-    }
-  },
-  {
-    name: 'chrome_debug_status',
-    description: 'Get debugger attachment status for tabs',
-    zodSchema: {
-      tabId: z.number().optional().describe('Specific tab ID to check (optional - if not provided, returns all debugger sessions)')
-    }
-  },
-  {
-    name: 'chrome_execute_script',
-    description: 'Execute JavaScript in a specific tab',
-    zodSchema: {
-      tabId: z.number().describe('The tab ID to execute script in'),
-      script: z.string().describe('The JavaScript code to execute')
-    }
-  },
-  {
-    name: 'chrome_get_dom_elements',
-    description: 'Query DOM elements in a specific tab',
-    zodSchema: {
-      tabId: z.number().describe('The tab ID to query elements in'),
-      selector: z.string().describe('CSS selector to find elements')
-    }
-  },
-  {
-    name: 'chrome_start_network_monitoring',
-    description: 'Start network request monitoring on a tab',
-    zodSchema: {
-      tabId: z.number().describe('The tab ID to monitor network requests')
-    }
-  },
-  {
-    name: 'chrome_stop_network_monitoring',
-    description: 'Stop network request monitoring on a tab',
-    zodSchema: {
-      tabId: z.number().describe('The tab ID to stop monitoring')
-    }
-  },
-  {
-    name: 'chrome_get_network_requests',
-    description: 'Get captured network requests from monitoring',
-    zodSchema: {
-      tabId: z.number().describe('The tab ID to get captured requests for')
-    }
-  }
-];
+const { createForwardingTool, createResourceSyncTool, extractToolsAndHandlers } = require('../utils/tool-factory');
 
 /**
  * Resource state sync handlers for chrome tools
@@ -105,61 +37,54 @@ const resourceSyncHandlers = {
 };
 
 /**
- * Chrome tool handlers
+ * Create tools using factory patterns to reduce code duplication
  */
-const chromeHandlers = {
-  'chrome_reload_extension': async (server, args) => {
-    return await server.forwardToExtension('chrome_reload_extension', args);
-  },
 
-  'chrome_debug_attach': async (server, args) => {
-    return await server.forwardWithResourceSync(
-      'chrome_debug_attach', 
-      args, 
-      resourceSyncHandlers.debuggerAttach
-    );
-  },
+// Simple forwarding tools (no resource management needed)
+const forwardingToolResults = [
+  createForwardingTool('chrome_reload_extension', 'Reload the Chrome extension to apply code changes', {}),
+  createForwardingTool('chrome_debug_status', 'Get debugger attachment status for tabs', {
+    tabId: z.number().optional().describe('Specific tab ID to check (optional - if not provided, returns all debugger sessions)')
+  }),
+  createForwardingTool('chrome_execute_script', 'Execute JavaScript in a specific tab', {
+    tabId: z.number().describe('The tab ID to execute script in'),
+    script: z.string().describe('The JavaScript code to execute')
+  }),
+  createForwardingTool('chrome_get_dom_elements', 'Query DOM elements in a specific tab', {
+    tabId: z.number().describe('The tab ID to query elements in'),
+    selector: z.string().describe('CSS selector to find elements')
+  }),
+  createForwardingTool('chrome_get_network_requests', 'Get captured network requests from monitoring', {
+    tabId: z.number().describe('The tab ID to get captured requests for')
+  })
+];
 
-  'chrome_debug_detach': async (server, args) => {
-    return await server.forwardWithResourceSync(
-      'chrome_debug_detach', 
-      args, 
-      resourceSyncHandlers.debuggerDetach
-    );
-  },
+// Resource sync tools (require resource state management)
+const resourceSyncToolResults = [
+  createResourceSyncTool('chrome_debug_attach', 'Attach Chrome debugger to a tab for advanced operations', {
+    tabId: z.number().describe('The tab ID to attach debugger to')
+  }, resourceSyncHandlers.debuggerAttach),
+  
+  createResourceSyncTool('chrome_debug_detach', 'Detach Chrome debugger from a tab', {
+    tabId: z.number().describe('The tab ID to detach debugger from')
+  }, resourceSyncHandlers.debuggerDetach),
+  
+  createResourceSyncTool('chrome_start_network_monitoring', 'Start network request monitoring on a tab', {
+    tabId: z.number().describe('The tab ID to monitor network requests')
+  }, resourceSyncHandlers.networkMonitoringStart),
+  
+  createResourceSyncTool('chrome_stop_network_monitoring', 'Stop network request monitoring on a tab', {
+    tabId: z.number().describe('The tab ID to stop monitoring')
+  }, resourceSyncHandlers.networkMonitoringStop)
+];
 
-  'chrome_debug_status': async (server, args) => {
-    return await server.forwardToExtension('chrome_debug_status', args);
-  },
+// Extract tools and handlers from factory results
+const forwardingTools = extractToolsAndHandlers(forwardingToolResults);
+const resourceSyncTools = extractToolsAndHandlers(resourceSyncToolResults);
 
-  'chrome_execute_script': async (server, args) => {
-    return await server.forwardToExtension('chrome_execute_script', args);
-  },
-
-  'chrome_get_dom_elements': async (server, args) => {
-    return await server.forwardToExtension('chrome_get_dom_elements', args);
-  },
-
-  'chrome_start_network_monitoring': async (server, args) => {
-    return await server.forwardWithResourceSync(
-      'chrome_start_network_monitoring', 
-      args, 
-      resourceSyncHandlers.networkMonitoringStart
-    );
-  },
-
-  'chrome_stop_network_monitoring': async (server, args) => {
-    return await server.forwardWithResourceSync(
-      'chrome_stop_network_monitoring', 
-      args, 
-      resourceSyncHandlers.networkMonitoringStop
-    );
-  },
-
-  'chrome_get_network_requests': async (server, args) => {
-    return await server.forwardToExtension('chrome_get_network_requests', args);
-  }
-};
+// Combine all tools and handlers
+const chromeTools = [...forwardingTools.tools, ...resourceSyncTools.tools];
+const chromeHandlers = { ...forwardingTools.handlers, ...resourceSyncTools.handlers };
 
 module.exports = {
   chromeTools,
