@@ -11,66 +11,216 @@
 
 **CRITICAL RULES**:
 
-WHEN: Editing CLAUDE.md
-THEN: ONLY include:
-  - Tools and their usage patterns
-  - Operational instructions and workflows
-  - Troubleshooting patterns and solutions
-  - WHEN/THEN decision logic
-NEVER include:
-  - Work accomplishments or progress reports
-  - Code examples (reference file paths instead)
-  - Implementation details or how things work internally
-  - Test results or coverage statistics
-  - Historical changes or "what was done"
-  
-WHEN: Tempted to document completed work in CLAUDE.md
-THEN: STOP - use GitHub issues or commit messages instead
+## Document Philosophy
 
-WHEN: Writing documentation in CLAUDE.md
-THEN: Use WHEN/THEN logic structure and decision trees
+THIS DOCUMENT IS: An operational playbook for daily use
+THIS DOCUMENT IS NOT: A development log, architecture guide, or progress tracker
 
-WHEN: Making ANY code changes
-THEN: Test changes thoroughly before committing - NO EXCEPTIONS
+ALWAYS:
+- Answer "What do I do?" not "How does it work?"
+- Update immediately when workflows change
+- Test every command before documenting
+- Include expected outputs and timing
+- Correct drift the moment it's noticed - no deferrals
+- Fill gaps when discovered during use - not "later"
+- Formalize patterns after 2+ occurrences
 
-WHEN: Need to implement new functionality
-THEN: Edit existing files rather than create new ones
+NEVER:
+- Document completed work (→ GitHub issues)
+- Explain implementations (→ docs/ folder)
+- Show code snippets (→ reference file paths)
+- Add emoji or decorative glyphs
+- Leave "TODO" or "TBD" markers - fix it now
+- Accept vague timings like "a while" - measure and specify
 
-WHEN: Your knowledge of the project improves
-THEN: Make immediate edits to existing docs to reflect new understanding
+## Content Patterns
 
-WHEN: Tracking work or knowledge
-THEN: Use single source of truth:
-  - GitHub Issues → active work
-  - docs folder → stable knowledge
-  - NEVER duplicate knowledge across docs
+### Primary Pattern: WHEN/THEN
+```
+WHEN: [Specific situation]
+THEN: [Concrete action with example]
+```
 
-WHEN: Encountering new, obsolete, or changed workflows
-THEN: Document them here in CLAUDE.md following these CRITICAL RULES
+### Troubleshooting Pattern: SYMPTOM → DIAGNOSIS → TREATMENT
+```
+SYMPTOM: MCP tool timeout
+DIAGNOSIS: Check connection with `mcp system_health`
+TREATMENT: 
+  Level 1: `mcp chrome_reload_extension`
+  Level 2: Manual reload at chrome://extensions/
+  Level 3: Enable debug mode and check logs
+```
 
-WHEN: Documenting in any file
-THEN: Don't include code examples (reference file paths instead)
+### Decision Pattern: IF/THEN/ELSE
+```
+IF: extension.relayConnected = false
+THEN: Reload extension
+ELSE IF: Still disconnected after reload
+THEN: Manual intervention required
+ELSE: Continue with operations
+```
 
-WHEN: Writing any documentation, issues, or code
-THEN: NEVER use emoji or pictogram glyphs - remove them when found
+### Workflow Pattern: CONTEXT → ACTION → EXPECTED
+```
+CONTEXT: Need to send message to Claude
+ACTION: `mcp tab_send_message --tabId 12345 --message "Hello"`
+EXPECTED: Returns immediately with operation ID
+```
 
-WHEN: Ready to commit changes
-THEN: Follow this sequence:
-  1. Run `git status` to review changes
-  2. Stage files selectively with `git add <specific-files>`
-  3. NEVER use `git add .` without explicit permission
-  4. Write detailed commit message with implementation details
-  5. Run `git status` again to verify clean working directory
+## Information Architecture
 
-WHEN: Multiple unrelated changes exist
-THEN: Commit them separately with focused commit messages
+PUT THIS HERE | NOT HERE
+---|---
+Operational procedures | Implementation details
+Command examples with output | Code snippets
+Troubleshooting steps | Root cause analysis
+Active warnings (e.g., Issue #7) | Resolved issues
+File path references | File contents
 
-WHEN: Need to interact with GitHub (issues, PRs, etc.)
-THEN: Use gh command via Bash tool (NOT WebFetch):
+ROUTING RULES:
+- Active work → GitHub Issues
+- Stable knowledge → docs/ folder  
+- What changed → Commit messages
+- How to operate → CLAUDE.md
+- Why it works → Architecture docs
+
+## Command Documentation Standards
+
+GOOD EXAMPLE:
 ```bash
-gh issue list --repo durapensa/claude-chrome-mcp
-gh issue view 7
-gh api repos/durapensa/claude-chrome-mcp/pulls/123/comments
+# Create tab (2-3 seconds)
+mcp tab_create --injectContentScript
+# Output: { "success": true, "tabId": 12345 }
+```
+
+BAD EXAMPLE:
+```bash
+# Create a tab
+mcp tab_create  # Missing timing, options, output format
+```
+
+PATTERN FOR COMMANDS:
+1. Purpose comment with timing expectation
+2. Full command with common options
+3. Expected output format or behavior
+4. Common failure modes (if any)
+
+## Critical Operational Rules
+
+ALWAYS:
+- Test in correct environment (Extension → MCP tools, Server → CLI tools)
+- Check `mcp system_health` before complex operations
+- Use `timeout` if you notice commands timing out
+- Use file paths not code: "See implementation in `path/to/file.js:123`"
+- Document timing: "Returns immediately" vs "Blocks 2-3 seconds"
+- Capture error codes/messages when encountered → Add to patterns
+- Verify recovery with explicit checklist after any failure
+- Document performance baseline on first observation
+
+NEVER:
+- Add `sleep` delays (commands handle own timing)
+- Test server changes with MCP tools
+- Create new files when existing ones can be edited
+- Skip documenting a workaround - formalize it immediately
+- Use relative performance terms without baseline numbers
+
+## Troubleshooting Decision Tree
+
+```
+Problem Detected
+├─ Connection Issue?
+│  ├─ YES → See "Connection Issues" pattern
+│  └─ NO → Continue
+├─ Operation Hanging?
+│  ├─ YES → See "Operation Failures" pattern
+│  └─ NO → Continue
+├─ After Chrome Restart?
+│  ├─ YES → See "State Recovery" pattern
+│  └─ NO → Continue
+└─ Need Detailed Diagnosis?
+   └─ See "Diagnostic Recipes"
+```
+
+## Git Workflow Rules
+
+BEFORE COMMITTING:
+1. ✓ All tests pass
+2. ✓ Changes are related
+3. ✓ Working directory is clean
+
+COMMIT SEQUENCE:
+```bash
+git status                    # Review all changes
+git add <specific-files>      # Stage selectively  
+git commit -m "type: description"
+git status                    # Verify clean state
+```
+
+IF: Multiple unrelated changes
+THEN: Split into separate commits
+EXAMPLE: 
+- Commit 1: "fix: tab operation timeout handling"
+- Commit 2: "docs: update troubleshooting guide"
+
+## Testing Patterns
+
+Component → Test Method:
+- `extension/*` → `mcp chrome_reload_extension` + MCP tools
+- `cli/*` → `npm run build && npm install -g` + CLI commands  
+- `mcp-server/*` → `mcp daemon restart` + CLI tools
+- `tests/*` → `cd tests && npm test`
+
+COMMON MISTAKE PATTERN:
+```
+MISTAKE: Using MCP tools after server changes
+WHY: MCP tools use Claude Code's server, not your local daemon
+CORRECT: Use CLI tools (mcp commands without __claude-chrome-mcp__)
+```
+
+## Meta-Rules for Updating This Document
+
+WHEN UPDATING:
+- Prefer revising existing patterns over adding new ones
+- Combine related WHEN/THEN rules when possible
+- Test every command/workflow before documenting
+- Keep examples concrete with real values
+- Update within the same session when drift detected
+- Add missing decision branches immediately when discovered
+
+STRUCTURE NEW CONTENT AS:
+1. Identify the pattern type (operational, troubleshooting, decision)
+2. Choose appropriate logical flow
+3. Include concrete example with expected output
+4. Add to correct section
+5. Remove any duplicate information
+6. Verify no gaps remain in the workflow
+7. Include error codes and recovery verification
+
+DRIFT CORRECTION PROTOCOL:
+```
+WHEN: Any documented behavior doesn't match reality
+THEN: 
+1. Test current behavior
+2. Update documentation immediately
+3. Include version/date if behavior changed
+4. NO "will update later" - fix now
+```
+
+GAP FILLING PROTOCOL:
+```
+WHEN: Missing information noticed during use
+THEN:
+1. Gather the missing data
+2. Add to appropriate section
+3. Test the addition
+4. Cross-reference related sections
+```
+
+PERFORMANCE BASELINE PROTOCOL:
+```
+WHEN: First timing observation made
+THEN: Document as: "Operation X: Y±Z seconds (measured DATE)"
+NOT: "Operation X: fast" or "usually quick"
 ```
 
 ## SESSION CONTINUITY
