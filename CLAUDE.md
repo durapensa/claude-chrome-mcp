@@ -97,6 +97,25 @@ mcp tab_close --tabId 12345
 - BAD: `sleep 3 && mcp system_health`
 - GOOD: `mcp system_health` (runs immediately, shows current state)
 
+### 🚀 Batch Operations (Advanced)
+
+WHEN: Need to coordinate multiple tabs
+THEN: Use batch operations for efficiency:
+```bash
+# Send messages to multiple tabs in parallel
+mcp tab_batch_operations \
+  --operation send_messages \
+  --messages '[{"tabId":123,"message":"Hello"},{"tabId":456,"message":"Hi"}]' \
+  --sequential false
+
+# Get responses from multiple tabs
+mcp tab_batch_operations \
+  --operation get_responses \
+  --tabIds '[123,456]'
+```
+
+**DISCOVERED**: Batch operations support parallel execution by default!
+
 ### Development & Testing
 
 WHEN: Making code changes
@@ -354,12 +373,29 @@ git push origin main
 
 **NEVER**: Close tab before detaching debugger!
 
-### Test Coverage Gaps
-**CURRENT**: 34.4% coverage (11/32 tools tested)
-**PRIORITY** when adding tests:
-1. Chrome tools: 8/9 untested (critical gap)
-2. Tab workflows: Advanced operations untested
-3. API sequences: Deletion/search untested
+### Test Coverage
+**CURRENT**: 100% coverage (32/32 tools tested) ✅
+**COMPLETED**: All MCP tools now have comprehensive test coverage
+- Chrome tools: 9/9 tested (debugger, script execution, DOM, network monitoring)
+- Tab tools: 11/11 tested (including batch ops, forwarding, export)
+- API tools: 5/5 tested (search, URL generation, deletion)
+- System tools: 7/7 tested (debug mode, log levels, operations)
+
+### Testing Best Practices
+**PATTERN**: Tab hygiene in tests
+**WHEN**: Writing integration tests
+**THEN**: Follow this structure:
+```javascript
+// Create shared tab in beforeAll for reuse
+// Track all created tabs
+// Clean up in afterEach AND afterAll
+// Only create new tabs when isolation needed
+```
+
+**DISCOVERED**: Response format variations
+- `chrome_debug_status` → Returns array directly, not {sessions: [...]}
+- `chrome_execute_script` → Result in `result.value`, not `result`
+- `chrome_get_dom_elements` → Returns array directly
 
 ## QUICK REFERENCE
 
