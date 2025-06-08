@@ -63,12 +63,12 @@ class AutoElectionRelay extends EventEmitter {
   }
   
   async checkExistingRelay() {
-    const healthUrl = `http://localhost:${this.port + 1}/health`;
+    const healthUrl = `http://${config.RELAY_HOST}:${config.HEALTH_PORT}/health`;
     
     try {
       const response = await fetch(healthUrl, {
         method: 'GET',
-        signal: AbortSignal.timeout(1000) // 1 second timeout
+        signal: AbortSignal.timeout(config.HEALTH_CHECK_TIMEOUT)
       });
       
       if (response.ok) {

@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { EventEmitter } = require('events');
 const { createLogger } = require('./logger');
+const config = require('../config');
 
 // Manages async operations with state persistence for MCP operations
 class MCPOperationManager extends EventEmitter {
@@ -143,7 +144,7 @@ class MCPOperationManager extends EventEmitter {
     return pending;
   }
 
-  cleanup(maxAge = 3600000) { // 1 hour
+  cleanup(maxAge = config.OPERATION_CLEANUP_AGE) {
     const cutoff = Date.now() - maxAge;
     let cleanedCount = 0;
     

@@ -189,7 +189,7 @@ class ChromeMCPServer {
     // Try to fetch relay health from endpoint
     let relayHealth = null;
     try {
-      const response = await fetch('http://localhost:54322/health');
+      const response = await fetch(config.RELAY_URLS.health());
       if (response.ok) {
         relayHealth = await response.json();
       }
@@ -240,8 +240,8 @@ class ChromeMCPServer {
       if (Date.now() - startTime > timeoutMs) {
         throw new Error(`Relay connection timeout after ${timeoutMs}ms`);
       }
-      // Wait 100ms before checking again
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Wait before checking again
+      await new Promise(resolve => setTimeout(resolve, config.POLL_INTERVAL_MS));
     }
   }
 
@@ -293,7 +293,7 @@ class ChromeMCPServer {
   }
 
   async waitForOperation(params) {
-    const { operationId, timeoutMs = 30000 } = params;
+    const { operationId, timeoutMs = config.DEFAULT_TIMEOUT } = params;
     const operation = await this.operationManager.waitForCompletion(operationId, timeoutMs);
     
     return formatMCPResponse(operation);

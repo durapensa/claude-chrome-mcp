@@ -79,7 +79,7 @@ const simpleForwardingToolResults = [
   createForwardingTool('tab_extract_elements', 'Extract conversation elements including artifacts, code blocks, and tool usage', {
     tabId: z.number().describe('The tab ID of the Claude conversation'),
     batchSize: z.number().default(50).describe('Max elements to process per type (default: 50)'),
-    maxElements: z.number().default(1000).describe('Max total elements to extract before stopping (default: 1000)')
+    maxElements: z.number().default(config.MAX_ELEMENTS_DEFAULT).describe(`Max total elements to extract before stopping (default: ${config.MAX_ELEMENTS_DEFAULT})`)
   }),
   createForwardingTool('tab_export_conversation', 'Export a full conversation transcript with metadata in markdown or JSON format', {
     tabId: z.number().describe('The tab ID of the Claude conversation to export'),

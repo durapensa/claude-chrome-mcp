@@ -58,6 +58,8 @@ const config = {
   
   // Network settings
   WEBSOCKET_PORT: parseInt(process.env.MCP_WEBSOCKET_PORT || '54321', 10),
+  HEALTH_PORT: parseInt(process.env.MCP_HEALTH_PORT || '54322', 10),
+  RELAY_HOST: process.env.MCP_RELAY_HOST || '127.0.0.1',
   CLAUDE_URL: process.env.MCP_CLAUDE_URL || 'https://claude.ai',
   CLAUDE_DOMAIN: process.env.MCP_CLAUDE_DOMAIN || 'claude.ai',
   
@@ -73,6 +75,7 @@ const config = {
   RETRY_DELAY_MS: parseInt(process.env.MCP_RETRY_DELAY_MS || '1000', 10),
   BATCH_SIZE: parseInt(process.env.MCP_BATCH_SIZE || '50', 10),
   MAX_CONCURRENT: parseInt(process.env.MCP_MAX_CONCURRENT || '5', 10),
+  OPERATION_CLEANUP_AGE: parseInt(process.env.MCP_OPERATION_CLEANUP_AGE || '3600000', 10), // 1 hour
   
   // Max reconnect delay for relay client
   MAX_RECONNECT_DELAY: parseInt(process.env.MCP_MAX_RECONNECT_DELAY || '30000', 10),
@@ -81,6 +84,10 @@ const config = {
   POLL_INTERVAL_MS: parseInt(process.env.MCP_POLL_INTERVAL || '1000', 10),
   SEQUENTIAL_DELAY_MS: parseInt(process.env.MCP_SEQUENTIAL_DELAY || '1000', 10),
   API_BATCH_SIZE: parseInt(process.env.MCP_API_BATCH_SIZE || '5', 10),
+  GRACE_PERIOD_MS: parseInt(process.env.MCP_GRACE_PERIOD || '2000', 10),
+  STALE_THRESHOLD_MS: parseInt(process.env.MCP_STALE_THRESHOLD || '300000', 10), // 5 minutes
+  MAX_ELEMENTS_DEFAULT: parseInt(process.env.MCP_MAX_ELEMENTS_DEFAULT || '1000', 10),
+  LOG_BATCH_INTERVAL_MS: parseInt(process.env.MCP_LOG_BATCH_INTERVAL || '2000', 10),
   
   // Request timeouts
   HEALTH_CHECK_TIMEOUT: parseInt(process.env.MCP_HEALTH_CHECK_TIMEOUT || '1000', 10),
@@ -163,7 +170,7 @@ const config = {
   }
 };
 
-// Add Claude.ai URL Templates after config is defined (to avoid circular reference)
+// Add URL Templates after config is defined (to avoid circular reference)
 config.CLAUDE_URLS = {
   // SAFE/STABLE URLs - User-facing, unlikely to change
   base() { return config.CLAUDE_URL; },
@@ -176,6 +183,13 @@ config.CLAUDE_URLS = {
   apiConversations(orgId) { return `${config.CLAUDE_URL}/api/organizations/${orgId}/chat_conversations`; },
   apiConversation(orgId, conversationId) { return `${config.CLAUDE_URL}/api/organizations/${orgId}/chat_conversations/${conversationId}`; },
   apiCompletion(orgId, conversationId) { return `${config.CLAUDE_URL}/api/organizations/${orgId}/chat_conversations/${conversationId}/completion`; }
+};
+
+// Add Relay URL Templates
+config.RELAY_URLS = {
+  websocket() { return `ws://${config.RELAY_HOST}:${config.WEBSOCKET_PORT}`; },
+  health() { return `http://${config.RELAY_HOST}:${config.HEALTH_PORT}/health`; },
+  takeover() { return `http://${config.RELAY_HOST}:${config.HEALTH_PORT}/takeover`; }
 };
 
 // Log config on startup if debug mode

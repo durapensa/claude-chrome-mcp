@@ -50,9 +50,9 @@ const customToolResults = [
   createCustomTool('api_delete_conversations', 'Delete Claude conversations permanently - supports single or bulk deletion with progress tracking', {
     conversationIds: z.array(z.string()).describe('Array of conversation UUIDs to delete (single item for individual deletion)'),
     batchSize: z.number().default(5).describe('Number of deletions to process per batch (default: 5)'),
-    delayMs: z.number().default(1000).describe('Delay between batches in milliseconds (default: 1000)')
+    delayMs: z.number().default(config.SEQUENTIAL_DELAY_MS).describe(`Delay between batches in milliseconds (default: ${config.SEQUENTIAL_DELAY_MS})`)
   }, async (server, args) => {
-    const { conversationIds, batchSize = 5, delayMs = 1000 } = args;
+    const { conversationIds, batchSize = config.API_BATCH_SIZE, delayMs = config.SEQUENTIAL_DELAY_MS } = args;
     
     // Create operation for async tracking
     const operationId = server.operationManager.createOperation('api_delete_conversations', {

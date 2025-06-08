@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { EventEmitter } = require('events');
 const { createLogger } = require('./logger');
+const config = require('../config');
 
 /**
  * ResourceStateManager - Persistent state management for critical extension resources
@@ -121,7 +122,7 @@ class ResourceStateManager extends EventEmitter {
   getOrphanedDebuggerSessions() {
     const orphaned = [];
     const now = Date.now();
-    const staleThreshold = 5 * 60 * 1000; // 5 minutes
+    const staleThreshold = config.STALE_THRESHOLD_MS;
     
     for (const [tabId, session] of this.debuggerSessions) {
       const isStale = !session.recovery.verified && 

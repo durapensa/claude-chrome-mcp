@@ -282,12 +282,12 @@ class WebSocketRelayServer extends RelayBase {
     this.broadcast({
       type: RELAY_MESSAGES.SHUTDOWN,
       _reason: reason,
-      _gracePeriodMs: 2000,
+      _gracePeriodMs: config.GRACE_PERIOD_MS,
       _timestamp: Date.now()
     });
     
     // Give clients time to prepare
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise(resolve => setTimeout(resolve, config.GRACE_PERIOD_MS));
     
     // Close all client connections
     this.clients.forEach((client, clientId) => {

@@ -3,6 +3,7 @@
 
 const { z } = require('zod');
 const { createForwardingTool, createForwardingToolWithCommand, createCustomTool, extractToolsAndHandlers } = require('../utils/tool-factory');
+const config = require('../config');
 
 /**
  * Create tools using factory patterns to reduce code duplication
@@ -24,7 +25,7 @@ const forwardingWithCommandResults = [
   createForwardingToolWithCommand('system_enable_extension_debug_mode', 'Enable real-time forwarding of Chrome extension logs to MCP server. Extension logs distinct from MCP server logs (winston files in ~/.claude-chrome-mcp/logs/)', {
     components: z.array(z.string()).describe('Specific extension components to monitor: background, relay-client, content-script, etc. (empty = all)').default([]),
     errorOnly: z.boolean().describe('Only forward ERROR level extension logs (true) or all levels (false)').default(false),
-    batchIntervalMs: z.number().describe('Batch interval for non-error extension logs in milliseconds').default(2000)
+    batchIntervalMs: z.number().describe('Batch interval for non-error extension logs in milliseconds').default(config.LOG_BATCH_INTERVAL_MS)
   }, 'enable_debug_mode'),
   
   createForwardingToolWithCommand('system_disable_extension_debug_mode', 'Disable real-time forwarding of Chrome extension logs to MCP server. Does not affect MCP server winston logs', {}, 'disable_debug_mode'),
@@ -50,12 +51,12 @@ const customToolResults = [
   createCustomTool('system_relay_takeover', 'Request the current relay to shut down gracefully, allowing a new relay to take over. Use with caution.', {}, async (server, args) => {
     try {
       // Check current relay health first
-      const healthResponse = await fetch('http://localhost:54322/health');
+      const healthResponse = await fetch(config.RELAY_URLS.health());
       if (!healthResponse.ok) {
         return {
           content: [{
             type: 'text',
-            text: 'No relay server found running on port 54321'
+            text: `No relay server found running on ${config.RELAY_HOST}:${config.WEBSOCKET_PORT}`
           }]
         };
       }
@@ -63,7 +64,7 @@ const customToolResults = [
       const health = await healthResponse.json();
       
       // Request takeover
-      const takeoverResponse = await fetch('http://localhost:54322/takeover', {
+      const takeoverResponse = await fetch(config.RELAY_URLS.takeover(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
