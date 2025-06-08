@@ -1,9 +1,10 @@
 const { MCPTestClient } = require('../helpers/mcp-test-client');
 const { PreFlightCheck } = require('../helpers/pre-flight-check');
+const { globalTabHygiene, setupTabHygiene, cleanupAllTabs } = require('../helpers/tab-hygiene');
 
 describe('Tab Operations Functionality (Requires Extension)', () => {
   let client;
-  let createdTabs = [];
+  let sharedTabId; // Reusable tab for tests that don't need isolation
   
   beforeAll(async () => {
     // Check full integration prerequisites
@@ -15,24 +16,29 @@ describe('Tab Operations Functionality (Requires Extension)', () => {
     } catch (error) {
       throw new Error(`Integration prerequisites failed: ${error.message}`);
     }
+    
+    // Initialize tab hygiene
+    const tempClient = new MCPTestClient();
+    await tempClient.connect();
+    await setupTabHygiene(tempClient);
+    
+    // Get a shared tab for tests that don't need isolation
+    sharedTabId = await globalTabHygiene.getSharedTab('tab-operations');
+    
+    await tempClient.disconnect();
   }, 15000);
+  
+  afterAll(async () => {
+    // Clean up all tabs created by this test suite
+    await cleanupAllTabs();
+  }, 10000);
   
   beforeEach(async () => {
     client = new MCPTestClient();
     await client.connect();
-    createdTabs = [];
   });
   
   afterEach(async () => {
-    // Clean up any tabs created during test
-    for (const tabId of createdTabs) {
-      try {
-        await client.callTool('tab_close', { tabId, force: true });
-      } catch (e) {
-        console.log(`Warning: Failed to close tab ${tabId}:`, e.message);
-      }
-    }
-    
     if (client) {
       await client.cleanup();
       await client.disconnect();
@@ -41,33 +47,24 @@ describe('Tab Operations Functionality (Requires Extension)', () => {
 
   describe('Core Tab Operations', () => {
     test('createTab functionality is preserved', async () => {
-      const result = await client.callTool('tab_create', {
+      const tabId = await globalTabHygiene.createDedicatedTab({
         waitForLoad: true,
         injectContentScript: true
       });
       
-      expect(result.success).toBe(true);
-      expect(result.tabId).toBeTruthy();
-      expect(typeof result.tabId).toBe('number');
-      createdTabs.push(result.tabId);
+      expect(tabId).toBeTruthy();
+      expect(typeof tabId).toBe('number');
       
-      // Verify injection result if provided
-      if (result.injectionResult) {
-        expect(result.injectionResult).toHaveProperty('success');
-      }
+      // Verify tab exists in tab list
+      const listResult = await client.callTool('tab_list');
+      const ourTab = listResult.tabs.find(t => t.id === tabId);
+      expect(ourTab).toBeTruthy();
       
-      console.log(`✅ Created tab ${result.tabId} with content script injection`);
+      console.log(`✅ Created tab ${tabId} with content script injection`);
     }, 30000);
 
     test('tab_list functionality is preserved', async () => {
-      // First create a tab to ensure we have at least one
-      const createResult = await client.callTool('tab_create', {
-        waitForLoad: true
-      });
-      expect(createResult.success).toBe(true);
-      createdTabs.push(createResult.tabId);
-      
-      // Now get the tab list
+      // Get the tab list (we already have a shared tab)
       const listResult = await client.callTool('tab_list');
       
       expect(listResult.success).toBe(true);
@@ -75,26 +72,24 @@ describe('Tab Operations Functionality (Requires Extension)', () => {
       expect(listResult.count).toBe(listResult.tabs.length);
       expect(listResult.tabs.length).toBeGreaterThan(0);
       
-      // Find our created tab
-      const ourTab = listResult.tabs.find(tab => tab.id === createResult.tabId);
+      // Find our shared tab
+      const ourTab = listResult.tabs.find(tab => tab.id === sharedTabId);
       expect(ourTab).toBeTruthy();
       expect(ourTab).toHaveProperty('title');
       expect(ourTab).toHaveProperty('url');
       expect(ourTab).toHaveProperty('status');
       expect(ourTab).toHaveProperty('hasContentScript');
       
-      console.log(`✅ Found ${listResult.count} Claude tabs, including our created tab ${createResult.tabId}`);
+      console.log(`✅ Found ${listResult.count} Claude tabs, including our shared tab ${sharedTabId}`);
     }, 20000);
 
     test('tab_close functionality is preserved', async () => {
-      // Create a tab to close
-      const createResult = await client.callTool('tab_create', {
+      // Create a dedicated tab to close
+      const tabId = await globalTabHygiene.createDedicatedTab({
         waitForLoad: true
       });
-      expect(createResult.success).toBe(true);
-      const tabId = createResult.tabId;
       
-      // Close the tab
+      // Close the tab using the API directly (testing the close functionality)
       const closeResult = await client.callTool('tab_close', { tabId });
       
       expect(closeResult.success).toBe(true);
@@ -107,8 +102,8 @@ describe('Tab Operations Functionality (Requires Extension)', () => {
         console.log(`✅ Tab ${tabId} closed successfully`);
       }
       
-      // Remove from our tracking since it's closed
-      createdTabs = createdTabs.filter(id => id !== tabId);
+      // Remove from tab hygiene tracking since we closed it manually
+      globalTabHygiene.untrackTab(tabId);
     }, 20000);
 
     test('tab_focus functionality works', async () => {

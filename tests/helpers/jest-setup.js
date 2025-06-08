@@ -35,3 +35,15 @@ console.error = (...args) => {
 
 // Set shorter timeout for all tests by default
 jest.setTimeout(15000);
+
+// Import tab hygiene for global cleanup
+const { finalTabCleanup } = require('./tab-hygiene');
+
+// Register global cleanup to run after ALL test suites complete
+// This ensures no tabs are left open even if individual test cleanup fails
+if (typeof afterAll === 'function') {
+  global.afterAll(async () => {
+    console.log = originalConsoleError; // Temporarily restore console for cleanup messages
+    await finalTabCleanup();
+  }, 30000);
+}

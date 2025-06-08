@@ -1,10 +1,10 @@
 const { MCPTestClient } = require('../helpers/mcp-test-client');
 const { PreFlightCheck } = require('../helpers/pre-flight-check');
+const { globalTabHygiene, setupTabHygiene, cleanupAllTabs } = require('../helpers/tab-hygiene');
 
 describe('Chrome Tools (Requires Extension)', () => {
   let client;
   let sharedTabId; // Reusable tab for most tests
-  let createdTabs = []; // Track all tabs we create
   let attachedTabs = [];
   let monitoringTabs = [];
   
@@ -20,34 +20,20 @@ describe('Chrome Tools (Requires Extension)', () => {
       throw new Error(`Integration prerequisites failed: ${error.message}`);
     }
     
-    // Create a shared tab for tests that don't need isolation
+    // Initialize tab hygiene
     const tempClient = new MCPTestClient();
     await tempClient.connect();
-    const result = await tempClient.callTool('tab_create', { 
-      injectContentScript: true, 
-      waitForLoad: true 
-    });
-    sharedTabId = result.tabId;
-    createdTabs.push(sharedTabId);
+    await setupTabHygiene(tempClient);
+    
+    // Get a shared tab for tests that don't need isolation
+    sharedTabId = await globalTabHygiene.getSharedTab('chrome-tools');
+    
     await tempClient.disconnect();
-    console.log(`✅ Created shared test tab ${sharedTabId}`);
   }, 15000);
   
   afterAll(async () => {
-    // Final tab cleanup - close all tabs we created
-    const tempClient = new MCPTestClient();
-    await tempClient.connect();
-    
-    for (const tabId of createdTabs) {
-      try {
-        await tempClient.callTool('tab_close', { tabId, force: true });
-        console.log(`✅ Closed tab ${tabId}`);
-      } catch (e) {
-        console.log(`Warning: Failed to close tab ${tabId} in final cleanup:`, e.message);
-      }
-    }
-    
-    await tempClient.disconnect();
+    // Clean up all tabs created by this test suite
+    await cleanupAllTabs();
   }, 10000);
   
   beforeEach(async () => {
@@ -153,12 +139,7 @@ describe('Chrome Tools (Requires Extension)', () => {
   describe('Network Monitoring', () => {
     test('Can start and stop network monitoring', async () => {
       // Create a dedicated tab for network monitoring since we'll navigate
-      const tabResult = await client.callTool('tab_create', { 
-        injectContentScript: true, 
-        waitForLoad: true 
-      });
-      const networkTestTabId = tabResult.tabId;
-      createdTabs.push(networkTestTabId);
+      const networkTestTabId = await globalTabHygiene.createDedicatedTab();
       
       try {
         // Start monitoring
@@ -194,14 +175,8 @@ describe('Chrome Tools (Requires Extension)', () => {
         monitoringTabs = monitoringTabs.filter(id => id !== networkTestTabId);
         console.log('✅ Network monitoring stopped');
       } finally {
-        // Clean up the dedicated tab
-        try {
-          await client.callTool('tab_close', { tabId: networkTestTabId, force: true });
-          createdTabs = createdTabs.filter(id => id !== networkTestTabId);
-          console.log(`✅ Closed network test tab ${networkTestTabId}`);
-        } catch (e) {
-          console.log(`Warning: Failed to close network test tab ${networkTestTabId}:`, e.message);
-        }
+        // Tab will be cleaned up automatically by tab hygiene
+        await globalTabHygiene.cleanupTab(networkTestTabId);
       }
     }, 30000);
   });

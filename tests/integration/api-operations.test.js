@@ -1,10 +1,10 @@
 const { MCPTestClient } = require('../helpers/mcp-test-client');
 const { PreFlightCheck } = require('../helpers/pre-flight-check');
+const { globalTabHygiene, setupTabHygiene, cleanupAllTabs } = require('../helpers/tab-hygiene');
 
 describe('API Operations (Requires Extension)', () => {
   let client;
   let testConversationId; // Store a conversation ID for testing
-  let createdTabs = []; // Track tabs for cleanup
   
   beforeAll(async () => {
     // Check full integration prerequisites
@@ -17,10 +17,12 @@ describe('API Operations (Requires Extension)', () => {
       throw new Error(`Integration prerequisites failed: ${error.message}`);
     }
     
-    // Get a conversation ID from the list for testing
+    // Initialize tab hygiene
     const tempClient = new MCPTestClient();
     await tempClient.connect();
+    await setupTabHygiene(tempClient);
     
+    // Get a conversation ID from the list for testing
     const listResult = await tempClient.callTool('api_list_conversations');
     if (listResult.conversations && listResult.conversations.length > 0) {
       // Pick a conversation that's not currently open to avoid conflicts
@@ -35,22 +37,8 @@ describe('API Operations (Requires Extension)', () => {
   }, 15000);
   
   afterAll(async () => {
-    // Clean up any tabs we created
-    if (createdTabs.length > 0) {
-      const tempClient = new MCPTestClient();
-      await tempClient.connect();
-      
-      for (const tabId of createdTabs) {
-        try {
-          await tempClient.callTool('tab_close', { tabId, force: true });
-          console.log(`✅ Closed tab ${tabId}`);
-        } catch (e) {
-          console.log(`Warning: Failed to close tab ${tabId}:`, e.message);
-        }
-      }
-      
-      await tempClient.disconnect();
-    }
+    // Clean up all tabs created by this test suite
+    await cleanupAllTabs();
   }, 10000);
   
   beforeEach(async () => {
@@ -166,51 +154,43 @@ describe('API Operations (Requires Extension)', () => {
       });
       
       // Open in new tab
-      const tabResult = await client.callTool('tab_create', {
+      const tabId = await globalTabHygiene.createDedicatedTab({
         url: urlResult.url,
         waitForLoad: true,
         injectContentScript: true
       });
       
-      createdTabs.push(tabResult.tabId);
-      
-      expect(tabResult.success).toBe(true);
-      expect(tabResult.tabId).toBeTruthy();
+      expect(tabId).toBeTruthy();
       
       // Verify we loaded the right conversation
       const tabList = await client.callTool('tab_list');
-      const ourTab = tabList.tabs.find(t => t.id === tabResult.tabId);
+      const ourTab = tabList.tabs.find(t => t.id === tabId);
       expect(ourTab).toBeTruthy();
       expect(ourTab.conversationId).toBe(testConversationId);
       
-      console.log(`✅ Opened conversation ${testConversationId} in tab ${tabResult.tabId}`);
+      console.log(`✅ Opened conversation ${testConversationId} in tab ${tabId}`);
     }, 30000);
   });
 
   describe('Conversation Deletion', () => {
     test('Can delete single conversation', async () => {
       // First, create a test conversation we can safely delete
-      const createResult = await client.callTool('tab_create', {
-        injectContentScript: true,
-        waitForLoad: true
-      });
-      createdTabs.push(createResult.tabId);
+      const tabId = await globalTabHygiene.createDedicatedTab();
       
       // Send a test message to create a conversation
       await client.callTool('tab_send_message', {
-        tabId: createResult.tabId,
+        tabId: tabId,
         message: "Test message for deletion test",
         waitForCompletion: true
       });
       
       // Get the conversation ID
       const tabList = await client.callTool('tab_list');
-      const ourTab = tabList.tabs.find(t => t.id === createResult.tabId);
+      const ourTab = tabList.tabs.find(t => t.id === tabId);
       const conversationToDelete = ourTab.conversationId;
       
       // Close the tab before deletion
-      await client.callTool('tab_close', { tabId: createResult.tabId, force: true });
-      createdTabs = createdTabs.filter(id => id !== createResult.tabId);
+      await globalTabHygiene.cleanupTab(tabId);
       
       if (conversationToDelete) {
         // Delete the conversation

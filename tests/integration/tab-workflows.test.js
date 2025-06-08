@@ -1,9 +1,9 @@
 const { MCPTestClient } = require('../helpers/mcp-test-client');
 const { PreFlightCheck } = require('../helpers/pre-flight-check');
+const { globalTabHygiene, setupTabHygiene, cleanupAllTabs } = require('../helpers/tab-hygiene');
 
 describe('Tab Workflows (Requires Extension)', () => {
   let client;
-  let createdTabs = [];
   
   beforeAll(async () => {
     // Check full integration prerequisites including MCP connectivity and extension availability
@@ -16,24 +16,25 @@ describe('Tab Workflows (Requires Extension)', () => {
     } catch (error) {
       throw new Error(`Integration prerequisites failed: ${error.message}`);
     }
+    
+    // Initialize tab hygiene
+    const tempClient = new MCPTestClient();
+    await tempClient.connect();
+    await setupTabHygiene(tempClient);
+    await tempClient.disconnect();
   }, 10000); // 10s timeout for beforeAll
+  
+  afterAll(async () => {
+    // Clean up all tabs created by this test suite
+    await cleanupAllTabs();
+  }, 10000);
   
   beforeEach(async () => {
     client = new MCPTestClient();
     await client.connect();
-    createdTabs = [];
   });
   
   afterEach(async () => {
-    // Clean up any tabs created during test
-    for (const tabId of createdTabs) {
-      try {
-        await client.callTool('tab_close', { tabId, force: true });
-      } catch (e) {
-        console.log(`Warning: Failed to close tab ${tabId}:`, e.message);
-      }
-    }
-    
     if (client) {
       await client.cleanup();
       await client.disconnect();
@@ -48,49 +49,49 @@ describe('Tab Workflows (Requires Extension)', () => {
   }, 20000); // 20s timeout
 
   test('Can create and close tab', async () => {
-    const result = await client.callTool('tab_create', {
+    const tabId = await globalTabHygiene.createDedicatedTab({
       waitForLoad: true,
       injectContentScript: true
     });
     
-    expect(result.tabId).toBeTruthy();
-    createdTabs.push(result.tabId);
+    expect(tabId).toBeTruthy();
     
     // Verify tab exists
     const tabList = await client.callTool('tab_list');
-    const createdTab = tabList.tabs.find(t => t.id === result.tabId);
+    const createdTab = tabList.tabs.find(t => t.id === tabId);
     expect(createdTab).toBeTruthy();
     
     // Close tab
-    await client.callTool('tab_close', { tabId: result.tabId });
-    
-    // Remove from tracking since it's closed
-    createdTabs = createdTabs.filter(id => id !== result.tabId);
+    await globalTabHygiene.cleanupTab(tabId);
     
     console.log('✅ Tab creation and cleanup successful');
   }, 30000); // 30s timeout
 
   test('Can send message and get response', async () => {
-    const createResult = await client.callTool('tab_create', {
+    const tabId = await globalTabHygiene.createDedicatedTab({
       waitForLoad: true,
       injectContentScript: true
     });
     
-    expect(createResult.tabId).toBeTruthy();
-    createdTabs.push(createResult.tabId);
+    expect(tabId).toBeTruthy();
     
-    // Send message
-    await client.callTool('tab_send_message', {
-      tabId: createResult.tabId,
-      message: "What is 2 + 2?",
-      waitForCompletion: true
-    });
-    
-    // Get response
-    const response = await client.callTool('tab_get_response', { tabId: createResult.tabId });
-    expect(response.completed).toBe(true);
-    expect(response.content).toContain('4');
-    
-    console.log('✅ Message send and response retrieval successful');
+    try {
+      // Send message
+      await client.callTool('tab_send_message', {
+        tabId: tabId,
+        message: "What is 2 + 2?",
+        waitForCompletion: true
+      });
+      
+      // Get response
+      const response = await client.callTool('tab_get_response', { tabId: tabId });
+      expect(response.completed).toBe(true);
+      expect(response.content).toContain('4');
+      
+      console.log('✅ Message send and response retrieval successful');
+    } finally {
+      // Ensure tab is cleaned up
+      await globalTabHygiene.cleanupTab(tabId);
+    }
   }, 45000); // 45s timeout
 });

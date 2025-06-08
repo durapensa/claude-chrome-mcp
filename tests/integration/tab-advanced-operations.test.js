@@ -1,10 +1,10 @@
 const { MCPTestClient } = require('../helpers/mcp-test-client');
 const { PreFlightCheck } = require('../helpers/pre-flight-check');
+const { globalTabHygiene, setupTabHygiene, cleanupAllTabs } = require('../helpers/tab-hygiene');
 
 describe('Advanced Tab Operations (Requires Extension)', () => {
   let client;
   let sharedTabId; // Reusable tab for most tests
-  let createdTabs = []; // Track all tabs we create
   
   beforeAll(async () => {
     // Check full integration prerequisites
@@ -17,15 +17,13 @@ describe('Advanced Tab Operations (Requires Extension)', () => {
       throw new Error(`Integration prerequisites failed: ${error.message}`);
     }
     
-    // Create a shared tab with test content
+    // Initialize tab hygiene
     const tempClient = new MCPTestClient();
     await tempClient.connect();
-    const result = await tempClient.callTool('tab_create', { 
-      injectContentScript: true, 
-      waitForLoad: true 
-    });
-    sharedTabId = result.tabId;
-    createdTabs.push(sharedTabId);
+    await setupTabHygiene(tempClient);
+    
+    // Get a shared tab with test content
+    sharedTabId = await globalTabHygiene.getSharedTab('advanced-ops');
     
     // Send a test message to have content for extraction/export
     await tempClient.callTool('tab_send_message', {
@@ -35,24 +33,12 @@ describe('Advanced Tab Operations (Requires Extension)', () => {
     });
     
     await tempClient.disconnect();
-    console.log(`✅ Created shared test tab ${sharedTabId} with conversation content`);
+    console.log(`✅ Prepared shared test tab ${sharedTabId} with conversation content`);
   }, 30000);
   
   afterAll(async () => {
-    // Final tab cleanup
-    const tempClient = new MCPTestClient();
-    await tempClient.connect();
-    
-    for (const tabId of createdTabs) {
-      try {
-        await tempClient.callTool('tab_close', { tabId, force: true });
-        console.log(`✅ Closed tab ${tabId}`);
-      } catch (e) {
-        console.log(`Warning: Failed to close tab ${tabId} in final cleanup:`, e.message);
-      }
-    }
-    
-    await tempClient.disconnect();
+    // Clean up all tabs created by this test suite
+    await cleanupAllTabs();
   }, 10000);
   
   beforeEach(async () => {
@@ -69,12 +55,7 @@ describe('Advanced Tab Operations (Requires Extension)', () => {
   describe('Response Status Operations', () => {
     test('Can get response status during generation', async () => {
       // Create a new tab for this test to control timing
-      const tabResult = await client.callTool('tab_create', { 
-        injectContentScript: true, 
-        waitForLoad: true 
-      });
-      const testTabId = tabResult.tabId;
-      createdTabs.push(testTabId);
+      const testTabId = await globalTabHygiene.createDedicatedTab();
       
       try {
         // Send a message that will take time to respond
@@ -105,8 +86,7 @@ describe('Advanced Tab Operations (Requires Extension)', () => {
         // Wait for completion
         await sendPromise;
       } finally {
-        await client.callTool('tab_close', { tabId: testTabId, force: true });
-        createdTabs = createdTabs.filter(id => id !== testTabId);
+        await globalTabHygiene.cleanupTab(testTabId);
       }
     }, 45000);
   });
@@ -114,12 +94,7 @@ describe('Advanced Tab Operations (Requires Extension)', () => {
   describe('Response Forwarding', () => {
     test('Can forward response between tabs', async () => {
       // Create a target tab
-      const targetResult = await client.callTool('tab_create', { 
-        injectContentScript: true, 
-        waitForLoad: true 
-      });
-      const targetTabId = targetResult.tabId;
-      createdTabs.push(targetTabId);
+      const targetTabId = await globalTabHygiene.createDedicatedTab();
       
       try {
         // Forward the response from shared tab to target tab
@@ -141,19 +116,13 @@ describe('Advanced Tab Operations (Requires Extension)', () => {
         expect(targetResponse.content).toBeTruthy();
         console.log('✅ Forwarded response received in target tab');
       } finally {
-        await client.callTool('tab_close', { tabId: targetTabId, force: true });
-        createdTabs = createdTabs.filter(id => id !== targetTabId);
+        await globalTabHygiene.cleanupTab(targetTabId);
       }
     }, 45000);
     
     test('Can forward response with transformation', async () => {
       // Create a target tab
-      const targetResult = await client.callTool('tab_create', { 
-        injectContentScript: true, 
-        waitForLoad: true 
-      });
-      const targetTabId = targetResult.tabId;
-      createdTabs.push(targetTabId);
+      const targetTabId = await globalTabHygiene.createDedicatedTab();
       
       try {
         // Forward with a transformation template
@@ -166,8 +135,7 @@ describe('Advanced Tab Operations (Requires Extension)', () => {
         expect(forwardResult.success).toBe(true);
         console.log('✅ Response forwarded with transformation');
       } finally {
-        await client.callTool('tab_close', { tabId: targetTabId, force: true });
-        createdTabs = createdTabs.filter(id => id !== targetTabId);
+        await globalTabHygiene.cleanupTab(targetTabId);
       }
     }, 45000);
   });
@@ -242,24 +210,16 @@ describe('Advanced Tab Operations (Requires Extension)', () => {
   describe('Batch Operations', () => {
     test('Can send messages to multiple tabs', async () => {
       // Create two target tabs
-      const tab1Result = await client.callTool('tab_create', { 
-        injectContentScript: true, 
-        waitForLoad: true 
-      });
-      const tab2Result = await client.callTool('tab_create', { 
-        injectContentScript: true, 
-        waitForLoad: true 
-      });
-      
-      createdTabs.push(tab1Result.tabId, tab2Result.tabId);
+      const tab1Id = await globalTabHygiene.createDedicatedTab();
+      const tab2Id = await globalTabHygiene.createDedicatedTab();
       
       try {
         // Send messages to both tabs
         const batchResult = await client.callTool('tab_batch_operations', {
           operation: 'send_messages',
           messages: [
-            { tabId: tab1Result.tabId, message: "What is 2 + 2?" },
-            { tabId: tab2Result.tabId, message: "What is 3 + 3?" }
+            { tabId: tab1Id, message: "What is 2 + 2?" },
+            { tabId: tab2Id, message: "What is 3 + 3?" }
           ],
           waitForAll: true,
           sequential: false // Parallel execution
@@ -277,24 +237,18 @@ describe('Advanced Tab Operations (Requires Extension)', () => {
         console.log('✅ Batch send completed for 2 tabs');
       } finally {
         // Clean up both tabs
-        for (const tabId of [tab1Result.tabId, tab2Result.tabId]) {
-          await client.callTool('tab_close', { tabId, force: true });
-          createdTabs = createdTabs.filter(id => id !== tabId);
-        }
+        await globalTabHygiene.cleanupTab(tab1Id);
+        await globalTabHygiene.cleanupTab(tab2Id);
       }
     }, 60000);
     
     test('Can get responses from multiple tabs', async () => {
       // Use shared tab and create another tab with content
-      const extraTabResult = await client.callTool('tab_create', { 
-        injectContentScript: true, 
-        waitForLoad: true 
-      });
-      createdTabs.push(extraTabResult.tabId);
+      const extraTabId = await globalTabHygiene.createDedicatedTab();
       
       // Send a message to the extra tab
       await client.callTool('tab_send_message', {
-        tabId: extraTabResult.tabId,
+        tabId: extraTabId,
         message: "What is the capital of France?",
         waitForCompletion: true
       });
@@ -303,7 +257,7 @@ describe('Advanced Tab Operations (Requires Extension)', () => {
         // Get responses from both tabs
         const batchResult = await client.callTool('tab_batch_operations', {
           operation: 'get_responses',
-          tabIds: [sharedTabId, extraTabResult.tabId]
+          tabIds: [sharedTabId, extraTabId]
         });
         
         expect(batchResult.success).toBe(true);
@@ -319,8 +273,7 @@ describe('Advanced Tab Operations (Requires Extension)', () => {
         
         console.log('✅ Batch response retrieval completed for 2 tabs');
       } finally {
-        await client.callTool('tab_close', { tabId: extraTabResult.tabId, force: true });
-        createdTabs = createdTabs.filter(id => id !== extraTabResult.tabId);
+        await globalTabHygiene.cleanupTab(extraTabId);
       }
     }, 30000);
   });
