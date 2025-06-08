@@ -67,6 +67,29 @@ function createForwardingToolBatch(toolDefinitions) {
 }
 
 /**
+ * Creates a forwarding tool that uses a different command name when forwarding
+ * Used when MCP tool name differs from extension command name
+ * 
+ * @param {string} name - Tool name (for MCP)
+ * @param {string} description - Tool description
+ * @param {object} zodSchema - Zod schema for validation
+ * @param {string} commandName - Command name to use when forwarding to extension
+ * @returns {object} Tool definition and handler
+ */
+function createForwardingToolWithCommand(name, description, zodSchema, commandName) {
+  return {
+    tool: {
+      name,
+      description,
+      zodSchema
+    },
+    handler: async (server, args) => {
+      return await server.forwardToExtension(commandName, args);
+    }
+  };
+}
+
+/**
  * Creates a tool with custom handler logic 
  * Used for tools that need specialized business logic beyond simple forwarding
  * 
@@ -107,6 +130,7 @@ function extractToolsAndHandlers(factoryResults) {
 
 module.exports = {
   createForwardingTool,
+  createForwardingToolWithCommand,
   createResourceSyncTool,
   createCustomTool,
   createForwardingToolBatch,

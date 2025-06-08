@@ -46,6 +46,7 @@ const { OperationManager } = require('./utils/operation-manager');
 const { ResourceStateManager } = require('./utils/resource-state-manager');
 const { NotificationManager } = require('./utils/notification-manager');
 const { MCPRelayClient } = require('./relay/mcp-relay-client');
+const { formatMCPResponse } = require('./utils/response-formatter');
 
 // Import modular tools
 const { allTools, getToolHandler, hasHandler } = require('./tools/index');
@@ -220,12 +221,7 @@ class ChromeMCPServer {
       relay: relayHealth
     };
 
-    return {
-      content: [{
-        type: 'text',
-        text: JSON.stringify(combinedHealth, null, 2)
-      }]
-    };
+    return formatMCPResponse(combinedHealth);
   }
 
   async waitForRelayConnection(timeoutMs = 10000) {
@@ -263,12 +259,7 @@ class ChromeMCPServer {
       throw new Error(result.error);
     }
 
-    return {
-      content: [{
-        type: 'text',
-        text: JSON.stringify(result, null, 2)
-      }]
-    };
+    return formatMCPResponse(result);
   }
 
   /**
@@ -305,12 +296,7 @@ class ChromeMCPServer {
     const { operationId, timeoutMs = 30000 } = params;
     const operation = await this.operationManager.waitForCompletion(operationId, timeoutMs);
     
-    return {
-      content: [{
-        type: 'text',
-        text: JSON.stringify(operation, null, 2)
-      }]
-    };
+    return formatMCPResponse(operation);
   }
 
 

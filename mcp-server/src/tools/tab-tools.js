@@ -2,6 +2,7 @@
 // Tab operations via tabId only - creating, messaging, and managing Claude.ai tabs
 
 const { z } = require('zod');
+const { createForwardingTool, extractToolsAndHandlers } = require('../utils/tool-factory');
 
 /**
  * Tab tool definitions
@@ -15,11 +16,6 @@ const tabTools = [
       injectContentScript: z.boolean().describe('Whether to inject content script for interaction').default(true),
       waitForLoad: z.boolean().describe('Wait for page to fully load').default(true)
     }
-  },
-  {
-    name: 'tab_list',
-    description: 'Get list of all currently open Claude.ai tabs with their IDs, status, and conversation IDs (if available).',
-    zodSchema: {}
   },
   {
     name: 'tab_close',
@@ -42,54 +38,6 @@ const tabTools = [
     }
   },
   {
-    name: 'tab_get_response',
-    description: 'Get the latest response from Claude tab with auto-completion detection',
-    zodSchema: {
-      tabId: z.number().describe('Tab ID to get response from'),
-      timeoutMs: z.number().default(30000).describe('Timeout in milliseconds')
-    }
-  },
-  {
-    name: 'tab_get_response_status',
-    description: 'Get real-time status of Claude response generation including progress estimation',
-    zodSchema: {
-      tabId: z.number().describe('The tab ID to check response status for')
-    }
-  },
-  {
-    name: 'tab_forward_response',
-    description: 'Forward Claude response from source tab to target tab',
-    zodSchema: {
-      sourceTabId: z.number().describe('Source tab ID to get response from'),
-      targetTabId: z.number().describe('Target tab ID to send response to'),
-      transformTemplate: z.string().optional().describe('Optional transformation template with  placeholder')
-    }
-  },
-  {
-    name: 'tab_extract_elements',
-    description: 'Extract conversation elements including artifacts, code blocks, and tool usage',
-    zodSchema: {
-      tabId: z.number().describe('The tab ID of the Claude conversation'),
-      batchSize: z.number().default(50).describe('Max elements to process per type (default: 50)'),
-      maxElements: z.number().default(1000).describe('Max total elements to extract before stopping (default: 1000)')
-    }
-  },
-  {
-    name: 'tab_export_conversation',
-    description: 'Export a full conversation transcript with metadata in markdown or JSON format',
-    zodSchema: {
-      tabId: z.number().describe('The tab ID of the Claude conversation to export'),
-      format: z.enum(['markdown', 'json']).default('markdown').describe('Export format (markdown or json)')
-    }
-  },
-  {
-    name: 'tab_debug_page',
-    description: 'Debug Claude page readiness and get page information',
-    zodSchema: {
-      tabId: z.number().describe('The tab ID of the Claude page to debug')
-    }
-  },
-  {
     name: 'tab_batch_operations',
     description: 'Perform batch operations on multiple tabs: send messages and/or get responses. ASYNC-BY-DEFAULT: Optimal for parallel operations.',
     zodSchema: {
@@ -108,6 +56,41 @@ const tabTools = [
     }
   }
 ];
+
+/**
+ * Simple forwarding tools created using factory pattern
+ * These tools just forward requests to the extension without complex logic
+ */
+const simpleForwardingToolResults = [
+  createForwardingTool('tab_list', 'Get list of all currently open Claude.ai tabs with their IDs, status, and conversation IDs (if available).', {}),
+  createForwardingTool('tab_get_response', 'Get the latest response from Claude tab with auto-completion detection', {
+    tabId: z.number().describe('Tab ID to get response from'),
+    timeoutMs: z.number().default(30000).describe('Timeout in milliseconds')
+  }),
+  createForwardingTool('tab_get_response_status', 'Get real-time status of Claude response generation including progress estimation', {
+    tabId: z.number().describe('The tab ID to check response status for')
+  }),
+  createForwardingTool('tab_forward_response', 'Forward Claude response from source tab to target tab', {
+    sourceTabId: z.number().describe('Source tab ID to get response from'),
+    targetTabId: z.number().describe('Target tab ID to send response to'),
+    transformTemplate: z.string().optional().describe('Optional transformation template with  placeholder')
+  }),
+  createForwardingTool('tab_extract_elements', 'Extract conversation elements including artifacts, code blocks, and tool usage', {
+    tabId: z.number().describe('The tab ID of the Claude conversation'),
+    batchSize: z.number().default(50).describe('Max elements to process per type (default: 50)'),
+    maxElements: z.number().default(1000).describe('Max total elements to extract before stopping (default: 1000)')
+  }),
+  createForwardingTool('tab_export_conversation', 'Export a full conversation transcript with metadata in markdown or JSON format', {
+    tabId: z.number().describe('The tab ID of the Claude conversation to export'),
+    format: z.enum(['markdown', 'json']).default('markdown').describe('Export format (markdown or json)')
+  }),
+  createForwardingTool('tab_debug_page', 'Debug Claude page readiness and get page information', {
+    tabId: z.number().describe('The tab ID of the Claude page to debug')
+  })
+];
+
+// Extract tools and handlers from factory results
+const simpleForwardingTools = extractToolsAndHandlers(simpleForwardingToolResults);
 
 /**
  * Resource state sync handlers for tab tools
@@ -152,10 +135,6 @@ const tabHandlers = {
       args, 
       resourceSyncHandlers.tabCreate
     );
-  },
-
-  'tab_list': async (server, args) => {
-    return await server.forwardToExtension('tab_list', args);
   },
 
   'tab_close': async (server, args) => {
@@ -223,30 +202,6 @@ const tabHandlers = {
     }
   },
 
-  'tab_get_response': async (server, args) => {
-    return await server.forwardToExtension('tab_get_response', args);
-  },
-
-  'tab_get_response_status': async (server, args) => {
-    return await server.forwardToExtension('tab_get_response_status', args);
-  },
-
-  'tab_forward_response': async (server, args) => {
-    return await server.forwardToExtension('tab_forward_response', args);
-  },
-
-  'tab_extract_elements': async (server, args) => {
-    return await server.forwardToExtension('tab_extract_elements', args);
-  },
-
-  'tab_export_conversation': async (server, args) => {
-    return await server.forwardToExtension('tab_export_conversation', args);
-  },
-
-  'tab_debug_page': async (server, args) => {
-    return await server.forwardToExtension('tab_debug_page', args);
-  },
-
   'tab_batch_operations': async (server, args) => {
     // Route to appropriate batch operations based on operation type
     switch (args.operation) {
@@ -297,4 +252,11 @@ const tabHandlers = {
   }
 };
 
-module.exports = { tabTools, tabHandlers };
+// Combine manual tools with factory-generated tools
+const allTabTools = [...tabTools, ...simpleForwardingTools.tools];
+const allTabHandlers = { ...tabHandlers, ...simpleForwardingTools.handlers };
+
+module.exports = { 
+  tabTools: allTabTools, 
+  tabHandlers: allTabHandlers 
+};
