@@ -140,6 +140,13 @@ class RelayBase extends EventEmitter {
     
     if (client && this._canSendToClient(client)) {
       const payload = data || message;
+      
+      // Ensure _from is included in the payload (like multicast does)
+      if (payload && typeof payload === 'object') {
+        payload._from = message._from;
+        payload._timestamp = payload._timestamp || Date.now();
+      }
+      
       this._sendToClient(client, payload);
       return { success: true, type: 'unicast', target: targetId };
     }
