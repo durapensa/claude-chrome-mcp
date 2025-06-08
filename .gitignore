@@ -140,6 +140,8 @@ discovery-data/
 # Runtime state files
 *.operations-state.json
 .operations-state.json
+*.resource-state.json
+.resource-state.json
 
 # AI tool state and memory directories
 .goose/
