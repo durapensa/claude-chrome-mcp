@@ -11,6 +11,22 @@
 
 **CRITICAL RULES**:
 
+WHEN: Editing CLAUDE.md
+THEN: ONLY include:
+  - Tools and their usage patterns
+  - Operational instructions and workflows
+  - Troubleshooting patterns and solutions
+  - WHEN/THEN decision logic
+NEVER include:
+  - Work accomplishments or progress reports
+  - Code examples (reference file paths instead)
+  - Implementation details or how things work internally
+  - Test results or coverage statistics
+  - Historical changes or "what was done"
+  
+WHEN: Tempted to document completed work in CLAUDE.md
+THEN: STOP - use GitHub issues or commit messages instead
+
 WHEN: Writing documentation in CLAUDE.md
 THEN: Use WHEN/THEN logic structure and decision trees
 
@@ -114,7 +130,7 @@ mcp tab_batch_operations \
   --tabIds '[123,456]'
 ```
 
-**DISCOVERED**: Batch operations support parallel execution by default!
+**NOTE**: Batch operations execute in parallel by default (use --sequential true for sequential)
 
 ### Development & Testing
 
@@ -295,28 +311,21 @@ mcp system_get_extension_logs --limit 50
 
 ## ARCHITECTURE GOTCHAS
 
-### Relay System Architecture (v2.7.0+)
-**DESIGN**: Modular relay system with auto-election and passive health monitoring
+### Relay System Architecture
 **WHEN**: Debugging connection issues
-**THEN**: Understand these architectural improvements:
-
-**Modular Components**:
+**THEN**: Check these relay components:
 - `relay-core.js` - Shared message types and constants
 - `websocket-server.js` - Server-side relay with health endpoints  
 - `websocket-client.js` - Client connection management with reconnection
 - `relay-index.js` - Auto-election coordinator (server/client roles)
 - `mcp-relay-client.js` - MCP-specific wrapper
 
-**Connection Health Monitoring**:
-- **Passive Monitoring**: Health tracked via normal message flow (zero overhead)
-- **Real-time Metrics**: Message counts, activity timestamps, idle detection
-- **User Visibility**: Extension popup shows live connection status with traffic indicators
-- **No Ping/Pong**: Eliminated active health checks in favor of message activity tracking
-
-**Benefits**: Better maintainability, improved debugging, zero health monitoring overhead, richer user feedback
+**Health Monitoring**:
+- Health tracked via normal message flow (no active pings)
+- Extension popup shows live connection status with traffic indicators
+- Check message counts, activity timestamps in system_health output
 
 ### Configuration Management
-**SOLUTION**: Centralized config with environment overrides
 **WHEN**: Changing settings
 **THEN**: Use environment variables:
 ```bash
@@ -334,35 +343,31 @@ MCP_DEBUG_MODE=true mcp system_health
 - NOTE: Extension config values are hardcoded; version dynamically retrieved from manifest
 
 ### Version Management
-**POLICY**: Bump minor versions frequently (e.g., 2.6.0 → 2.7.0)
-**WHEN**: Components connect
-**THEN**: Automatic version checking occurs:
-- Major mismatch: Warning logged
-- Minor difference: Info logged
-- Components include version in relay messages
-
-**Version Source**: Single `VERSION` file at project root
-
-**VERSION BUMP PROCESS**:
+**WHEN**: Need to bump version
+**THEN**: Follow this process:
 ```bash
 # 1. Update VERSION file
-echo "2.6.2" > VERSION
+echo "X.Y.Z" > VERSION
 
 # 2. Run update script (updates all files + validates)
 npm run update-versions
 
 # 3. Commit with detailed message
 git add .
-git commit -m "chore: bump version to 2.6.2"
+git commit -m "chore: bump version to X.Y.Z"
 
 # 4. Push to GitHub
 git push origin main
 ```
 
+**WHEN**: Components connect
+**THEN**: Version checking occurs automatically:
+- Major mismatch: Warning logged
+- Minor difference: Info logged
+
 **DETAILS**: See docs/VERSION-MANAGEMENT.md for complete process
 
 ### Resource Cleanup Order
-**ISSUE**: Dependencies between cleanup steps
 **WHEN**: Cleaning up tabs/debugger
 **THEN**: MUST follow this order:
 1. Stop network monitoring (if active)
@@ -373,13 +378,6 @@ git push origin main
 
 **NEVER**: Close tab before detaching debugger!
 
-### Test Coverage
-**CURRENT**: 100% coverage (32/32 tools tested) ✅
-**COMPLETED**: All MCP tools now have comprehensive test coverage
-- Chrome tools: 9/9 tested (debugger, script execution, DOM, network monitoring)
-- Tab tools: 11/11 tested (including batch ops, forwarding, export)
-- API tools: 5/5 tested (search, URL generation, deletion)
-- System tools: 7/7 tested (debug mode, log levels, operations)
 
 
 ## QUICK REFERENCE
