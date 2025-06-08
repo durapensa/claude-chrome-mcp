@@ -38,7 +38,7 @@ export const tabOperations = {
       }
       
       // Inject content script if requested
-      if (params.injectContentScript && this.contentScriptManager) {
+      if (params.injectContentScript && this.extensionScriptManager) {
         console.log(`CCM Extension: Injecting content script into spawned tab ${tab.id}`);
         
         // Wait for the URL to actually be set (not just status complete)
@@ -54,7 +54,7 @@ export const tabOperations = {
           checkUrl();
         });
         
-        const injectionResult = await this.contentScriptManager.injectContentScript(tab.id);
+        const injectionResult = await this.extensionScriptManager.injectContentScript(tab.id);
         console.log(`CCM Extension: Injection result:`, injectionResult);
         
         return {
@@ -130,8 +130,8 @@ export const tabOperations = {
         
         // Clean up any associated data
         this.operationLock.releaseLock(tabId);
-        if (this.contentScriptManager) {
-          this.contentScriptManager.removeTab(tabId);
+        if (this.extensionScriptManager) {
+          this.extensionScriptManager.removeTab(tabId);
         }
         
         // Clean up debugger session if exists
@@ -163,8 +163,8 @@ export const tabOperations = {
         url: tab.url,
         active: tab.active,
         status: tab.status,
-        hasContentScript: this.contentScriptManager ? 
-          this.contentScriptManager.injectedTabs.has(tab.id) : false
+        hasContentScript: this.extensionScriptManager ? 
+          this.extensionScriptManager.injectedTabs.has(tab.id) : false
       }));
       
       return {
