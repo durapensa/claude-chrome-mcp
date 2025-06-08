@@ -382,15 +382,29 @@ git push origin main
 - System tools: 7/7 tested (debug mode, log levels, operations)
 
 ### Testing Best Practices
-**PATTERN**: Tab hygiene in tests
+**PATTERN**: Tab hygiene in tests (IMPLEMENTED in helpers/tab-hygiene.js)
 **WHEN**: Writing integration tests
-**THEN**: Follow this structure:
+**THEN**: Use the tab hygiene helper:
 ```javascript
-// Create shared tab in beforeAll for reuse
-// Track all created tabs
-// Clean up in afterEach AND afterAll
-// Only create new tabs when isolation needed
+const { globalTabHygiene, setupTabHygiene, cleanupAllTabs } = require('../helpers/tab-hygiene');
+
+// In beforeAll: Initialize hygiene
+await setupTabHygiene(client);
+const sharedTabId = await globalTabHygiene.getSharedTab('test-purpose');
+
+// For dedicated tabs:
+const tabId = await globalTabHygiene.createDedicatedTab();
+
+// In afterAll: Clean up everything
+await cleanupAllTabs();
 ```
+
+**BENEFITS**:
+- Automatic tracking of all created tabs
+- Shared tab pool reduces total tabs needed
+- Cleanup runs even if tests fail
+- Process exit handlers ensure no leaked tabs
+- Final cleanup keeps exactly 1 tab open
 
 **DISCOVERED**: Response format variations
 - `chrome_debug_status` → Returns array directly, not {sessions: [...]}
