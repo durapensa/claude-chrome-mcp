@@ -270,16 +270,24 @@ export class MCPDaemon {
   private async handleToolCall(socket: net.Socket, request: DaemonRequest): Promise<void> {
     const { server_id, tool_name, args, request_id } = request;
     
+    this.logger.info(`handleToolCall started`, { tool_name, server_id, request_id });
+    
     if (!tool_name) {
+      this.logger.error(`Tool name missing in request`, { request_id });
       throw new Error('Tool name is required');
     }
 
+    this.logger.info(`Attempting to resolve tool`, { tool_name, server_id });
+    
     // Resolve the tool
     const tool = this.toolRegistry.resolveTool(tool_name, server_id);
+    this.logger.info(`Tool resolution result`, { tool_name, found: !!tool });
+    
     if (!tool) {
       const available = server_id 
         ? `Server '${server_id}' does not have tool '${tool_name}'`
         : `Tool '${tool_name}' not found`;
+      this.logger.error(`Tool resolution failed`, { tool_name, server_id, error: available });
       throw new Error(available);
     }
 
@@ -489,19 +497,26 @@ export class MCPDaemon {
    * Send response to client
    */
   private sendResponse(socket: net.Socket, response: DaemonResponse): void {
-    const wrappedSend = withErrorResponse(
-      () => {
-        console.log(`Sending response: ${response.status} (id: ${response.request_id})`);
-        const message = JSON.stringify(response) + '\n';
-        socket.write(message);
-        return Promise.resolve();
-      },
-      'Send response to client',
-      (error) => ({ success: false, error: error.message })
-    );
-    
-    // Fire and forget - errors are logged but don't propagate
-    wrappedSend();
+    try {
+      this.logger.info(`Sending response`, { status: response.status, request_id: response.request_id });
+      const message = JSON.stringify(response) + '\n';
+      
+      // Check if socket is writable
+      if (socket.destroyed || !socket.writable) {
+        this.logger.error(`Cannot send response: socket not writable`, { request_id: response.request_id });
+        return;
+      }
+      
+      // socket.write returns false if backpressure is applied
+      const success = socket.write(message);
+      if (!success) {
+        this.logger.warn(`Response backpressure applied`, { request_id: response.request_id });
+      }
+      
+      this.logger.info(`Response sent successfully`, { request_id: response.request_id });
+    } catch (error) {
+      this.logger.error(`Failed to send response`, { request_id: response.request_id, error: (error as Error).message });
+    }
   }
 
   /**

@@ -19,6 +19,7 @@ export class DaemonClient {
   private socket: net.Socket | null = null;
   private requestId = 0;
   private requestManager = new RequestManager<DaemonRequest, DaemonResponse>(5000);
+  private progressCallbacks = new Map<string, (progress: { message: string; step: number; total: number }) => void>();
 
   constructor(private socketPath: string) {}
 
@@ -52,6 +53,8 @@ export class DaemonClient {
             this.socket = null;
             // Use RequestManager for consistent cleanup
             this.requestManager.cleanup(new Error('Connection to daemon lost'));
+            // Clear progress callbacks
+            this.progressCallbacks.clear();
           },
           onData: (data) => {
             buffer += data.toString();
@@ -87,6 +90,7 @@ export class DaemonClient {
       this.socket.end();
       this.socket = null;
     }
+    this.progressCallbacks.clear();
   }
 
   /**
@@ -145,23 +149,26 @@ export class DaemonClient {
     };
 
     return new Promise((resolve, reject) => {
-      // Custom resolver for progress handling
-      const progressResolver = (response: DaemonResponse) => {
+      // Store progress callback for this request
+      if (onProgress) {
+        this.progressCallbacks.set(requestId, onProgress);
+      }
+
+      // Standard resolver that handles final responses only
+      const resolver = (response: DaemonResponse) => {
         if (response.status === 'success') {
+          this.progressCallbacks.delete(requestId);
           resolve(response.data);
-        } else if (response.status === 'progress' && onProgress && response.progress) {
-          onProgress(response.progress);
-          // Don't resolve yet, keep waiting for final response
-          return;
         } else if (response.status === 'error') {
+          this.progressCallbacks.delete(requestId);
           reject(new Error(response.error || 'Unknown error'));
         }
+        // Progress responses are handled in handleResponse before calling resolver
       };
 
-      // Register with custom progress handler  
       this.requestManager.registerRequest(
         requestId,
-        progressResolver,
+        resolver,
         reject,
         `Daemon ${request.type} with progress`,
         timeout
@@ -176,7 +183,17 @@ export class DaemonClient {
    * Handle response from daemon
    */
   private handleResponse(response: DaemonResponse): void {
-    // Use RequestManager for consistent response handling
+    // Handle progress responses without consuming the request
+    if (response.status === 'progress' && response.progress) {
+      const progressCallback = this.progressCallbacks.get(response.request_id);
+      if (progressCallback) {
+        progressCallback(response.progress);
+      }
+      // Don't call resolveRequest for progress - keep waiting for final response
+      return;
+    }
+
+    // Handle final responses (success/error)
     this.requestManager.resolveRequest(response.request_id, response);
   }
 
