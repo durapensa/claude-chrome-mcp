@@ -3,7 +3,7 @@ const { PreFlightCheck } = require('../helpers/pre-flight-check');
 
 describe('Tab Workflows (Requires Extension)', () => {
   let client;
-  let preFlightResult;
+  let createdTabs = [];
   
   beforeAll(async () => {
     // Check full integration prerequisites including MCP connectivity and extension availability
@@ -21,9 +21,19 @@ describe('Tab Workflows (Requires Extension)', () => {
   beforeEach(async () => {
     client = new MCPTestClient();
     await client.connect();
+    createdTabs = [];
   });
   
   afterEach(async () => {
+    // Clean up any tabs created during test
+    for (const tabId of createdTabs) {
+      try {
+        await client.callTool('tab_close', { tabId, force: true });
+      } catch (e) {
+        console.log(`Warning: Failed to close tab ${tabId}:`, e.message);
+      }
+    }
+    
     if (client) {
       await client.cleanup();
       await client.disconnect();
@@ -44,6 +54,7 @@ describe('Tab Workflows (Requires Extension)', () => {
     });
     
     expect(result.tabId).toBeTruthy();
+    createdTabs.push(result.tabId);
     
     // Verify tab exists
     const tabList = await client.callTool('tab_list');
@@ -53,6 +64,9 @@ describe('Tab Workflows (Requires Extension)', () => {
     // Close tab
     await client.callTool('tab_close', { tabId: result.tabId });
     
+    // Remove from tracking since it's closed
+    createdTabs = createdTabs.filter(id => id !== result.tabId);
+    
     console.log('✅ Tab creation and cleanup successful');
   }, 30000); // 30s timeout
 
@@ -61,6 +75,9 @@ describe('Tab Workflows (Requires Extension)', () => {
       waitForLoad: true,
       injectContentScript: true
     });
+    
+    expect(createResult.tabId).toBeTruthy();
+    createdTabs.push(createResult.tabId);
     
     // Send message
     await client.callTool('tab_send_message', {

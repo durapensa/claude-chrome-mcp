@@ -40,7 +40,7 @@ describe('Tab Operations Functionality (Requires Extension)', () => {
   });
 
   describe('Core Tab Operations', () => {
-    test('spawnClaudeTab functionality is preserved', async () => {
+    test('createTab functionality is preserved', async () => {
       const result = await client.callTool('tab_create', {
         waitForLoad: true,
         injectContentScript: true
@@ -59,7 +59,7 @@ describe('Tab Operations Functionality (Requires Extension)', () => {
       console.log(`✅ Created tab ${result.tabId} with content script injection`);
     }, 30000);
 
-    test('getClaudeTabs functionality is preserved', async () => {
+    test('tab_list functionality is preserved', async () => {
       // First create a tab to ensure we have at least one
       const createResult = await client.callTool('tab_create', {
         waitForLoad: true
@@ -86,7 +86,7 @@ describe('Tab Operations Functionality (Requires Extension)', () => {
       console.log(`✅ Found ${listResult.count} Claude tabs, including our created tab ${createResult.tabId}`);
     }, 20000);
 
-    test('closeClaudeTab functionality is preserved', async () => {
+    test('tab_close functionality is preserved', async () => {
       // Create a tab to close
       const createResult = await client.callTool('tab_create', {
         waitForLoad: true
@@ -111,7 +111,7 @@ describe('Tab Operations Functionality (Requires Extension)', () => {
       createdTabs = createdTabs.filter(id => id !== tabId);
     }, 20000);
 
-    test('focusClaudeTab functionality works', async () => {
+    test('tab_focus functionality works', async () => {
       // Create a tab to focus
       const createResult = await client.callTool('tab_create', {
         waitForLoad: true,
@@ -156,7 +156,7 @@ describe('Tab Operations Functionality (Requires Extension)', () => {
       console.log(`Found ${extractResult.elements.messages.length} messages`);
     }, 30000);
 
-    test('sendMessageToClaudeTab preserves operation ID unification', async () => {
+    test('sendTabMessage preserves operation ID unification', async () => {
       // Create a tab with content script
       const createResult = await client.callTool('tab_create', {
         waitForLoad: true,
@@ -181,7 +181,7 @@ describe('Tab Operations Functionality (Requires Extension)', () => {
       console.log(`✅ Sent message to tab ${createResult.tabId} with operation ID ${sendResult.operationId}`);
     }, 30000);
 
-    test('getClaudeResponse functionality is preserved', async () => {
+    test('tab_get_response functionality is preserved', async () => {
       // Create a tab with content script
       const createResult = await client.callTool('tab_create', {
         waitForLoad: true,

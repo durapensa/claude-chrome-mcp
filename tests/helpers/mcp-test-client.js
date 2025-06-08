@@ -88,7 +88,7 @@ class MCPTestClient {
       
       if (error.message?.includes('not found') || error.message?.includes('Unknown tool')) {
         throw new Error(
-          `TOOL NOT FOUND: '${fullToolName}' is not available.\n` +
+          `TOOL NOT FOUND: '${toolName}' is not available.\n` +
           `This means the MCP server is running but the tool registry is incomplete.\n` +
           `Check that the server started correctly.\n` +
           `Original error: ${error.message}`
