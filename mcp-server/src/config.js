@@ -10,6 +10,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 // Try to load dotenv if available (optional dependency)
 try {
@@ -75,6 +76,23 @@ const config = {
   
   // Max reconnect delay for relay client
   MAX_RECONNECT_DELAY: parseInt(process.env.MCP_MAX_RECONNECT_DELAY || '30000', 10),
+  
+  // Tool operation defaults
+  POLL_INTERVAL_MS: parseInt(process.env.MCP_POLL_INTERVAL || '1000', 10),
+  SEQUENTIAL_DELAY_MS: parseInt(process.env.MCP_SEQUENTIAL_DELAY || '1000', 10),
+  API_BATCH_SIZE: parseInt(process.env.MCP_API_BATCH_SIZE || '5', 10),
+  
+  // Request timeouts
+  HEALTH_CHECK_TIMEOUT: parseInt(process.env.MCP_HEALTH_CHECK_TIMEOUT || '1000', 10),
+  RELAY_REQUEST_TIMEOUT: parseInt(process.env.MCP_RELAY_REQUEST_TIMEOUT || '10000', 10),
+  RELAY_CONNECTION_TIMEOUT: parseInt(process.env.MCP_RELAY_CONNECTION_TIMEOUT || '10000', 10),
+  
+  // Environment variable consolidation
+  CLIENT_NAME_OVERRIDE: process.env.CCM_CLIENT_NAME || null,
+  VERBOSE_MODE: process.env.CCM_VERBOSE === '1',
+  
+  // File system paths
+  LOG_DIR: process.env.MCP_LOG_DIR || path.join(os.homedir(), '.claude-chrome-mcp', 'logs'),
   
   // Debug settings
   DEBUG_MODE: process.env.MCP_DEBUG_MODE === 'true',

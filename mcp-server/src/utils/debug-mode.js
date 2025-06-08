@@ -1,11 +1,11 @@
 // Debug logging utilities
 const winston = require('winston');
 const path = require('path');
-const os = require('os');
 const fs = require('fs');
+const config = require('../config');
 
 // Create log directory
-const logDir = path.join(os.homedir(), '.claude-chrome-mcp-logs');
+const logDir = config.LOG_DIR;
 if (!fs.existsSync(logDir)) {
   fs.mkdirSync(logDir, { recursive: true });
 }
@@ -18,7 +18,7 @@ const fileLogger = winston.createLogger({
   ),
   transports: [
     new winston.transports.File({
-      filename: path.join(logDir, `mcp-server-${process.pid}.log`),
+      filename: path.join(logDir, `claude-chrome-mcp-server-debug-PID-${process.pid}.log`),
       level: 'debug'
     })
   ]

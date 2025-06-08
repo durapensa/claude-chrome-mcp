@@ -3,6 +3,7 @@
 
 const { z } = require('zod');
 const { createForwardingTool, extractToolsAndHandlers } = require('../utils/tool-factory');
+const config = require('../config');
 
 /**
  * Tab tool definitions
@@ -12,7 +13,7 @@ const tabTools = [
     name: 'tab_create',
     description: 'Open a new Claude.ai tab with optional content script injection',
     zodSchema: {
-      url: z.string().describe('URL to open').default('https://claude.ai'),
+      url: z.string().describe('URL to open').default(config.CLAUDE_URL),
       injectContentScript: z.boolean().describe('Whether to inject content script for interaction').default(true),
       waitForLoad: z.boolean().describe('Wait for page to fully load').default(true)
     }
@@ -33,8 +34,8 @@ const tabTools = [
       message: z.string().describe('Message to send to Claude'),
       waitForCompletion: z.boolean().describe('Whether to wait for response completion (false = async, true = sync)').default(false),
       waitForReady: z.boolean().describe('Whether to wait for Claude to be ready before sending').default(true),
-      maxRetries: z.number().describe('Maximum number of retry attempts if sending fails').default(3),
-      retryDelayMs: z.number().describe('Delay between retry attempts in milliseconds').default(1000)
+      maxRetries: z.number().describe('Maximum number of retry attempts if sending fails').default(config.MAX_RETRIES),
+      retryDelayMs: z.number().describe('Delay between retry attempts in milliseconds').default(config.RETRY_DELAY_MS)
     }
   },
   {
@@ -48,11 +49,11 @@ const tabTools = [
       })).optional().describe('Array of message objects for send operations'),
       tabIds: z.array(z.number()).optional().describe('Array of tab IDs for get_responses operations'),
       sequential: z.boolean().default(false).describe('Whether to process sequentially (true) or in parallel (false)'),
-      delayMs: z.number().default(1000).describe('Delay between sequential operations in milliseconds'),
-      maxConcurrent: z.number().default(5).describe('Maximum concurrent operations for parallel mode'),
-      timeoutMs: z.number().default(30000).describe('Maximum time to wait for operations in milliseconds'),
+      delayMs: z.number().default(config.SEQUENTIAL_DELAY_MS).describe('Delay between sequential operations in milliseconds'),
+      maxConcurrent: z.number().default(config.MAX_CONCURRENT).describe('Maximum concurrent operations for parallel mode'),
+      timeoutMs: z.number().default(config.DEFAULT_TIMEOUT).describe('Maximum time to wait for operations in milliseconds'),
       waitForAll: z.boolean().default(true).describe('Whether to wait for all operations or return as they complete'),
-      pollIntervalMs: z.number().default(1000).describe('How often to check for completion in milliseconds')
+      pollIntervalMs: z.number().default(config.POLL_INTERVAL_MS).describe('How often to check for completion in milliseconds')
     }
   }
 ];
