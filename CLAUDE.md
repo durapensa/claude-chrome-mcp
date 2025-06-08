@@ -5,7 +5,7 @@
 **ARCHITECTURE OVERVIEW**: 
 ```
 [AI Agent/Claude Code] → [MCP Server] → [Modular Relay System] → [Chrome Extension] → [Chrome Browser]
-                         32 tools         Auto-election         Passive health        Controls Chrome
+                         44 tools         Auto-election         Passive health        Controls Chrome
                                          Port 54321           monitoring
 ```
 
