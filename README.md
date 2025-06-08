@@ -83,7 +83,7 @@ In Claude Desktop, you can now use natural language commands like:
 
 ### CLI Tool (Optional)
 ```bash
-cd cli && npm install && npm run build && npm link
+npm install && npm run build && npm link
 ```
 
 ## Architecture
