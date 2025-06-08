@@ -163,6 +163,21 @@ const config = {
   }
 };
 
+// Add Claude.ai URL Templates after config is defined (to avoid circular reference)
+config.CLAUDE_URLS = {
+  // SAFE/STABLE URLs - User-facing, unlikely to change
+  base() { return config.CLAUDE_URL; },
+  newConversation() { return `${config.CLAUDE_URL}/new`; },
+  conversation(conversationId) { return `${config.CLAUDE_URL}/chat/${conversationId}`; },
+  
+  // RISKY/INTERNAL URLs - API endpoints, may change without notice
+  // These are internal Claude.ai API patterns observed through network monitoring
+  // CAUTION: These may break if Claude.ai changes their internal API structure
+  apiConversations(orgId) { return `${config.CLAUDE_URL}/api/organizations/${orgId}/chat_conversations`; },
+  apiConversation(orgId, conversationId) { return `${config.CLAUDE_URL}/api/organizations/${orgId}/chat_conversations/${conversationId}`; },
+  apiCompletion(orgId, conversationId) { return `${config.CLAUDE_URL}/api/organizations/${orgId}/chat_conversations/${conversationId}/completion`; }
+};
+
 // Log config on startup if debug mode
 if (config.DEBUG_MODE) {
   console.log('MCP Server Config loaded:', {
@@ -172,5 +187,5 @@ if (config.DEBUG_MODE) {
   });
 }
 
-// Freeze config to prevent accidental mutations
+// Freeze config to prevent accidental mutations (including the added CLAUDE_URLS)
 module.exports = Object.freeze(config);

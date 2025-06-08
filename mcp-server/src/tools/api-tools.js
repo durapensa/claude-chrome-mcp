@@ -3,6 +3,8 @@
 
 const { z } = require('zod');
 const { createForwardingTool, createCustomTool, extractToolsAndHandlers } = require('../utils/tool-factory');
+const { requireValidConversationId } = require('../utils/claude-url-validation');
+const config = require('../config');
 
 /**
  * Create tools using factory patterns to reduce code duplication
@@ -34,17 +36,14 @@ const customToolResults = [
     // Pure URL generation without tab creation
     const { conversationId } = args;
     
-    // Validate UUID format
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(conversationId)) {
-      throw new Error('conversationId must be a valid UUID format');
-    }
+    // Validate using centralized validation
+    requireValidConversationId(conversationId);
 
-    // Return the conversation URL
+    // Return the conversation URL using centralized template
     return {
       success: true,
       conversationId: conversationId,
-      url: `https://claude.ai/chat/${conversationId}`
+      url: config.CLAUDE_URLS.conversation(conversationId)
     };
   }),
 
