@@ -49,6 +49,14 @@ THEN: Follow this sequence:
 WHEN: Multiple unrelated changes exist
 THEN: Commit them separately with focused commit messages
 
+WHEN: Need to interact with GitHub (issues, PRs, etc.)
+THEN: Use gh command via Bash tool (NOT WebFetch):
+```bash
+gh issue list --repo durapensa/claude-chrome-mcp
+gh issue view 7
+gh api repos/durapensa/claude-chrome-mcp/pulls/123/comments
+```
+
 ## SESSION CONTINUITY
 
 WHEN: User types 'continue'
