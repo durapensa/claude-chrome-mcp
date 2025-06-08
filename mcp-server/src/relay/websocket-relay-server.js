@@ -62,9 +62,9 @@ class WebSocketRelayServer extends RelayBase {
     const healthPort = this.port + 1;
     
     const server = http.createServer((req, res) => {
-      if (req.url === '/health' && req.method === 'GET') {
+      if (req.url === config.RELAY_URLS.paths.HEALTH && req.method === 'GET') {
         this.handleHealthRequest(res);
-      } else if (req.url === '/takeover' && req.method === 'POST') {
+      } else if (req.url === config.RELAY_URLS.paths.TAKEOVER && req.method === 'POST') {
         this.handleTakeoverRequest(req, res);
       } else {
         res.writeHead(404);

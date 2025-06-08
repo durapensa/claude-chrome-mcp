@@ -15,7 +15,7 @@ class WebSocketRelayClient extends EventEmitter {
     this.clientInfo = new ClientInfo(clientInfo);
     this.port = port;
     this.ws = null;
-    this.url = `ws://${config.RELAY_HOST}:${port}`;
+    this.url = config.RELAY_URLS.websocket(port);
     this.logger = createLogger('WebSocketRelayClient');
     
     // Connection state

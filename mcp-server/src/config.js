@@ -12,6 +12,83 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
+// ============================================
+// CLAUDE.AI CONSTANTS
+// ============================================
+
+// Claude base values
+const CLAUDE_BASE_URL = 'https://claude.ai';
+
+// Claude path segments
+const CHAT = '/chat';
+const NEW = '/new';
+const API = '/api';
+const ORGANIZATIONS = '/organizations';
+const CHAT_CONVERSATIONS = '/chat_conversations';
+const COMPLETION = '/completion';
+
+// Claude compound paths
+const CLAUDE_API_PREFIX = `${API}${ORGANIZATIONS}`;
+
+// Claude full paths
+const CLAUDE_PATH_NEW = NEW;
+const CLAUDE_PATH_CONVERSATION = `${CHAT}/{conversationId}`;
+const CLAUDE_PATH_API_CONVERSATIONS = `${CLAUDE_API_PREFIX}/{orgId}${CHAT_CONVERSATIONS}`;
+const CLAUDE_PATH_API_CONVERSATION = `${CLAUDE_API_PREFIX}/{orgId}${CHAT_CONVERSATIONS}/{conversationId}`;
+const CLAUDE_PATH_API_COMPLETION = `${CLAUDE_API_PREFIX}/{orgId}${CHAT_CONVERSATIONS}/{conversationId}${COMPLETION}`;
+
+// ============================================
+// RELAY & INTERNAL CONSTANTS
+// ============================================
+
+// Relay base values
+const RELAY_HOST_DEFAULT = '127.0.0.1';
+const WEBSOCKET_PORT_DEFAULT = 54321;
+const HEALTH_PORT_DEFAULT = 54322;
+
+// Protocols
+const WS_PROTOCOL = 'ws://';
+const HTTP_PROTOCOL = 'http://';
+
+// Relay paths
+const HEALTH_PATH = '/health';
+const TAKEOVER_PATH = '/takeover';
+
+// ============================================
+// TIMEOUT CONSTANTS (milliseconds)
+// ============================================
+
+const TIMEOUT_OPERATION = 180000;        // 3 minutes
+const TIMEOUT_COMPLETION = 600000;       // 10 minutes
+const TIMEOUT_DEFAULT = 30000;           // 30 seconds
+const TIMEOUT_KEEPALIVE = 20000;         // 20 seconds
+const TIMEOUT_RECONNECT = 2000;          // 2 seconds
+const TIMEOUT_MAX_RECONNECT = 30000;     // 30 seconds
+const TIMEOUT_HEALTH_CHECK = 1000;       // 1 second
+const TIMEOUT_RELAY_REQUEST = 10000;     // 10 seconds
+const TIMEOUT_RELAY_CONNECTION = 10000;  // 10 seconds
+const TIMEOUT_GRACE_PERIOD = 2000;       // 2 seconds
+const TIMEOUT_STALE_THRESHOLD = 300000;  // 5 minutes
+const TIMEOUT_CLEANUP_AGE = 3600000;     // 1 hour
+
+// ============================================
+// OPERATIONAL CONSTANTS
+// ============================================
+
+const OP_MAX_RETRIES = 3;
+const OP_RETRY_DELAY = 1000;
+const OP_BATCH_SIZE = 50;
+const OP_API_BATCH_SIZE = 5;
+const OP_MAX_CONCURRENT = 5;
+const OP_POLL_INTERVAL = 1000;
+const OP_SEQUENTIAL_DELAY = 1000;
+const OP_MAX_ELEMENTS = 1000;
+const OP_LOG_BATCH_INTERVAL = 2000;
+
+// ============================================
+// ENVIRONMENT & VERSION SETUP
+// ============================================
+
 // Try to load dotenv if available (optional dependency)
 try {
   require('dotenv').config({ path: path.join(__dirname, '../../.env') });
@@ -50,63 +127,170 @@ function getVersion() {
   }
 }
 
-// Central configuration with environment overrides
+// ============================================
+// RESOLVED CONFIGURATION VALUES
+// All environment overrides resolved here
+// ============================================
+
+const VERSION = getVersion();
+const COMPONENT_NAME = 'mcp-server';
+
+// Network settings (resolved from env)
+const WEBSOCKET_PORT = parseInt(process.env.MCP_WEBSOCKET_PORT || WEBSOCKET_PORT_DEFAULT, 10);
+const HEALTH_PORT = parseInt(process.env.MCP_HEALTH_PORT || HEALTH_PORT_DEFAULT, 10);
+const RELAY_HOST = process.env.MCP_RELAY_HOST || RELAY_HOST_DEFAULT;
+const CLAUDE_URL = process.env.MCP_CLAUDE_URL || CLAUDE_BASE_URL;
+const CLAUDE_DOMAIN = new URL(CLAUDE_URL).hostname;
+
+// Timeouts (resolved from env)
+const OPERATION_TIMEOUT = parseInt(process.env.MCP_OPERATION_TIMEOUT || TIMEOUT_OPERATION, 10);
+const COMPLETION_TIMEOUT = parseInt(process.env.MCP_COMPLETION_TIMEOUT || TIMEOUT_COMPLETION, 10);
+const KEEPALIVE_INTERVAL = parseInt(process.env.MCP_KEEPALIVE_INTERVAL || TIMEOUT_KEEPALIVE, 10);
+const RECONNECT_INTERVAL = parseInt(process.env.MCP_RECONNECT_INTERVAL || TIMEOUT_RECONNECT, 10);
+const DEFAULT_TIMEOUT = parseInt(process.env.MCP_DEFAULT_TIMEOUT || TIMEOUT_DEFAULT, 10);
+const MAX_RECONNECT_DELAY = parseInt(process.env.MCP_MAX_RECONNECT_DELAY || TIMEOUT_MAX_RECONNECT, 10);
+const HEALTH_CHECK_TIMEOUT = parseInt(process.env.MCP_HEALTH_CHECK_TIMEOUT || TIMEOUT_HEALTH_CHECK, 10);
+const RELAY_REQUEST_TIMEOUT = parseInt(process.env.MCP_RELAY_REQUEST_TIMEOUT || TIMEOUT_RELAY_REQUEST, 10);
+const RELAY_CONNECTION_TIMEOUT = parseInt(process.env.MCP_RELAY_CONNECTION_TIMEOUT || TIMEOUT_RELAY_CONNECTION, 10);
+const GRACE_PERIOD_MS = parseInt(process.env.MCP_GRACE_PERIOD || TIMEOUT_GRACE_PERIOD, 10);
+const STALE_THRESHOLD_MS = parseInt(process.env.MCP_STALE_THRESHOLD || TIMEOUT_STALE_THRESHOLD, 10);
+const OPERATION_CLEANUP_AGE = parseInt(process.env.MCP_OPERATION_CLEANUP_AGE || TIMEOUT_CLEANUP_AGE, 10);
+
+// Operations (resolved from env)
+const MAX_RETRIES = parseInt(process.env.MCP_MAX_RETRIES || OP_MAX_RETRIES, 10);
+const RETRY_DELAY_MS = parseInt(process.env.MCP_RETRY_DELAY_MS || OP_RETRY_DELAY, 10);
+const BATCH_SIZE = parseInt(process.env.MCP_BATCH_SIZE || OP_BATCH_SIZE, 10);
+const MAX_CONCURRENT = parseInt(process.env.MCP_MAX_CONCURRENT || OP_MAX_CONCURRENT, 10);
+const POLL_INTERVAL_MS = parseInt(process.env.MCP_POLL_INTERVAL || OP_POLL_INTERVAL, 10);
+const SEQUENTIAL_DELAY_MS = parseInt(process.env.MCP_SEQUENTIAL_DELAY || OP_SEQUENTIAL_DELAY, 10);
+const API_BATCH_SIZE = parseInt(process.env.MCP_API_BATCH_SIZE || OP_API_BATCH_SIZE, 10);
+const MAX_ELEMENTS_DEFAULT = parseInt(process.env.MCP_MAX_ELEMENTS_DEFAULT || OP_MAX_ELEMENTS, 10);
+const LOG_BATCH_INTERVAL_MS = parseInt(process.env.MCP_LOG_BATCH_INTERVAL || OP_LOG_BATCH_INTERVAL, 10);
+
+// Other settings
+const CLIENT_NAME_OVERRIDE = process.env.CCM_CLIENT_NAME || null;
+const VERBOSE_MODE = process.env.CCM_VERBOSE === '1';
+const LOG_DIR = process.env.MCP_LOG_DIR || path.join(os.homedir(), '.claude-chrome-mcp', 'logs');
+const DEBUG_MODE = process.env.MCP_DEBUG_MODE === 'true';
+const LOG_LEVEL = process.env.MCP_LOG_LEVEL || 'info';
+const ENABLE_HEALTH_CHECK = process.env.MCP_ENABLE_HEALTH_CHECK !== 'false';
+
+// ============================================
+// URL BUILDER HELPER
+// ============================================
+
+// Helper to replace path parameters
+function buildPath(pathTemplate, params = {}) {
+  let path = pathTemplate;
+  for (const [key, value] of Object.entries(params)) {
+    path = path.replace(`{${key}}`, value);
+  }
+  return path;
+}
+
+// ============================================
+// CLAUDE URL BUILDERS - Using resolved constants
+// ============================================
+
+const CLAUDE_URLS = {
+  // SAFE/STABLE URLs - User-facing, unlikely to change
+  base() { return CLAUDE_URL; },
+  newConversation() { return `${CLAUDE_URL}${CLAUDE_PATH_NEW}`; },
+  conversation(conversationId) { 
+    return `${CLAUDE_URL}${buildPath(CLAUDE_PATH_CONVERSATION, { conversationId })}`;
+  },
+  
+  // RISKY/INTERNAL URLs - API endpoints, may change without notice
+  // These are internal Claude.ai API patterns observed through network monitoring
+  // CAUTION: These may break if Claude.ai changes their internal API structure
+  apiConversations(orgId, queryParams = {}) { 
+    const path = buildPath(CLAUDE_PATH_API_CONVERSATIONS, { orgId });
+    const url = `${CLAUDE_URL}${path}`;
+    const query = new URLSearchParams(queryParams).toString();
+    return query ? `${url}?${query}` : url;
+  },
+  apiConversation(orgId, conversationId) { 
+    return `${CLAUDE_URL}${buildPath(CLAUDE_PATH_API_CONVERSATION, { orgId, conversationId })}`;
+  },
+  apiCompletion(orgId, conversationId) { 
+    return `${CLAUDE_URL}${buildPath(CLAUDE_PATH_API_COMPLETION, { orgId, conversationId })}`;
+  }
+};
+
+// ============================================
+// RELAY URL BUILDERS - Using resolved constants
+// ============================================
+
+const RELAY_URLS = {
+  websocket(port = WEBSOCKET_PORT) { 
+    return `${WS_PROTOCOL}${RELAY_HOST}:${port}`; 
+  },
+  health() { 
+    return `${HTTP_PROTOCOL}${RELAY_HOST}:${HEALTH_PORT}${HEALTH_PATH}`; 
+  },
+  takeover() { 
+    return `${HTTP_PROTOCOL}${RELAY_HOST}:${HEALTH_PORT}${TAKEOVER_PATH}`; 
+  },
+  // Path constants for route matching in server
+  paths: {
+    HEALTH: HEALTH_PATH,
+    TAKEOVER: TAKEOVER_PATH
+  }
+};
+
+// ============================================
+// MAIN CONFIGURATION OBJECT
+// Now just assembles all the resolved values
+// ============================================
+
 const config = {
   // Component version
-  VERSION: getVersion(),
-  COMPONENT_NAME: 'mcp-server',
+  VERSION,
+  COMPONENT_NAME,
   
   // Network settings
-  WEBSOCKET_PORT: parseInt(process.env.MCP_WEBSOCKET_PORT || '54321', 10),
-  HEALTH_PORT: parseInt(process.env.MCP_HEALTH_PORT || '54322', 10),
-  RELAY_HOST: process.env.MCP_RELAY_HOST || '127.0.0.1',
-  CLAUDE_URL: process.env.MCP_CLAUDE_URL || 'https://claude.ai',
-  CLAUDE_DOMAIN: process.env.MCP_CLAUDE_DOMAIN || 'claude.ai',
+  WEBSOCKET_PORT,
+  HEALTH_PORT,
+  RELAY_HOST,
+  CLAUDE_URL,
+  CLAUDE_DOMAIN,
   
-  // Timeouts (in milliseconds)
-  OPERATION_TIMEOUT: parseInt(process.env.MCP_OPERATION_TIMEOUT || '180000', 10), // 3 minutes
-  COMPLETION_TIMEOUT: parseInt(process.env.MCP_COMPLETION_TIMEOUT || '600000', 10), // 10 minutes
-  KEEPALIVE_INTERVAL: parseInt(process.env.MCP_KEEPALIVE_INTERVAL || '20000', 10), // 20 seconds
-  RECONNECT_INTERVAL: parseInt(process.env.MCP_RECONNECT_INTERVAL || '2000', 10), // 2 seconds
-  DEFAULT_TIMEOUT: parseInt(process.env.MCP_DEFAULT_TIMEOUT || '30000', 10), // 30 seconds
+  // Timeouts
+  OPERATION_TIMEOUT,
+  COMPLETION_TIMEOUT,
+  KEEPALIVE_INTERVAL,
+  RECONNECT_INTERVAL,
+  DEFAULT_TIMEOUT,
+  MAX_RECONNECT_DELAY,
+  HEALTH_CHECK_TIMEOUT,
+  RELAY_REQUEST_TIMEOUT,
+  RELAY_CONNECTION_TIMEOUT,
+  GRACE_PERIOD_MS,
+  STALE_THRESHOLD_MS,
+  OPERATION_CLEANUP_AGE,
   
   // Operational limits
-  MAX_RETRIES: parseInt(process.env.MCP_MAX_RETRIES || '3', 10),
-  RETRY_DELAY_MS: parseInt(process.env.MCP_RETRY_DELAY_MS || '1000', 10),
-  BATCH_SIZE: parseInt(process.env.MCP_BATCH_SIZE || '50', 10),
-  MAX_CONCURRENT: parseInt(process.env.MCP_MAX_CONCURRENT || '5', 10),
-  OPERATION_CLEANUP_AGE: parseInt(process.env.MCP_OPERATION_CLEANUP_AGE || '3600000', 10), // 1 hour
+  MAX_RETRIES,
+  RETRY_DELAY_MS,
+  BATCH_SIZE,
+  MAX_CONCURRENT,
+  POLL_INTERVAL_MS,
+  SEQUENTIAL_DELAY_MS,
+  API_BATCH_SIZE,
+  MAX_ELEMENTS_DEFAULT,
+  LOG_BATCH_INTERVAL_MS,
   
-  // Max reconnect delay for relay client
-  MAX_RECONNECT_DELAY: parseInt(process.env.MCP_MAX_RECONNECT_DELAY || '30000', 10),
+  // Other settings
+  CLIENT_NAME_OVERRIDE,
+  VERBOSE_MODE,
+  LOG_DIR,
+  DEBUG_MODE,
+  LOG_LEVEL,
+  ENABLE_HEALTH_CHECK,
   
-  // Tool operation defaults
-  POLL_INTERVAL_MS: parseInt(process.env.MCP_POLL_INTERVAL || '1000', 10),
-  SEQUENTIAL_DELAY_MS: parseInt(process.env.MCP_SEQUENTIAL_DELAY || '1000', 10),
-  API_BATCH_SIZE: parseInt(process.env.MCP_API_BATCH_SIZE || '5', 10),
-  GRACE_PERIOD_MS: parseInt(process.env.MCP_GRACE_PERIOD || '2000', 10),
-  STALE_THRESHOLD_MS: parseInt(process.env.MCP_STALE_THRESHOLD || '300000', 10), // 5 minutes
-  MAX_ELEMENTS_DEFAULT: parseInt(process.env.MCP_MAX_ELEMENTS_DEFAULT || '1000', 10),
-  LOG_BATCH_INTERVAL_MS: parseInt(process.env.MCP_LOG_BATCH_INTERVAL || '2000', 10),
-  
-  // Request timeouts
-  HEALTH_CHECK_TIMEOUT: parseInt(process.env.MCP_HEALTH_CHECK_TIMEOUT || '1000', 10),
-  RELAY_REQUEST_TIMEOUT: parseInt(process.env.MCP_RELAY_REQUEST_TIMEOUT || '10000', 10),
-  RELAY_CONNECTION_TIMEOUT: parseInt(process.env.MCP_RELAY_CONNECTION_TIMEOUT || '10000', 10),
-  
-  // Environment variable consolidation
-  CLIENT_NAME_OVERRIDE: process.env.CCM_CLIENT_NAME || null,
-  VERBOSE_MODE: process.env.CCM_VERBOSE === '1',
-  
-  // File system paths
-  LOG_DIR: process.env.MCP_LOG_DIR || path.join(os.homedir(), '.claude-chrome-mcp', 'logs'),
-  
-  // Debug settings
-  DEBUG_MODE: process.env.MCP_DEBUG_MODE === 'true',
-  LOG_LEVEL: process.env.MCP_LOG_LEVEL || 'info',
-  
-  // Feature flags
-  ENABLE_HEALTH_CHECK: process.env.MCP_ENABLE_HEALTH_CHECK !== 'false', // Default true
+  // URL builders
+  CLAUDE_URLS,
+  RELAY_URLS,
   
   // Version checking utilities
   parseVersion(version) {
@@ -128,37 +312,33 @@ const config = {
     
     if (!otherVersion) return false;
     
-    const current = this.parseVersion(this.VERSION);
+    const current = this.parseVersion(VERSION);
     const other = this.parseVersion(otherVersion);
     
     if (requireExact) {
-      return this.VERSION === otherVersion;
+      return VERSION === otherVersion;
     }
     
     if (requireMinor) {
-      // Require same major and minor version
       return current.major === other.major && current.minor === other.minor;
     }
     
-    // Default: just check major version compatibility
     return current.major === other.major;
   },
   
-  // Version mismatch message helper
   getVersionMismatchMessage(componentName, theirVersion) {
-    const current = this.parseVersion(this.VERSION);
+    const current = this.parseVersion(VERSION);
     const other = this.parseVersion(theirVersion);
     
     if (current.major !== other.major) {
-      return `Major version mismatch with ${componentName}: ${this.VERSION} vs ${theirVersion}. Please update all components.`;
+      return `Major version mismatch with ${componentName}: ${VERSION} vs ${theirVersion}. Please update all components.`;
     } else if (current.minor !== other.minor) {
-      return `Minor version difference with ${componentName}: ${this.VERSION} vs ${theirVersion}. Consider updating for best compatibility.`;
+      return `Minor version difference with ${componentName}: ${VERSION} vs ${theirVersion}. Consider updating for best compatibility.`;
     } else {
-      return `Patch version difference with ${componentName}: ${this.VERSION} vs ${theirVersion}. Should be compatible.`;
+      return `Patch version difference with ${componentName}: ${VERSION} vs ${theirVersion}. Should be compatible.`;
     }
   },
   
-  // Helper to get all config as object (useful for debugging)
   toObject() {
     const obj = {};
     for (const [key, value] of Object.entries(this)) {
@@ -170,36 +350,14 @@ const config = {
   }
 };
 
-// Add URL Templates after config is defined (to avoid circular reference)
-config.CLAUDE_URLS = {
-  // SAFE/STABLE URLs - User-facing, unlikely to change
-  base() { return config.CLAUDE_URL; },
-  newConversation() { return `${config.CLAUDE_URL}/new`; },
-  conversation(conversationId) { return `${config.CLAUDE_URL}/chat/${conversationId}`; },
-  
-  // RISKY/INTERNAL URLs - API endpoints, may change without notice
-  // These are internal Claude.ai API patterns observed through network monitoring
-  // CAUTION: These may break if Claude.ai changes their internal API structure
-  apiConversations(orgId) { return `${config.CLAUDE_URL}/api/organizations/${orgId}/chat_conversations`; },
-  apiConversation(orgId, conversationId) { return `${config.CLAUDE_URL}/api/organizations/${orgId}/chat_conversations/${conversationId}`; },
-  apiCompletion(orgId, conversationId) { return `${config.CLAUDE_URL}/api/organizations/${orgId}/chat_conversations/${conversationId}/completion`; }
-};
-
-// Add Relay URL Templates
-config.RELAY_URLS = {
-  websocket() { return `ws://${config.RELAY_HOST}:${config.WEBSOCKET_PORT}`; },
-  health() { return `http://${config.RELAY_HOST}:${config.HEALTH_PORT}/health`; },
-  takeover() { return `http://${config.RELAY_HOST}:${config.HEALTH_PORT}/takeover`; }
-};
-
 // Log config on startup if debug mode
-if (config.DEBUG_MODE) {
+if (DEBUG_MODE) {
   console.log('MCP Server Config loaded:', {
-    version: config.VERSION,
-    websocketPort: config.WEBSOCKET_PORT,
+    version: VERSION,
+    websocketPort: WEBSOCKET_PORT,
     environment: process.env.NODE_ENV || 'production'
   });
 }
 
-// Freeze config to prevent accidental mutations (including the added CLAUDE_URLS)
+// Freeze config to prevent accidental mutations
 module.exports = Object.freeze(config);

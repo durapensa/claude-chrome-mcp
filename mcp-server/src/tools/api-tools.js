@@ -3,7 +3,6 @@
 
 const { z } = require('zod');
 const { createForwardingTool, createCustomTool, extractToolsAndHandlers } = require('../utils/tool-factory');
-const { requireValidConversationId } = require('../utils/claude-url-validation');
 const config = require('../config');
 
 /**
@@ -35,9 +34,6 @@ const customToolResults = [
   }, async (server, args) => {
     // Pure URL generation without tab creation
     const { conversationId } = args;
-    
-    // Validate using centralized validation
-    requireValidConversationId(conversationId);
 
     // Return the conversation URL using centralized template
     return {

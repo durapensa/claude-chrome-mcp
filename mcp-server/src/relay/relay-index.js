@@ -63,7 +63,7 @@ class AutoElectionRelay extends EventEmitter {
   }
   
   async checkExistingRelay() {
-    const healthUrl = `http://${config.RELAY_HOST}:${config.HEALTH_PORT}/health`;
+    const healthUrl = config.RELAY_URLS.health();
     
     try {
       const response = await fetch(healthUrl, {
