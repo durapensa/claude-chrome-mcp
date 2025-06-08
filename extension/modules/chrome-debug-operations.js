@@ -1,7 +1,7 @@
 // Debug Operations for Chrome Extension
 // Methods for debugging, DOM inspection, and script execution
 
-export const debugOperationMethods = {
+export const chromeDebugOperations = {
   async getDomElements(params) {
     const { tabId, selector } = params;
     const script = `

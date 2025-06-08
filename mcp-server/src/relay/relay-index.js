@@ -4,8 +4,8 @@
  */
 
 const EventEmitter = require('events');
-const { WebSocketRelayServer } = require('./websocket-server');
-const { WebSocketRelayClient } = require('./websocket-client');
+const { WebSocketRelayServer } = require('./websocket-relay-server');
+const { WebSocketRelayClient } = require('./websocket-relay-client');
 const { createLogger } = require('../utils/logger');
 const config = require('../config');
 

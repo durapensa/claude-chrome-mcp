@@ -4,13 +4,13 @@ const { EventEmitter } = require('events');
 const { createLogger } = require('./logger');
 
 // Manages async operations with state persistence for MCP operations
-class OperationManager extends EventEmitter {
+class MCPOperationManager extends EventEmitter {
   constructor() {
     super();
     this.operations = new Map();
     this.stateFile = path.join(__dirname, '../../.operations-state.json');
     this.pendingCompletions = new Map(); // Track completion promises
-    this.logger = createLogger('OperationManager');
+    this.logger = createLogger('MCPOperationManager');
     this.loadState();
   }
 
@@ -185,4 +185,4 @@ class OperationManager extends EventEmitter {
   }
 }
 
-module.exports = { OperationManager };
+module.exports = { MCPOperationManager };

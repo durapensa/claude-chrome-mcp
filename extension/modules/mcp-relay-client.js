@@ -1,6 +1,6 @@
 // MCP Client representation for connected clients
 
-export class MCPClient {
+export class MCPRelayClient {
   constructor(ws, clientInfo) {
     this.id = clientInfo.id || `client-${Date.now()}`;
     this.name = clientInfo.name || 'Unknown Client';

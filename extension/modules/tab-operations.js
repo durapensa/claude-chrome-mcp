@@ -10,8 +10,8 @@ import {
 } from '../utils/error-handler.js';
 
 // Tab operation methods to be mixed into ExtensionRelayClient
-export const tabOperationMethods = {
-  async spawnClaudeTab(params = {}) {
+export const tabOperations = {
+  async createTab(params = {}) {
     console.log('CCM Extension: Spawning new Claude.ai tab', params);
     
     // Extract core logic for error handling
@@ -291,8 +291,8 @@ export const tabOperationMethods = {
     return await wrappedExtract();
   },
 
-  async sendMessageToClaudeTab(params) {
-    console.log(`CCM Extension: sendMessageToClaudeTab received params:`, params);
+  async sendTabMessage(params) {
+    console.log(`CCM Extension: sendTabMessage received params:`, params);
     const { tabId, message, waitForReady = true, operationId: serverOperationId } = params;
     console.log(`CCM Extension: extracted serverOperationId:`, serverOperationId);
     

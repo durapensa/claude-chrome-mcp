@@ -1,6 +1,6 @@
 // Message Queue for reliable message delivery
 
-export class MessageQueue {
+export class MessageRelayQueue {
   constructor() {
     this.queue = [];
     this.processing = false;

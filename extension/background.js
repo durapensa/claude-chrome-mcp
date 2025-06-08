@@ -2,8 +2,8 @@
 // Safe initialization but more aggressive connection attempts
 
 import { MESSAGE_TYPES, VERSION } from './modules/config.js';
-import { ExtensionRelayClient } from './modules/relay-client.js';
-import { ContentScriptManager } from './modules/content-script-manager.js';
+import { ExtensionRelayClient } from './modules/extension-relay-client.js';
+import { ExtensionScriptManager } from './modules/extension-script-manager.js';
 import { createLogger } from './utils/logger.js';
 
 const logger = createLogger('background');
@@ -11,7 +11,7 @@ logger.info('Balanced background script starting');
 
 // Global variables
 let relayClient = null;
-let contentScriptManager = null;
+let extensionScriptManager = null;
 let initializationComplete = false;
 let offscreenCreated = false;
 
@@ -161,7 +161,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         ...currentState,
         operationLocks: relayClient ? relayClient.operationLock.getAllLocks() : [],
         messageQueueSize: relayClient ? relayClient.messageQueue.size() : 0,
-        contentScriptTabs: contentScriptManager ? Array.from(contentScriptManager.injectedTabs) : [],
+        contentScriptTabs: extensionScriptManager ? Array.from(extensionScriptManager.injectedTabs) : [],
         initialized: initializationComplete
       }
     });
@@ -180,7 +180,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 function handleMessage(request, sender, sendResponse) {
   // Health checks are now handled at the top level
   
-  if (!relayClient || !contentScriptManager) {
+  if (!relayClient || !extensionScriptManager) {
     sendResponse({ success: false, error: 'Extension not fully initialized' });
     return false;
   }
@@ -196,7 +196,7 @@ function handleMessage(request, sender, sendResponse) {
   
   // Handle content script injection
   if (request.type === MESSAGE_TYPES.MANUAL_INJECT && request.tabId) {
-    contentScriptManager.injectContentScript(request.tabId)
+    extensionScriptManager.injectContentScript(request.tabId)
       .then(result => sendResponse(result))
       .catch(error => sendResponse({ success: false, error: error.message }));
     return true;
@@ -236,20 +236,20 @@ setTimeout(async () => {
     // Create ExtensionRelayClient first (no DOM dependencies)
     relayClient = new ExtensionRelayClient();
     
-    // Create ContentScriptManager
-    contentScriptManager = new ContentScriptManager();
-    logger.info('ContentScriptManager created');
+    // Create ExtensionScriptManager
+    extensionScriptManager = new ExtensionScriptManager();
+    logger.info('ExtensionScriptManager created');
     
     // Create offscreen document for WebSocket connection
     await ensureOffscreenDocument();
     
     // Set the content script manager reference
-    relayClient.contentScriptManager = contentScriptManager;
+    relayClient.extensionScriptManager = extensionScriptManager;
     await relayClient.init();
     
     // Make globally accessible
     globalThis.ccmRelayClient = relayClient;
-    globalThis.contentScriptManager = contentScriptManager;
+    globalThis.extensionScriptManager = extensionScriptManager;
     
     initializationComplete = true;
     logger.info('Initialization complete');
@@ -287,8 +287,8 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
   } else {
     // Fallback to old method if centralized cleanup not available
     logger.warn(`Relaying to fallback cleanup for tab ${tabId}`);
-    if (contentScriptManager) {
-      contentScriptManager.removeTab(tabId);
+    if (extensionScriptManager) {
+      extensionScriptManager.removeTab(tabId);
     }
     if (relayClient && relayClient.operationLock) {
       relayClient.operationLock.releaseLock(tabId);
@@ -327,7 +327,7 @@ chrome.debugger.onEvent.addListener((source, method, params) => {
 // Handle tab navigation/reload - content scripts are lost during navigation
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   // Only clear content script tracking for actual navigation (not initial loads during tab creation)
-  if (changeInfo.url && contentScriptManager) {
+  if (changeInfo.url && extensionScriptManager) {
     // Check if this is a significant URL change (not just claude.ai -> claude.ai/new during creation)
     const isSignificantNavigation = !changeInfo.url.includes('claude.ai') || 
                                    (tab.url && !tab.url.includes('claude.ai'));
@@ -338,7 +338,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
         oldUrl: changeInfo.url, 
         newUrl: tab.url 
       });
-      contentScriptManager.removeTab(tabId);
+      extensionScriptManager.removeTab(tabId);
     }
   }
 });
@@ -346,14 +346,14 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 // Handle web navigation events for page reloads and navigations
 chrome.webNavigation.onCommitted.addListener((details) => {
   // Clear content script tracking for navigation that could lose content scripts
-  if (details.frameId === 0 && contentScriptManager && 
-      contentScriptManager.shouldClearOnNavigation(details.tabId)) {
+  if (details.frameId === 0 && extensionScriptManager && 
+      extensionScriptManager.shouldClearOnNavigation(details.tabId)) {
     logger.debug('Navigation event detected, clearing content script tracking', { 
       tabId: details.tabId, 
       url: details.url,
       transitionType: details.transitionType
     });
-    contentScriptManager.removeTab(details.tabId);
+    extensionScriptManager.removeTab(details.tabId);
   }
 }, { url: [{ hostContains: 'claude.ai' }] });
 

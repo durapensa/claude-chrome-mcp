@@ -42,9 +42,9 @@ const os = require('os');
 // Import modular components
 const { ErrorTracker } = require('./utils/error-tracker');
 const { createLogger } = require('./utils/logger');
-const { OperationManager } = require('./utils/operation-manager');
+const { MCPOperationManager } = require('./utils/mcp-operation-manager');
 const { ResourceStateManager } = require('./utils/resource-state-manager');
-const { NotificationManager } = require('./utils/notification-manager');
+const { MCPNotificationManager } = require('./utils/mcp-notification-manager');
 const { MCPRelayClient } = require('./relay/mcp-relay-client');
 const { formatMCPResponse } = require('./utils/response-formatter');
 
@@ -71,9 +71,9 @@ class ChromeMCPServer {
     // Initialize utility modules
     this.errorTracker = new ErrorTracker();
     this.debug = createLogger('ChromeMCPServer');
-    this.operationManager = new OperationManager();
+    this.operationManager = new MCPOperationManager();
     this.resourceStateManager = new ResourceStateManager();
-    this.notificationManager = new NotificationManager(this.server, this.errorTracker);
+    this.notificationManager = new MCPNotificationManager(this.server, this.errorTracker);
     
     // Initialize relay client  
     this.relayClient = null;

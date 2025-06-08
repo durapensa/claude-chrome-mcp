@@ -1,11 +1,11 @@
 // Handles MCP notification sending for operation progress and completion
 const { createLogger } = require('./logger');
 
-class NotificationManager {
+class MCPNotificationManager {
   constructor(server, errorTracker = null) {
     this.server = server;
     this.errorTracker = errorTracker;
-    this.logger = createLogger('NotificationManager');
+    this.logger = createLogger('MCPNotificationManager');
   }
 
   async sendProgress(operationId, milestone, data = {}) {
@@ -146,4 +146,4 @@ class NotificationManager {
   }
 }
 
-module.exports = { NotificationManager };
+module.exports = { MCPNotificationManager };

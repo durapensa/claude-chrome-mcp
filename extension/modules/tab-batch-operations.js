@@ -6,7 +6,7 @@ import {
   validateParams 
 } from '../utils/error-handler.js';
 
-export const batchOperationMethods = {
+export const tabBatchOperations = {
   async batchSendMessages(params) {
     // Validate parameters with custom array validator
     const validationError = validateParams(
@@ -44,7 +44,7 @@ export const batchOperationMethods = {
         for (const msg of messages) {
           const wrappedSendMessage = withErrorHandling(
             async () => {
-              const sendResult = await this.sendMessageToClaudeTab({
+              const sendResult = await this.sendTabMessage({
                 tabId: msg.tabId,
                 message: msg.message
               });
@@ -83,7 +83,7 @@ export const batchOperationMethods = {
         const promises = messages.map(async (msg) => {
           const wrappedSendMessage = withErrorHandling(
             async () => {
-              const sendResult = await this.sendMessageToClaudeTab({
+              const sendResult = await this.sendTabMessage({
                 tabId: msg.tabId,
                 message: msg.message
               });

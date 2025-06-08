@@ -3,7 +3,7 @@
 import { CLAUDE_AI_URL } from './config.js';
 import { withErrorHandling } from '../utils/error-handler.js';
 
-export class ContentScriptManager {
+export class ExtensionScriptManager {
   constructor() {
     this.injectedTabs = new Set();
     this.injectionTimestamps = new Map(); // Track when injection happened

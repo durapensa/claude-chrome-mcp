@@ -9,14 +9,14 @@ import {
   OPERATION_TYPES,
   CLAUDE_AI_URL
 } from './config.js';
-import { MessageQueue } from './message-queue.js';
+import { MessageRelayQueue } from './message-relay-queue.js';
 import { TabOperationLock } from './tab-operation-lock.js';
-import { MCPClient } from './mcp-client.js';
-import { tabOperationMethods } from './tab-operations.js';
+import { MCPRelayClient } from './mcp-relay-client.js';
+import { tabOperations } from './tab-operations.js';
 import { createLogger, extensionLogger } from '../utils/logger.js';
-import { conversationOperationMethods } from './conversation-operations.js';
-import { batchOperationMethods } from './batch-operations.js';
-import { debugOperationMethods } from './debug-operations.js';
+import { conversationOperations } from './conversation-operations.js';
+import { tabBatchOperations } from './tab-batch-operations.js';
+import { chromeDebugOperations } from './chrome-debug-operations.js';
 import { updateBadge } from '../utils/utils.js';
 
 export class ExtensionRelayClient {
@@ -25,10 +25,10 @@ export class ExtensionRelayClient {
     this.connectedClients = new Map();
     this.debuggerSessions = new Map();
     this.requestCounter = 0;
-    this.messageQueue = new MessageQueue();
+    this.messageQueue = new MessageRelayQueue();
     this.operationLock = new TabOperationLock();
-    // ContentScriptManager will be passed in from background script
-    this.contentScriptManager = null;
+    // ExtensionScriptManager will be passed in from background script
+    this.extensionScriptManager = null;
     
     // WebSocket relay configuration
     this.relayConnected = false;
@@ -136,7 +136,7 @@ export class ExtensionRelayClient {
 
         // Tab tools
         case 'tab_create':
-          result = await this.spawnClaudeTab(command.params || {});
+          result = await this.createTab(command.params || {});
           break;
         case 'tab_list':
           result = await this.getClaudeTabs(command.params || {});
@@ -147,7 +147,7 @@ export class ExtensionRelayClient {
         case 'tab_send_message':
           // Route based on waitForCompletion parameter
           if (command.params && command.params.waitForCompletion) {
-            result = await this.sendMessageToClaudeTab(command.params);
+            result = await this.sendTabMessage(command.params);
           } else {
             result = await this.sendMessageAsync(command.params || {});
           }
@@ -176,7 +176,7 @@ export class ExtensionRelayClient {
 
         // API tools
         case 'api_list_conversations':
-          result = await this.getClaudeConversations(command.params || {});
+          result = await this.listConversations(command.params || {});
           break;
         case 'api_search_conversations':
           result = await this.searchClaudeConversations(command.params || {});
@@ -273,7 +273,7 @@ export class ExtensionRelayClient {
         })),
         operationLocks: this.operationLock.getAllLocks(),
         messageQueueSize: this.messageQueue.size(),
-        contentScriptTabs: this.contentScriptManager ? Array.from(this.contentScriptManager.injectedTabs) : [],
+        contentScriptTabs: this.extensionScriptManager ? Array.from(this.extensionScriptManager.injectedTabs) : [],
         extensionStartup: {
           timestamp: this.startupTimestamp,
           uptime: Date.now() - this.startupTimestamp,
@@ -296,7 +296,7 @@ export class ExtensionRelayClient {
     
     try {
       // Use the synchronous send but don't wait for response
-      const result = await this.sendMessageToClaudeTab({
+      const result = await this.sendTabMessage({
         tabId,
         message,
         waitForReady: true,
@@ -402,14 +402,14 @@ export class ExtensionRelayClient {
     }
 
     // Check if target tab has content script injected
-    const hasContentScript = this.contentScriptManager ? 
-      this.contentScriptManager.injectedTabs.has(targetTabId) : false;
+    const hasContentScript = this.extensionScriptManager ? 
+      this.extensionScriptManager.injectedTabs.has(targetTabId) : false;
 
-    if (!hasContentScript && this.contentScriptManager) {
+    if (!hasContentScript && this.extensionScriptManager) {
       console.log(`CCM Extension: Content script not detected in target tab ${targetTabId}, attempting injection`);
       
       try {
-        const injectionResult = await this.contentScriptManager.injectContentScript(targetTabId);
+        const injectionResult = await this.extensionScriptManager.injectContentScript(targetTabId);
         if (!injectionResult.success) {
           return { 
             success: false, 
@@ -1319,10 +1319,10 @@ export class ExtensionRelayClient {
       }
 
       // Step 5: Remove content scripts
-      if (this.contentScriptManager) {
+      if (this.extensionScriptManager) {
         try {
-          const wasTracked = this.contentScriptManager.injectedTabs.has(tabId);
-          this.contentScriptManager.removeTab(tabId);
+          const wasTracked = this.extensionScriptManager.injectedTabs.has(tabId);
+          this.extensionScriptManager.removeTab(tabId);
           if (wasTracked) {
             cleanupSteps.push('content_scripts_removed');
           }
@@ -1374,7 +1374,7 @@ export class ExtensionRelayClient {
 }
 
 // Mix in all operation methods
-Object.assign(ExtensionRelayClient.prototype, tabOperationMethods);
-Object.assign(ExtensionRelayClient.prototype, conversationOperationMethods);
-Object.assign(ExtensionRelayClient.prototype, batchOperationMethods);
-Object.assign(ExtensionRelayClient.prototype, debugOperationMethods);
+Object.assign(ExtensionRelayClient.prototype, tabOperations);
+Object.assign(ExtensionRelayClient.prototype, conversationOperations);
+Object.assign(ExtensionRelayClient.prototype, tabBatchOperations);
+Object.assign(ExtensionRelayClient.prototype, chromeDebugOperations);

@@ -8,8 +8,8 @@ import {
   validateParams 
 } from '../utils/error-handler.js';
 
-export const conversationOperationMethods = {
-  async getClaudeConversations() {
+export const conversationOperations = {
+  async listConversations() {
     // Extract core logic for error handling
     const coreGetConversationsLogic = async () => {
       // Get current Claude tabs with conversation ID mapping
@@ -706,7 +706,7 @@ export const conversationOperationMethods = {
     // Extract core logic for error handling
     const coreSearchLogic = async () => {
       // First get all conversations
-      const allConversations = await this.getClaudeConversations();
+      const allConversations = await this.listConversations();
       
       if (!Array.isArray(allConversations)) {
         return { success: false, error: 'Failed to retrieve conversations' };
